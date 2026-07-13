@@ -22,7 +22,21 @@ const MAP: Record<string, Omit<UiError, 'code'>> = {
   'API-500': { message: 'Serverfehler — bitte erneut versuchen.', action: 'retry' },
 };
 
-export function toUiError(code: string | undefined, fallback = 'Unbekannter Fehler'): UiError {
+export function toUiError(
+  code: string | undefined,
+  fallback = 'Unbekannter Fehler',
+  reason?: string,
+): UiError {
+  // API-302 hat zwei Ursachen: Solvenz-Cap beim Wetten (Einsatz zu groß für
+  // den Pool) vs. Tages-Auszahlungslimit. Der `reason` aus den API-Details
+  // unterscheidet sie — ohne reason bleibt die generische Meldung.
+  if (code === 'API-302' && reason === 'bankroll_cap') {
+    return {
+      code,
+      message: 'Einsatz übersteigt gerade das Gewinn-Limit des Pools — versuch einen kleineren Einsatz.',
+      action: 'info',
+    };
+  }
   if (code && MAP[code]) return { code, ...MAP[code] };
   return { code: code ?? 'ERR', message: fallback, action: 'retry' };
 }

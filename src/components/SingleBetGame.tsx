@@ -57,7 +57,7 @@ export function SingleBetGame({
         }),
       }).then((x) => x.json());
       if (r.error) {
-        const ui = toUiError(r.error.code, r.error.message);
+        const ui = toUiError(r.error.code, r.error.message, r.error.reason);
         setError(`${ui.code}: ${ui.message}`);
         return;
       }

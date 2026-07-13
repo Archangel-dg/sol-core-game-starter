@@ -76,7 +76,7 @@ export function SessionGame({
         body: body ? JSON.stringify(body) : undefined,
       }).then((x) => x.json());
       if (r.error) {
-        const ui = toUiError(r.error.code, r.error.message);
+        const ui = toUiError(r.error.code, r.error.message, r.error.reason);
         setError(`${ui.code}: ${ui.message}`);
         return null;
       }

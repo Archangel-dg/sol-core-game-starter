@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     return NextResponse.json(view);
   } catch (err) {
     if (err instanceof SolcoreError) {
-      return NextResponse.json({ error: { code: err.code, message: err.message } }, { status: err.status });
+      return NextResponse.json({ error: { code: err.code, message: err.message, reason: err.reason } }, { status: err.status });
     }
     return NextResponse.json({ error: { code: 'API-500', message: (err as Error).message } }, { status: 500 });
   }

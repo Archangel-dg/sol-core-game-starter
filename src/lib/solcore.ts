@@ -10,10 +10,13 @@ interface ApiErrorBody {
 export class SolcoreError extends Error {
   code: string;
   status: number;
-  constructor(code: string, status: number, message?: string) {
+  /** Maschinenlesbarer Grund aus den API-Details (z. B. 'bankroll_cap'). */
+  reason?: string;
+  constructor(code: string, status: number, message?: string, reason?: string) {
     super(message ?? code);
     this.code = code;
     this.status = status;
+    this.reason = reason;
   }
 }
 
@@ -30,7 +33,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const body = (await res.json().catch(() => ({}))) as T & ApiErrorBody;
   if (!res.ok) {
-    throw new SolcoreError(body.error?.code ?? 'API-500', res.status, body.error?.message);
+    const details = body.error?.details as { reason?: unknown } | undefined;
+    const reason = typeof details?.reason === 'string' ? details.reason : undefined;
+    throw new SolcoreError(body.error?.code ?? 'API-500', res.status, body.error?.message, reason);
   }
   return body;
 }

@@ -25,7 +25,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${cfg.apiUrl}${path}`, {
     ...init,
     headers: {
-      'content-type': 'application/json',
+      // content-type nur bei tatsächlichem Body — sonst lehnen strikte Server
+      // (Fastify) einen leeren application/json-Body ab (z. B. bodyloser Cashout).
+      ...(init?.body != null ? { 'content-type': 'application/json' } : {}),
       'x-api-key': cfg.apiKey,
       ...(init?.headers ?? {}),
     },

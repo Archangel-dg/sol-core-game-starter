@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  /* Sol-Grün #14f195 / #39d98a — überschrieben von NEXT_PUBLIC_ACCENT_COLOR (layout.tsx). */
+  --accent-rgb: 20 241 149;
+  --accent-soft-rgb: 57 217 138;
+}
+
+body {
+  background: #0a0a0f;
+  color: #e8e8ee;
+}
+
+/* Wallet-Adapter-Button an das Theme angleichen (Design-Zone). */
+.wallet-adapter-button-trigger {
+  background-color: #9945ff !important;
+  border-radius: 9999px !important;
+  height: 40px !important;
+}

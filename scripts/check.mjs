@@ -56,12 +56,31 @@ let devMock = false;
   devMock = h.devMock === true;
 }
 
-// 2) Spiel im Katalog + aktiv
+// 2) Spiel im Katalog + aktiv + Engine passt zur Registrierung
 {
   const c = await j(await fetch(`${API}/api/public/catalog?limit=200`, { signal: AbortSignal.timeout(60000) }));
   const games = c.games ?? c ?? [];
   const found = Array.isArray(games) && games.find((g) => (g.gameId ?? g.id) === GAME);
   ok(!!found, found ? `Spiel im Katalog gefunden (${found.mode ?? ''})` : `Spiel NICHT im Katalog (pausiert/inaktiv?)`);
+  if (found && found.mode) {
+    ok(found.mode === ENGINE,
+      found.mode === ENGINE
+        ? `NEXT_PUBLIC_ENGINE (${ENGINE}) entspricht der Registrierung`
+        : `ENGINE-KONFLIKT: Spiel ist als '${found.mode}' registriert, .env sagt '${ENGINE}' — jede Runde wird fehlschlagen`);
+  }
+}
+
+// 2b) Aufgelöste Engine-Config (neuer Endpoint; ältere API-Stände: übersprungen)
+{
+  const r = await fetch(`${API}/api/game/config`, {
+    headers: { 'x-api-key': KEY }, signal: AbortSignal.timeout(60000),
+  });
+  if (r.ok) {
+    const b = await j(r);
+    ok(!!b.engineConfig, `Engine-Config abrufbar (${JSON.stringify(b.engineConfig)})`);
+  } else {
+    console.log('• Engine-Config übersprungen (API-Stand ohne /api/game/config).');
+  }
 }
 
 // 3) Test-Aktion

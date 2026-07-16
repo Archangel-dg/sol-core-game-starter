@@ -10,6 +10,25 @@ Auth for game endpoints: header `X-API-Key: sk_live_…` (set by the server prox
 `GET /health` → `{ status, devMock: boolean, network }`
 `devMock: true` ⇒ no balances, bets don't check funds → hide the money UI.
 
+## Game config (API key)
+
+`GET /api/game/config` → `{ gameId, mode, engineConfig }`
+
+`engineConfig` contains the **resolved engine dimensions** of the registered game — the UI must
+render exactly this geometry, never guessed values:
+
+| Mode | `engineConfig` |
+|---|---|
+| `towers` | `{ levels: 4–12, columns: 2–4 }` |
+| `mines` | `{ gridSize, mineCount }` |
+| `pump` | `{ growthBps, maxPumps }` |
+| `hilo` | `{ maxSteps: 20 }` |
+| others | `{}` |
+
+Game config is immutable after creation → cache the response indefinitely. The starter exposes it
+to the client via `GET /api/meta` (`engineConfig`, `serverMode`, `warning: "engine_mismatch"` when
+`NEXT_PUBLIC_ENGINE` differs from the registration).
+
 ## Single bet
 
 `POST /api/game/bet`
@@ -45,6 +64,7 @@ Response (SessionView):
   "status": "active"|"busted"|"cashed_out",
   "steps": 2, "multiplierBps": 21830, "potentialPayoutLamports": "218300000",
   "proof": { "serverSeedHash": "…", "clientSeed": "…", "nonce": 7 },
+  "engine": { "mode": "towers", "config": { "levels": 8, "columns": 3 } },
   "progress": { … },
   "roundId"?: "…", "payoutLamports"?: "…", "serverSeed"?: "…",
   "reveal"?: { … }, "capped"?: true }
@@ -78,7 +98,7 @@ UI requirement: show the hash BEFORE the round, `roundId` + verify link after.
 |---|---|---|---|
 | API-201 | 409 | game paused / globally halted | lock |
 | API-202 | 409 | game not active | lock |
-| API-204 | 400/422 | validation (incl. `session_only_mode`, `impossible_guess`) | message |
+| API-204 | 400/422 | validation (incl. `session_only_mode`, `impossible_guess`; `invalid_column`/`invalid_tile` carry `validRange`) | message |
 | API-300 | 400 | bet below minimum | clamp input |
 | API-301 | 400 | bet above level maximum | show max |
 | API-302 | 429 | payout/bankroll limit (`bankroll_cap`, `withdraw_daily_limit`) | try later |

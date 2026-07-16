@@ -9,20 +9,27 @@ import type { Control } from '@/lib/engines';
 export function EngineControls({
   controls,
   values,
+  engineConfig,
   onChange,
 }: {
   controls: Control[];
   values: Record<string, string>;
+  /** Aufgelöste Engine-Dimensionen vom Server (für dynamische Grenzen). */
+  engineConfig?: Record<string, number> | null;
   onChange: (name: string, value: string) => void;
 }) {
   if (controls.length === 0) {
     return <p className="text-xs text-white/40">Diese Engine braucht keine Zusatz-Eingaben.</p>;
   }
+  // intlist-Grenzen: echte Werte aus der Server-Config, sonst Fallback.
+  const listBounds = (c: Extract<Control, { kind: 'intlist' }>) =>
+    engineConfig && c.boundsFrom ? c.boundsFrom(engineConfig) : { min: c.min, max: c.max };
   return (
     <div className="grid gap-3">
       {controls.map((c) => (
         <label key={c.name} className="text-xs text-white/50">
           {c.label}
+          {c.kind === 'intlist' ? ` (${listBounds(c).min}–${listBounds(c).max})` : ''}
           {c.kind === 'select' ? (
             <select
               value={values[c.name] ?? c.default}

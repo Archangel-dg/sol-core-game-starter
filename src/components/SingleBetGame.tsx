@@ -21,10 +21,13 @@ export interface RoundLog {
  */
 export function SingleBetGame({
   engine,
+  engineConfig,
   onRound,
   onLog,
 }: {
   engine: EngineDef;
+  /** Aufgelöste Engine-Dimensionen vom Server (null = nicht verfügbar). */
+  engineConfig?: Record<string, number> | null;
   onRound: (serverSeedHash: string, roundId: string) => void;
   onLog: (r: RoundLog) => void;
 }) {
@@ -57,7 +60,9 @@ export function SingleBetGame({
         }),
       }).then((x) => x.json());
       if (r.error) {
-        const ui = toUiError(r.error.code, r.error.message, r.error.reason);
+        const details = r.error.details as Record<string, unknown> | undefined;
+        const reason = typeof details?.reason === 'string' ? details.reason : undefined;
+        const ui = toUiError(r.error.code, r.error.message, reason, details);
         setError(`${ui.code}: ${ui.message}`);
         return;
       }
@@ -87,8 +92,14 @@ export function SingleBetGame({
         {result ? (
           <ResultView {...result} />
         ) : (
-          <div className="grid h-28 place-items-center rounded-xl bg-night text-center text-white/40">
-            {engine.blurb}
+          <div className="grid min-h-28 place-items-center rounded-xl bg-night px-4 py-3 text-center">
+            <div>
+              <p className="text-white/40">{engine.blurb}</p>
+              {/* Income/Outcome in einfachen Worten — was man tut, was passieren kann. */}
+              <p className="mt-2 text-xs text-white/30">
+                {engine.playerFacts.inputs} {engine.playerFacts.outcomes}
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -107,6 +118,7 @@ export function SingleBetGame({
         <EngineControls
           controls={engine.singleControls ?? []}
           values={values}
+          engineConfig={engineConfig}
           onChange={(name, value) => setValues((v) => ({ ...v, [name]: value }))}
         />
       </div>

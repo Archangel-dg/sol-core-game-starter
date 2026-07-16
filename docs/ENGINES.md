@@ -33,10 +33,37 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 
 | Engine | Body per step |
 |---|---|
-| `mines` | `{ tile: 0–24 }` |
-| `towers` | `{ column: 0–(width−1) }` |
+| `mines` | `{ tile: 0–(gridSize−1) }` |
+| `towers` | `{ column: 0–(columns−1) }` |
 | `hilo` | `{ guess: "higher"\|"lower" }` (a tie loses; ends after 20 steps) |
 | `pump` | `{}` (just pump again) |
+
+**Never hardcode the grid/column count.** The real dimensions come from the server:
+`GET /api/meta` → `engineConfig` (e.g. towers `{ levels, columns }`, mines `{ gridSize, mineCount }`),
+and every `SessionView` carries `engine.config`. The generic UI derives its buttons from these values
+(`boundsFrom` in `lib/engines.ts`); an out-of-range step is rejected with `API-204` + `validRange`.
+
+## What the player puts in — and what can come out
+
+Plain-language income/outcome facts (also in each engine's `playerFacts` in `src/lib/engines.ts`,
+shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
+
+| Engine | The player chooses | What can happen | Max win |
+|---|---|---|---|
+| `coin-flip` | heads or tails | right side pays ~1.96× | `winMultiplierBps` (default 1.96×) |
+| `dice` | target + over/under | riskier pick = higher multiplier | `(1−edge)/winChance` |
+| `limbo` | a target multiplier | hit pays exactly the target | your target (level cap) |
+| `scratch` | — (buy a ticket) | prize table from blank to jackpot | top prize of the paytable |
+| `crash` | auto-cashout | curve above it = win, crash before = loss | your cashout (level cap) |
+| `plinko` | — (drop the ball) | slot decides; edges pay big | edge slot of the paytable |
+| `wheel` | — (spin) | one segment wins | top segment of the paytable |
+| `mines` | safe tiles on the grid | each safe pick grows the multiplier; mine = loss; cash out any time | compounds per pick |
+| `hilo` | higher/lower | right guess grows the multiplier; tie/wrong = loss; ≤ 20 steps | compounds per step |
+| `keno` | 1–10 of 40 numbers | more hits = more payout | top tier at all hits |
+| `roulette` | classic bet | fixed payouts (2×/3×/36×) | 36× straight (RTP 97.3%) |
+| `slots-3x3` | — (spin) | centre line: triple/pair pays | top triple of the reel |
+| `towers` | one column per floor (2–4, from config) | each safe floor multiplies; bomb = loss; cash out any time | `(1−edge)·(c/(c−1))^levels` |
+| `pump` | pump again or cash out | each pump grows the multiplier; burst = loss | `growth^maxPumps` |
 
 ## Roulette `betType`
 

@@ -12,26 +12,41 @@ import type { RoundLog } from './SingleBetGame';
  * Generischer Session-Flow (mines/hilo/towers/pump): start → step* → cashout.
  * Reconnect nach Reload über localStorage. Ergebnisse kommen vom Server;
  * die UI hier ist bewusst schlicht — Design-Zone.
+ *
+ * Index-Schritte (towers/mines) rendern ein Button-Feld, dessen Größe aus der
+ * Server-Config kommt (engineConfig aus /api/meta, bzw. view.engine.config in
+ * der laufenden Session) — ungültige Eingaben sind damit unmöglich.
  */
 export function SessionGame({
   engine,
   gameId,
+  engineConfig,
   onRound,
   onLog,
 }: {
   engine: EngineDef;
   gameId: string;
+  /** Aufgelöste Engine-Dimensionen vom Server (null = nicht verfügbar). */
+  engineConfig?: Record<string, number> | null;
   onRound: (serverSeedHash: string, roundId: string) => void;
   onLog: (r: RoundLog) => void;
 }) {
   const { publicKey, connected } = useWallet();
   const [bet, setBet] = useState('0.01');
   const [view, setView] = useState<SessionView | null>(null);
-  const [indexVal, setIndexVal] = useState('0');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const storeKey = `sc_session_${gameId}`;
   const sess = engine.session!;
+
+  // Grenzen des Index-Schritts: bevorzugt aus der laufenden Session, sonst
+  // aus /api/meta; ohne beides greifen die Engine-DEFAULTS (nie das Maximum).
+  const cfg = view?.engine?.config ?? engineConfig ?? null;
+  const idxStep = sess.step.kind === 'index' ? sess.step : null;
+  const bounds =
+    idxStep &&
+    (cfg && idxStep.boundsFrom ? idxStep.boundsFrom(cfg) : { min: idxStep.min, max: idxStep.max });
+  const boundsAssumed = !!idxStep?.boundsFrom && !cfg;
 
   const finishIfEnded = useCallback(
     (v: SessionView) => {
@@ -76,7 +91,9 @@ export function SessionGame({
         body: body ? JSON.stringify(body) : undefined,
       }).then((x) => x.json());
       if (r.error) {
-        const ui = toUiError(r.error.code, r.error.message, r.error.reason);
+        const details = r.error.details as Record<string, unknown> | undefined;
+        const reason = typeof details?.reason === 'string' ? details.reason : undefined;
+        const ui = toUiError(r.error.code, r.error.message, reason, details);
         setError(`${ui.code}: ${ui.message}`);
         return null;
       }
@@ -139,7 +156,13 @@ export function SessionGame({
             {ended && view.capped && <div className="text-xs text-white/40">Payout-Limit erreicht</div>}
           </div>
         ) : (
-          <span className="text-white/40">{engine.blurb}</span>
+          <div className="px-4">
+            <p className="text-white/40">{engine.blurb}</p>
+            {/* Income/Outcome in einfachen Worten — was man tut, was passieren kann. */}
+            <p className="mt-2 text-xs text-white/30">
+              {engine.playerFacts.inputs} {engine.playerFacts.outcomes}
+            </p>
+          </div>
         )}
       </div>
 
@@ -176,14 +199,41 @@ export function SessionGame({
                 className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">Tiefer</button>
             </div>
           )}
-          {sess.step.kind === 'index' && (
-            <div className="flex items-center gap-2">
-              <input type="number" min={sess.step.min} max={sess.step.max} value={indexVal}
-                onChange={(e) => setIndexVal(e.target.value)}
-                className="w-24 rounded-lg border border-white/10 bg-night px-3 py-2 tabular-nums text-white outline-none focus:border-accent/50" />
-              <span className="text-xs text-white/40">{sess.step.label}</span>
-              <button type="button" disabled={busy} onClick={() => void step({ value: parseInt(indexVal, 10) || 0 })}
-                className="ml-auto rounded-lg border border-white/15 px-4 py-2 text-sm disabled:opacity-40">Aufdecken</button>
+          {idxStep && bounds && (
+            <div>
+              <div className="mb-1 flex items-baseline justify-between">
+                <span className="text-xs text-white/40">{idxStep.label} wählen</span>
+                {boundsAssumed && (
+                  <span className="text-[10px] text-amber-300/70">Config nicht geladen — Standardwerte angenommen</span>
+                )}
+              </div>
+              <div
+                className="grid gap-2"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.min(bounds.max - bounds.min + 1, 5)}, minmax(0, 1fr))`,
+                }}
+              >
+                {Array.from({ length: bounds.max - bounds.min + 1 }, (_, i) => bounds.min + i).map((idx) => {
+                  const picked = Array.isArray(view.progress?.picks)
+                    ? (view.progress.picks as number[]).includes(idx)
+                    : false;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      disabled={busy || picked}
+                      onClick={() => void step({ value: idx })}
+                      className={`rounded-lg border py-2 text-sm tabular-nums transition disabled:opacity-40 ${
+                        picked
+                          ? 'border-accent/40 bg-accent/10 text-accent'
+                          : 'border-white/15 hover:border-accent/50'
+                      }`}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
           {sess.step.kind === 'action' && (

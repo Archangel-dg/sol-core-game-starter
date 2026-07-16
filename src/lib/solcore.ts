@@ -49,6 +49,19 @@ export async function health(): Promise<{ devMock: boolean; network: string }> {
   return (await res.json()) as { devMock: boolean; network: string };
 }
 
+/** Aufgelöste Engine-Config des registrierten Spiels (z. B. towers columns). */
+export interface GameConfigInfo {
+  gameId: string;
+  mode: string;
+  engineConfig: Record<string, number>;
+}
+
+/** GET /api/game/config — die UI rendert exakt die Auswahl, die der Server
+ * akzeptiert. Wirft bei alten API-Ständen (404) — Aufrufer fangen das ab. */
+export function gameConfig(): Promise<GameConfigInfo> {
+  return request<GameConfigInfo>('/api/game/config');
+}
+
 export interface BetResult {
   roundId: string;
   result: {
@@ -100,6 +113,8 @@ export interface SessionView {
   multiplierBps: number;
   potentialPayoutLamports: string;
   proof: { serverSeedHash: string; clientSeed: string; nonce: number };
+  /** Aufgelöste Engine-Dimensionen (fehlt bei alten API-Ständen). */
+  engine?: { mode: string; config: Record<string, number> };
   progress: Record<string, unknown>;
   // nur bei Ende:
   roundId?: string;

@@ -26,6 +26,7 @@ export function toUiError(
   code: string | undefined,
   fallback = 'Unbekannter Fehler',
   reason?: string,
+  details?: Record<string, unknown>,
 ): UiError {
   // API-302 hat zwei Ursachen: Solvenz-Cap beim Wetten (Einsatz zu groß für
   // den Pool) vs. Tages-Auszahlungslimit. Der `reason` aus den API-Details
@@ -34,6 +35,17 @@ export function toUiError(
     return {
       code,
       message: 'Einsatz übersteigt gerade das Gewinn-Limit des Pools — versuch einen kleineren Einsatz.',
+      action: 'info',
+    };
+  }
+  // Ungültiger Spalten-/Feld-Index: der Server nennt den gültigen Bereich.
+  if (code === 'API-204' && (reason === 'invalid_column' || reason === 'invalid_tile')) {
+    const range = typeof details?.validRange === 'string' ? details.validRange : undefined;
+    return {
+      code,
+      message: range
+        ? `Ungültige Auswahl — gültig ist ${range}. (UI und Spiel-Config passen nicht zusammen?)`
+        : 'Ungültige Auswahl — außerhalb des Spielfelds.',
       action: 'info',
     };
   }

@@ -150,3 +150,93 @@ export function sessionStep(id: string, body: Record<string, unknown>): Promise<
 export function sessionCashout(id: string): Promise<SessionView> {
   return request<SessionView>(`/api/game/session/${id}/cashout`, { method: 'POST' });
 }
+
+// ── Turnier-Schicht (Pot-basierte Highscore-Läufe: gauntlet) ────────────────
+
+export interface TournamentCycleInfo {
+  gameId: string;
+  cycle: {
+    cycleId: string;
+    cycleNo: string;
+    status: string;
+    startsAt: string;
+    endsAt: string;
+    potLamports: string;
+    entriesCount: number;
+    playersCount: number;
+    entryFeeLamports: string;
+    /** was der Spieler tatsächlich zahlt (Einsatz + Fees on top). */
+    totalChargeLamports: string;
+    payoutSplitBps: number[];
+    maxAttemptsPerCycle: number | null;
+    maxSteps: number;
+  } | null;
+}
+
+export interface TournamentLeaderboardEntry {
+  rank: number;
+  wallet: string;
+  bestScore: number;
+  achievedAt: string;
+  attempts: number;
+}
+
+export interface TournamentRunView {
+  runId: string;
+  gameId: string;
+  mode: string;
+  status: 'active' | 'busted' | 'stopped' | 'expired';
+  steps: number;
+  maxSteps: number;
+  score: number;
+  history: { step: number; risk: string; roll: number; survived: boolean; points: number }[];
+  proof: { serverSeedHash: string; clientSeed: string; nonce: number };
+  engine: { mode: string; config: Record<string, number> };
+  cycle: { cycleId: string; cycleNo: string; endsAt: string; potLamports: string; entriesCount: number };
+  /** nur bei beendetem Lauf. */
+  serverSeed?: string;
+  bestScore?: number;
+}
+
+export function tournamentCycle(): Promise<TournamentCycleInfo> {
+  return request<TournamentCycleInfo>('/api/game/tournament/cycle');
+}
+
+export function tournamentLeaderboard(limit = 50): Promise<{ cycleId: string | null; leaderboard: TournamentLeaderboardEntry[] }> {
+  return request(`/api/game/tournament/leaderboard?limit=${limit}`);
+}
+
+export function tournamentMe(wallet: string): Promise<{
+  cycleId: string | null;
+  attempts: number;
+  bestScore: number;
+  rank: number | null;
+  activeRunId: string | null;
+}> {
+  return request(`/api/game/tournament/me/${wallet}`);
+}
+
+export function tournamentEnter(input: {
+  playerWallet: string;
+  clientSeed?: string;
+}): Promise<TournamentRunView> {
+  return request<TournamentRunView>('/api/game/tournament/enter', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function tournamentRun(id: string): Promise<TournamentRunView> {
+  return request<TournamentRunView>(`/api/game/tournament/run/${id}`);
+}
+
+export function tournamentStep(id: string, risk: 'safe' | 'medium' | 'risky'): Promise<TournamentRunView> {
+  return request<TournamentRunView>(`/api/game/tournament/run/${id}/step`, {
+    method: 'POST',
+    body: JSON.stringify({ risk }),
+  });
+}
+
+export function tournamentStop(id: string): Promise<TournamentRunView> {
+  return request<TournamentRunView>(`/api/game/tournament/run/${id}/stop`, { method: 'POST' });
+}

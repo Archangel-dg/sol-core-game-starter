@@ -5,6 +5,7 @@ import { WalletButton } from '@/components/WalletButton';
 import { BalanceBar } from '@/components/BalanceBar';
 import { SingleBetGame, type RoundLog } from '@/components/SingleBetGame';
 import { SessionGame } from '@/components/SessionGame';
+import { TournamentGame } from '@/components/TournamentGame';
 import { FairnessPanel } from '@/components/FairnessPanel';
 import { History } from '@/components/History';
 import { getEngine } from '@/lib/engines';
@@ -12,7 +13,7 @@ import { getEngine } from '@/lib/engines';
 interface Meta {
   gameName: string;
   engine: string;
-  mechanic: 'single' | 'session';
+  mechanic: 'single' | 'session' | 'tournament';
   gameId: string;
   apiUrl: string;
   devMock: boolean;
@@ -53,6 +54,7 @@ export default function Home() {
           <p className="text-xs text-white/40">
             Devnet · {engine?.label ?? meta?.engine ?? '…'}
             {meta?.mechanic === 'session' ? ' · Session' : ''}
+            {meta?.mechanic === 'tournament' ? ' · Turnier' : ''}
           </p>
         </div>
         <WalletButton />
@@ -79,7 +81,11 @@ export default function Home() {
             </div>
           )}
           <BalanceBar devMock={meta.devMock} />
-          {meta.mechanic === 'session' ? (
+          {meta.mechanic === 'tournament' ? (
+            // Turnier bringt Countdown/Pot/Leaderboard/Proof selbst mit —
+            // Verify läuft über /api/game/tournament/verify/:runId.
+            <TournamentGame engine={engine} />
+          ) : meta.mechanic === 'session' ? (
             <SessionGame
               engine={engine}
               gameId={meta.gameId}
@@ -95,8 +101,12 @@ export default function Home() {
               onLog={onLog}
             />
           )}
-          <FairnessPanel apiUrl={meta.apiUrl} serverSeedHash={seedHash} roundId={roundId} />
-          <History rounds={history} apiUrl={meta.apiUrl} />
+          {meta.mechanic !== 'tournament' && (
+            <>
+              <FairnessPanel apiUrl={meta.apiUrl} serverSeedHash={seedHash} roundId={roundId} />
+              <History rounds={history} apiUrl={meta.apiUrl} />
+            </>
+          )}
           <p className="pt-2 text-center text-[11px] text-white/30">
             Ergebnisse kommen ausschließlich vom Sol-Core-Server. Nur Devnet-Test-SOL.
           </p>

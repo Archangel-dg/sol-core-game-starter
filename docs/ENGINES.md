@@ -9,6 +9,10 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 - **single** — one bet, immediate result (`/api/game/bet`).
 - **session** — progressive: start a round → steps → cash out any time (`/api/game/session/*`). The
   whole outcome is committed at start (provably-fair).
+- **tournament** — pot-based highscore runs (`/api/game/tournament/*`): a fixed entry fee per run
+  goes into the cycle pot; the run itself pays nothing. Players collect a score (all rolls are
+  pre-committed at enter, provably-fair); at cycle end the pot is paid out 100% to the top ranks.
+  Re-entries are allowed — the best score per wallet counts.
 
 ## Overview
 
@@ -28,6 +32,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `slots-3x3` | slot | ✓ | | `{}` |
 | `towers` | chain | | ✓ | — (session) |
 | `pump` | curve | | ✓ | — (session) |
+| `gauntlet` | tournament | | | — (tournament) |
 
 ## Session steps (`step` body)
 
@@ -37,6 +42,23 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `towers` | `{ column: 0–(columns−1) }` |
 | `hilo` | `{ guess: "higher"\|"lower" }` (a tie loses; ends after 20 steps) |
 | `pump` | `{}` (just pump again) |
+
+## Tournament steps (`gauntlet`)
+
+Flow: `POST /tournament/enter` (fixed entry, debited immediately into the pot) →
+`POST /tournament/run/:id/step` with `{ risk: "safe"|"medium"|"risky" }` →
+`POST /tournament/run/:id/stop` banks the score. **A bust zeroes the run** — stop in time.
+
+| Tier | Survives | Points |
+|---|---|---|
+| `safe` | 90% | +10 |
+| `medium` | 60% | +15 |
+| `risky` | 30% | +30 |
+
+Equal expected value per tier (9 points/step) — the choice is pure variance strategy relative to
+the live leaderboard. `maxSteps` (10–100) comes from the cycle config
+(`GET /tournament/cycle` → `maxSteps`). Runs idle for 15 minutes (or still active at cycle end)
+are auto-banked with their current score.
 
 **Never hardcode the grid/column count.** The real dimensions come from the server:
 `GET /api/meta` → `engineConfig` (e.g. towers `{ levels, columns }`, mines `{ gridSize, mineCount }`),
@@ -64,6 +86,7 @@ shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
 | `slots-3x3` | — (spin) | centre line: triple/pair pays | top triple of the reel |
 | `towers` | one column per floor (2–4, from config) | each safe floor multiplies; bomb = loss; cash out any time | `(1−edge)·(c/(c−1))^levels` |
 | `pump` | pump again or cash out | each pump grows the multiplier; burst = loss | `growth^maxPumps` |
+| `gauntlet` | a risk tier per step, bank in time | entry feeds the pot; bust zeroes the run; best score per wallet ranks — top ranks split the pot at cycle end | pot share of rank 1 |
 
 ## Roulette `betType`
 

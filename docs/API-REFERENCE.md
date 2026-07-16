@@ -77,6 +77,46 @@ Rules the UI MUST reflect:
 - **15 min inactivity** → the server settles automatically (≥1 step = auto-cashout, 0 steps = full
   refund). Warn about this in the UI.
 
+## Tournament layer (gauntlet)
+
+Pot-based highscore cycles: a fixed entry fee per run is debited at enter (fee-on-top like `/bet`)
+and feeds the cycle pot; the run itself pays nothing. At cycle end the pot is paid 100% to the top
+ranks (creator-configured split); the next cycle opens automatically with the creator's latest
+settings.
+
+- `GET /api/game/tournament/cycle` — current cycle: `{ cycleId, cycleNo, startsAt, endsAt,
+  potLamports, entriesCount, playersCount, entryFeeLamports, totalChargeLamports,
+  payoutSplitBps, maxAttemptsPerCycle, maxSteps }` (cached ~5 s)
+- `GET /api/game/tournament/leaderboard?limit=50` — `{ leaderboard: [{ rank, wallet, bestScore,
+  achievedAt, attempts }] }` (cached ~3 s — poll, don't hammer)
+- `GET /api/game/tournament/me/:wallet` — `{ attempts, bestScore, rank, activeRunId }`
+- `POST /api/game/tournament/enter` — `{ playerWallet, clientSeed? }` → `TournamentRunView`
+- `GET /api/game/tournament/run/:id` — current run (**reconnect after reload!**)
+- `POST /api/game/tournament/run/:id/step` — `{ risk: "safe"|"medium"|"risky" }`
+- `POST /api/game/tournament/run/:id/stop` — banks the score
+- `GET /api/game/tournament/history?limit=10` — settled cycles incl. payouts
+- `GET /api/game/tournament/verify/:runId` — **public** provably-fair check (revealed seed +
+  recomputed rolls vs. the run's history)
+
+Response (TournamentRunView):
+```json
+{ "runId": "…", "gameId": "…", "mode": "gauntlet",
+  "status": "active"|"busted"|"stopped"|"expired",
+  "steps": 4, "maxSteps": 30, "score": 45,
+  "history": [{ "step": 0, "risk": "safe", "roll": 12.3, "survived": true, "points": 10 }],
+  "proof": { "serverSeedHash": "…", "clientSeed": "…", "nonce": 9 },
+  "engine": { "mode": "gauntlet", "config": { "maxSteps": 30, "safeSurviveBps": 9000, … } },
+  "cycle": { "cycleId": "…", "cycleNo": "3", "endsAt": "…", "potLamports": "…", "entriesCount": 12 },
+  "serverSeed"?: "…", "bestScore"?: 60 }
+```
+Rules the UI MUST reflect:
+- **A bust zeroes the run's score** (`status: "busted"`); banking (`stop`) is the real decision.
+- Re-entries are allowed (each costs the entry fee, grows the pot); **best score per wallet** ranks.
+- Entries/steps are rejected once `endsAt` has passed (`API-204 cycle_ended`); runs still active at
+  cycle end are auto-banked with their current score.
+- **15 min inactivity** → auto-bank (no refund — the entry fed the pot at purchase).
+- The creator can't play their own tournament (`API-303`).
+
 ## Player balance (program mode; hide when `devMock: true`)
 
 - `GET /api/game/balance/:wallet` → `{ wallet, devMock, balanceLamports: string|null }`

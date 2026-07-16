@@ -3,7 +3,7 @@
 // params-Bauer (für /bet bzw. Session-Steps) und Ergebnis-Text. Datengesteuert,
 // damit eine generische UI jede Engine bedienen kann.
 
-export type Mechanic = 'single' | 'session';
+export type Mechanic = 'single' | 'session' | 'tournament';
 
 /**
  * Aufgelöste Engine-Dimensionen des konkreten Spiels (vom Server, via
@@ -53,6 +53,14 @@ export interface EngineDef {
       | { kind: 'action'; label: string }; // pump
     /** Baut den Step-Body. */
     buildStep: (input: { value?: number; guess?: 'higher' | 'lower' }) => Record<string, unknown>;
+    hint: string;
+  };
+  // ── Turnier (Pot-basierte Highscore-Läufe) ──
+  /** Turnier-Lauf: enter (fester Einsatz → Pot) → step* (Risikostufe) →
+   * stop (Score banken). Ausschüttung an die Top-Plätze am Zyklusende. */
+  tournament?: {
+    step: { kind: 'risk'; tiers: readonly ['safe', 'medium', 'risky'] };
+    buildStep: (input: { risk: 'safe' | 'medium' | 'risky' }) => Record<string, unknown>;
     hint: string;
   };
 }
@@ -286,6 +294,24 @@ export const ENGINES: EngineDef[] = [
         boundsFrom: (c) => ({ min: 0, max: (c.columns ?? 3) - 1 }) },
       buildStep: (i) => ({ column: i.value ?? 0 }),
       hint: 'Pro Etage eine Spalte wählen; jederzeit cashout.',
+    },
+  },
+  {
+    key: 'gauntlet',
+    label: 'Gauntlet',
+    category: 'Tournament',
+    mechanics: ['tournament'],
+    blurb: 'Highscore-Turnier: Risikostufe wählen, Punkte banken — Pot an die Top-Plätze.',
+    playerFacts: {
+      inputs:
+        'Fester Einsatz pro Lauf. Pro Schritt eine Risikostufe wählen: Safe (90%, +10), Medium (60%, +15) oder Risky (30%, +30) — gleicher Erwartungswert, deine Strategie entscheidet.',
+      outcomes:
+        'Der Einsatz geht in den Zyklus-Pot. Punkte sammeln und rechtzeitig banken — ein Bust nullt den Lauf (neuer Versuch möglich, bester Score zählt). Am Zyklusende geht der Pot zu 100% an die Top-Plätze.',
+    },
+    tournament: {
+      step: { kind: 'risk', tiers: ['safe', 'medium', 'risky'] },
+      buildStep: (i) => ({ risk: i.risk }),
+      hint: 'Pro Schritt eine Risikostufe; „Banken" sichert den Score — Bust nullt ihn.',
     },
   },
   {

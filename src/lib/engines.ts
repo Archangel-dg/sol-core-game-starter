@@ -181,7 +181,7 @@ export const ENGINES: EngineDef[] = [
     session: {
       step: { kind: 'guess' },
       buildStep: (i) => ({ guess: i.guess ?? 'higher' }),
-      hint: 'Höher/Tiefer tippen; Gleichstand verliert. Kette endet nach 20 Schritten.',
+      hint: 'Höher/Tiefer tippen; Gleichstand verliert. Die Kette endet nach der im Spiel gesetzten Schrittzahl.',
     },
   },
   {
@@ -221,8 +221,9 @@ export const ENGINES: EngineDef[] = [
       outcomes: '10 Zahlen werden gezogen: je mehr Treffer, desto höher die Auszahlung — wenige Treffer zahlen nichts.',
     },
     singleControls: [
-      { kind: 'intlist', name: 'picks', label: 'Zahlen (1–40, 1–10 Stück)', min: 1, max: 40, maxCount: 10,
-        hint: 'z. B. 3,7,12,25' },
+      { kind: 'intlist', name: 'picks', label: 'Zahlen tippen', min: 1, max: 40, maxCount: 10,
+        hint: 'z. B. 3,7,12,25',
+        boundsFrom: (c) => ({ min: 1, max: c.pool ?? 40 }) },
     ],
     buildSingleParams: (v) => ({ picks: intList(v, 'picks') }),
   },

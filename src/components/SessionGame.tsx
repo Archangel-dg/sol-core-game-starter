@@ -8,6 +8,21 @@ import { solToLamports, toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
 import type { RoundLog } from './SingleBetGame';
 
+/** towers-Reveal: `bombColumns` ist `number[][]` (eine Spalten-Menge je
+ * Etage, `c.bombs` Bomben pro Etage). Rein defensiv — akzeptiert auch ältere
+ * `number[]`-Formen ohne zu crashen und liefert '' wenn nichts zu zeigen ist. */
+function formatTowersBombs(bombColumns: unknown): string {
+  if (!Array.isArray(bombColumns)) return '';
+  const rows = bombColumns
+    .map((row: unknown, i: number) => {
+      const cols = Array.isArray(row) ? row : typeof row === 'number' ? [row] : [];
+      const nums = cols.filter((n): n is number => typeof n === 'number');
+      return nums.length ? `E${i + 1}: ${nums.map((n) => n + 1).join(',')}` : null;
+    })
+    .filter((s): s is string => s !== null);
+  return rows.length ? `Bomben je Etage — ${rows.join(' · ')}` : '';
+}
+
 /**
  * Generischer Session-Flow (mines/hilo/towers/pump): start → step* → cashout.
  * Reconnect nach Reload über localStorage. Ergebnisse kommen vom Server;
@@ -138,6 +153,8 @@ export function SessionGame({
 
   const active = view?.status === 'active';
   const ended = view && view.status !== 'active';
+  const towersBombText =
+    view && view.status === 'busted' && engine.key === 'towers' ? formatTowersBombs(view.reveal?.bombColumns) : '';
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
@@ -154,6 +171,7 @@ export function SessionGame({
               {view.status === 'cashed_out' && `Cashout ${toSol(view.payoutLamports ?? '0')} ◎`}
             </div>
             {ended && view.capped && <div className="text-xs text-white/40">Payout-Limit erreicht</div>}
+            {towersBombText && <div className="mt-1 text-[11px] text-white/30">{towersBombText}</div>}
           </div>
         ) : (
           <div className="px-4">

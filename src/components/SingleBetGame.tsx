@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import type { EngineDef } from '@/lib/engines';
+import type { Control, EngineDef } from '@/lib/engines';
 import { solToLamports } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
 import { EngineControls } from './EngineControls';
@@ -13,6 +13,19 @@ export interface RoundLog {
   multiplierBps: number;
   payoutLamports: string;
   roundId: string;
+}
+
+/** keno-Pool/Pick-Limit: echte Werte aus der Server-Config, sonst der
+ * statische Fallback aus der Control-Definition (Systemvertrag unverändert
+ * — reine Anzeige). */
+function kenoBounds(engine: EngineDef, engineConfig?: Record<string, number> | null) {
+  const control = engine.singleControls?.find(
+    (c): c is Extract<Control, { kind: 'intlist' }> => c.kind === 'intlist' && c.name === 'picks',
+  );
+  return {
+    pool: engineConfig?.pool ?? control?.max ?? 40,
+    maxPicks: engineConfig?.maxPicks ?? control?.maxCount ?? 10,
+  };
 }
 
 /**
@@ -42,6 +55,18 @@ export function SingleBetGame({
     payoutLamports: string;
     roll: number | null;
   } | null>(null);
+
+  // Render-Grenzen aus der Server-Config — ändert NICHT die params-Struktur
+  // (buildSingleParams bleibt unverändert), nur die angezeigten Controls.
+  // roulette: straight `value` geht bis 37 ('00') auf dem amerikanischen Rad
+  // (pocketCount 38); Control.number kennt kein boundsFrom, daher hier.
+  const singleControls: Control[] =
+    engine.key === 'roulette' && engineConfig?.pocketCount
+      ? (engine.singleControls ?? []).map((c) =>
+          c.kind === 'number' && c.name === 'value' ? { ...c, max: engineConfig.pocketCount - 1 } : c,
+        )
+      : (engine.singleControls ?? []);
+  const { pool: kenoPool, maxPicks: kenoMaxPicks } = kenoBounds(engine, engineConfig);
 
   const play = async () => {
     if (!publicKey) return;
@@ -116,11 +141,16 @@ export function SingleBetGame({
 
       <div className="mt-3">
         <EngineControls
-          controls={engine.singleControls ?? []}
+          controls={singleControls}
           values={values}
           engineConfig={engineConfig}
           onChange={(name, value) => setValues((v) => ({ ...v, [name]: value }))}
         />
+        {engine.key === 'keno' && (
+          <p className="mt-1 text-[11px] text-white/30">
+            Erlaubt: bis zu {kenoMaxPicks} Zahlen aus 1–{kenoPool}.
+          </p>
+        )}
       </div>
 
       <button

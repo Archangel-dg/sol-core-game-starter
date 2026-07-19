@@ -22,7 +22,7 @@ for (const file of ['.env', '.env.local']) {
 const API = (process.env.SOLCORE_API_URL ?? '').replace(/\/$/, '');
 const KEY = process.env.SOLCORE_API_KEY ?? '';
 const GAME = process.env.SOLCORE_GAME_ID ?? '';
-const ENGINE = process.env.NEXT_PUBLIC_ENGINE ?? 'crash';
+const ENGINE = process.env.NEXT_PUBLIC_ENGINE ?? 'dice';
 const MECHANIC = process.env.NEXT_PUBLIC_MECHANIC ?? 'single';
 // Test-Spieler (NICHT die Creator-Wallet). In Programm-Modus ohne Guthaben →
 // API-305 ist der erwartete „erreichbar"-Beweis.
@@ -37,7 +37,6 @@ const SINGLE_PARAMS = {
   'coin-flip': { side: 'heads' },
   dice: { target: 50, direction: 'over' },
   limbo: { targetMultiplierBps: 20000 },
-  crash: { cashoutBps: 20000 },
   mines: { tiles: [0] },
   hilo: { card: 7, guess: 'higher' },
   plinko: {}, wheel: {}, scratch: {}, 'slots-3x3': {},

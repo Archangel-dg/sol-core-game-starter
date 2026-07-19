@@ -15,7 +15,7 @@ Vercel is the easiest target (free, mobile-friendly). Any other Next.js platform
    | `SOLCORE_API_KEY` | your game API key (**secret**) |
    | `SOLCORE_GAME_ID` | your game id |
    | `NEXT_PUBLIC_GAME_NAME` | display name |
-   | `NEXT_PUBLIC_ENGINE` | e.g. `crash` |
+   | `NEXT_PUBLIC_ENGINE` | e.g. `dice` |
    | `NEXT_PUBLIC_MECHANIC` | `single` or `session` |
    | `NEXT_PUBLIC_SOLANA_RPC` | `https://api.devnet.solana.com` |
    | `NEXT_PUBLIC_SOLANA_NETWORK` | `devnet` |

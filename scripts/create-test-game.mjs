@@ -1,6 +1,6 @@
 /**
  * Dev-Helfer (NICHT Teil des Creator-Flows): registriert einen Wegwerf-Creator
- * und legt ein Crash-Game an, druckt SOLCORE_API_KEY + SOLCORE_GAME_ID zum
+ * und legt ein Dice-Game an, druckt SOLCORE_API_KEY + SOLCORE_GAME_ID zum
  * Eintragen in die lokale .env. Nur für Devnet/Test.
  *
  *   SOLCORE_API_URL=https://api.sol-core.com node scripts/create-test-game.mjs
@@ -23,7 +23,7 @@ console.log('Backend:', API);
   const r = await fetch(`${API}/api/creator/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ walletAddress: address, displayName: 'Starter Test', signature: sign(m), message: m, timestamp: t }) });
   if (!r.ok) { console.error('register fehlgeschlagen:', await r.text()); process.exit(1); }
 }
-const r = await fetch(`${API}/api/creator/games`, { method: 'POST', headers: { 'content-type': 'application/json', ...wh() }, body: JSON.stringify({ gameMode: 'crash', displayName: 'Starter Crash', creatorFeeBps: 200, config: { houseEdgeBps: 300 }, paytable: {}, maxMultiplierBps: 200000, domain: 'https://example.com/starter' }) });
+const r = await fetch(`${API}/api/creator/games`, { method: 'POST', headers: { 'content-type': 'application/json', ...wh() }, body: JSON.stringify({ gameMode: 'dice', displayName: 'Starter Dice', creatorFeeBps: 200, config: {}, paytable: {}, maxMultiplierBps: 200000, domain: 'https://example.com/starter' }) });
 const b = await r.json();
 if (!r.ok) { console.error('game anlegen fehlgeschlagen:', JSON.stringify(b)); process.exit(1); }
 console.log('\n✓ Test-Game angelegt. In deine .env eintragen:\n');

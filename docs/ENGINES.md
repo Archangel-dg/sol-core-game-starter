@@ -22,7 +22,6 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `dice` | instant | ✓ | | `{ target: 0.01–99.99, direction: "over"\|"under" }` |
 | `limbo` | instant | ✓ | | `{ targetMultiplierBps: ≥10000 }` |
 | `scratch` | instant | ✓ | | `{}` |
-| `crash` | interactive | ✓ | | `{ cashoutBps: ≥10000 }` |
 | `plinko` | interactive | ✓ | | `{}` |
 | `wheel` | interactive | ✓ | | `{}` |
 | `mines` | interactive | ✓ | ✓ | `{ tiles: number[] }` |
@@ -76,7 +75,6 @@ shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
 | `dice` | target + over/under | riskier pick = higher multiplier | `(1−edge)/winChance` |
 | `limbo` | a target multiplier | hit pays exactly the target | your target (level cap) |
 | `scratch` | — (buy a ticket) | prize table from blank to jackpot | top prize of the paytable |
-| `crash` | auto-cashout | curve above it = win, crash before = loss | your cashout (level cap) |
 | `plinko` | — (drop the ball) | slot decides; edges pay big | edge slot of the paytable |
 | `wheel` | — (spin) | one segment wins | top segment of the paytable |
 | `mines` | safe tiles on the grid | each safe pick grows the multiplier; mine = loss; cash out any time | compounds per pick |

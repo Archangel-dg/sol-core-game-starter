@@ -125,21 +125,6 @@ export const ENGINES: EngineDef[] = [
     buildSingleParams: (v) => ({ targetMultiplierBps: Math.round(num(v, 'target', 2) * 10000) }),
   },
   {
-    key: 'crash',
-    label: 'Crash',
-    category: 'Interactive',
-    mechanics: ['single'],
-    blurb: 'Auto-Cashout wählen — bleibt die Kurve darüber, gewinnst du.',
-    playerFacts: {
-      inputs: 'Auto-Cashout (z. B. 2x) zusammen mit dem Einsatz festlegen.',
-      outcomes: 'Die Kurve steigt und crasht an einem zufälligen Punkt: über deinem Cashout gewinnst du ihn — crasht sie vorher, ist der Einsatz weg.',
-    },
-    singleControls: [
-      { kind: 'number', name: 'cashout', label: 'Auto-Cashout (×)', min: 1.01, step: 0.01, default: 2 },
-    ],
-    buildSingleParams: (v) => ({ cashoutBps: Math.round(num(v, 'cashout', 2) * 10000) }),
-  },
-  {
     key: 'mines',
     label: 'Mines',
     category: 'Interactive',

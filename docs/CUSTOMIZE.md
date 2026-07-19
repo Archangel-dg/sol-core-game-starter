@@ -16,7 +16,7 @@ None of this touches the money flow — reshape it freely.
 
 ## Build your own engine visuals
 
-Want a real animation for your engine (a rising crash curve, flipping hi-lo cards) instead of the
+Want a real animation for your engine (a rising pump curve, flipping hi-lo cards) instead of the
 plain `ResultView`:
 
 1. Build a component that receives the **same props** as `ResultView`
@@ -35,7 +35,7 @@ independent.
 ## Keep building with Claude
 
 See `CLAUDE.md` — you can start Claude in this repo and tell it, e.g.: "Build an animated rising
-curve for the crash engine in `ResultView`, without violating the system contract." Claude then
+curve for the pump engine in `ResultView`, without violating the system contract." Claude then
 knows the rules from the MD files.
 
 ## Change the accent color without code

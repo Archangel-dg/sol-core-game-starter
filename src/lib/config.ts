@@ -33,7 +33,7 @@ export interface PublicConfig {
  * Wirft mit klarer Meldung bei ungültiger Kombination. */
 export function publicConfig(): PublicConfig {
   const gameName = process.env.NEXT_PUBLIC_GAME_NAME ?? 'Sol-Core Game';
-  const engine = (process.env.NEXT_PUBLIC_ENGINE ?? 'crash').trim();
+  const engine = (process.env.NEXT_PUBLIC_ENGINE ?? 'dice').trim();
   const mechanic = (process.env.NEXT_PUBLIC_MECHANIC ?? 'single').trim() as Mechanic;
 
   const def = getEngine(engine);

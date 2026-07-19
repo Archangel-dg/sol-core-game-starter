@@ -24,6 +24,13 @@ export function EngineControls({
   // intlist-Grenzen: echte Werte aus der Server-Config, sonst Fallback.
   const listBounds = (c: Extract<Control, { kind: 'intlist' }>) =>
     engineConfig && c.boundsFrom ? c.boundsFrom(engineConfig) : { min: c.min, max: c.max };
+  // number-Grenzen: echte Werte aus der Server-Config, sonst Fallback (wie
+  // intlist). boundsFrom darf nur min ODER nur max liefern — das jeweils
+  // andere Ende bleibt beim statischen Fallback der Control.
+  const numberBounds = (c: Extract<Control, { kind: 'number' }>) => {
+    const dyn = engineConfig && c.boundsFrom ? c.boundsFrom(engineConfig) : undefined;
+    return { min: dyn?.min ?? c.min, max: dyn?.max ?? c.max };
+  };
   return (
     <div className="grid gap-3">
       {controls.map((c) => (
@@ -46,8 +53,8 @@ export function EngineControls({
             <input
               type="number"
               inputMode="decimal"
-              min={c.min}
-              max={c.max}
+              min={numberBounds(c).min}
+              max={numberBounds(c).max}
               step={c.step ?? 1}
               value={values[c.name] ?? String(c.default)}
               onChange={(e) => onChange(c.name, e.target.value)}

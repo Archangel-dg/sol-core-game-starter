@@ -28,6 +28,21 @@ function kenoBounds(engine: EngineDef, engineConfig?: Record<string, number> | n
   };
 }
 
+/** plinko-Bälle: die `balls`-Auswahl auf Optionen ≤ `maxBalls` einschränken
+ * (der Server clampt ohnehin — das hier ist reine Anzeige). Default-Config
+ * (keine Pro-Config, maxBalls 1) blendet die Auswahl KOMPLETT aus — sonst
+ * bekäme jedes Spiel eine "1 Kugel"-Dropdown, die es heute nicht gibt. */
+function plinkoControls(engine: EngineDef, engineConfig?: Record<string, number> | null): Control[] {
+  const controls = engine.singleControls ?? [];
+  const maxBalls = engineConfig?.maxBalls ?? 1;
+  if (maxBalls <= 1) return controls.filter((c) => !(c.kind === 'select' && c.name === 'balls'));
+  return controls.map((c) =>
+    c.kind === 'select' && c.name === 'balls'
+      ? { ...c, options: c.options.filter((o) => Number(o.value) <= maxBalls) }
+      : c,
+  );
+}
+
 /**
  * Generischer Einzel-Bet-Flow (funktioniert für JEDE single-Engine). Die
  * Ergebnis-Darstellung ist bewusst schlicht — hier ist die Design-Zone.
@@ -58,14 +73,11 @@ export function SingleBetGame({
 
   // Render-Grenzen aus der Server-Config — ändert NICHT die params-Struktur
   // (buildSingleParams bleibt unverändert), nur die angezeigten Controls.
-  // roulette: straight `value` geht bis 37 ('00') auf dem amerikanischen Rad
-  // (pocketCount 38); Control.number kennt kein boundsFrom, daher hier.
+  // dice/limbo/hilo/roulette laufen über den generischen `number`-boundsFrom
+  // (siehe EngineControls); nur plinko (Options-Filter einer `select`-Liste)
+  // braucht hier noch einen Spezialfall.
   const singleControls: Control[] =
-    engine.key === 'roulette' && engineConfig?.pocketCount
-      ? (engine.singleControls ?? []).map((c) =>
-          c.kind === 'number' && c.name === 'value' ? { ...c, max: engineConfig.pocketCount - 1 } : c,
-        )
-      : (engine.singleControls ?? []);
+    engine.key === 'plinko' ? plinkoControls(engine, engineConfig) : (engine.singleControls ?? []);
   const { pool: kenoPool, maxPicks: kenoMaxPicks } = kenoBounds(engine, engineConfig);
 
   const play = async () => {

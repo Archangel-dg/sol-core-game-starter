@@ -15,7 +15,13 @@ export type EngineConfig = Record<string, number>;
 /** Eingabe-Control für die generische Param-UI. */
 export type Control =
   | { kind: 'select'; name: string; label: string; options: { value: string; label: string }[]; default: string }
-  | { kind: 'number'; name: string; label: string; min?: number; max?: number; step?: number; default: number }
+  | {
+      kind: 'number'; name: string; label: string; min?: number; max?: number; step?: number; default: number;
+      /** echte Grenzen aus der Server-Config; min/max sind nur Fallback (wie
+       * intlist). Teilweise Ergebnisse (nur min ODER nur max) sind erlaubt —
+       * das jeweils andere Ende bleibt beim statischen Fallback. */
+      boundsFrom?: (cfg: EngineConfig) => { min?: number; max?: number };
+    }
   | {
       kind: 'intlist'; name: string; label: string; min: number; max: number; maxCount: number; hint?: string;
       /** echte Grenzen aus der Server-Config; min/max sind nur Fallback. */
@@ -47,8 +53,12 @@ export interface EngineDef {
       | {
           kind: 'index'; label: string; min: number; max: number; // tile/column
           /** echte Grenzen aus der Server-Config; min/max sind nur Fallback
-           * (Fallback = Engine-DEFAULTS des Servers, nie das Maximum!). */
-          boundsFrom?: (cfg: EngineConfig) => { min: number; max: number };
+           * (Fallback = Engine-DEFAULTS des Servers, nie das Maximum!).
+           * `currentStep` (0-basiert = bereits absolvierte Schritte) erlaubt
+           * PRO-SCHRITT variierende Grenzen (towers-Etagen mit `floors`);
+           * Engines ohne Bedarf (z. B. mines) ignorieren den zweiten
+           * Parameter einfach. */
+          boundsFrom?: (cfg: EngineConfig, currentStep?: number) => { min: number; max: number };
         }
       | { kind: 'action'; label: string }; // pump
     /** Baut den Step-Body. */
@@ -74,6 +84,22 @@ const intList = (v: Record<string, string>, k: string): number[] =>
     .split(/[,\s]+/)
     .map((s) => parseInt(s, 10))
     .filter((n) => Number.isInteger(n));
+
+/** towers Pro-Config: `publicEngineConfig('towers', …)` echot zusätzlich
+ * `floors` (ein Eintrag `{columns,bombs,multiplierBps?}` je Etage — siehe
+ * Server `TowersFloorConfig`). `EngineConfig` selbst bleibt `Record<string,
+ * number>` (der Vertrag für alle anderen boundsFrom-Nutzer); der Zugriff auf
+ * dieses Array-Feld geht daher defensiv über `unknown`, mit `Array.isArray`
+ * abgesichert — dieselbe Vorsicht wie beim `bombColumns`-Reveal in
+ * SessionGame. Fehlt `floors` (alte, uniforme Configs), liefert dies
+ * `undefined` und der Aufrufer fällt auf den Skalar `columns` zurück. */
+function towersFloorColumns(cfg: EngineConfig, currentStep: number): number | undefined {
+  const raw = (cfg as unknown as { floors?: unknown }).floors;
+  if (!Array.isArray(raw)) return undefined;
+  const floor = raw[currentStep] as { columns?: unknown } | undefined;
+  const columns = floor?.columns;
+  return typeof columns === 'number' && Number.isFinite(columns) ? columns : undefined;
+}
 
 export const ENGINES: EngineDef[] = [
   {
@@ -103,7 +129,19 @@ export const ENGINES: EngineDef[] = [
       outcomes: 'Treffer: je riskanter die Wahl, desto höher der Multiplikator (kleine Chance = großer Gewinn). Daneben: Einsatz weg.',
     },
     singleControls: [
-      { kind: 'number', name: 'target', label: 'Zielwert (0.01–99.99)', min: 0.01, max: 99.99, step: 0.01, default: 50 },
+      {
+        kind: 'number', name: 'target', label: 'Zielwert (0.01–99.99)', min: 0.01, max: 99.99, step: 0.01, default: 50,
+        // rangeMin/rangeMax werden IMMER echot (Default 0/100) — der Server
+        // clampt das Ziel aber mit Sicherheitsabstand von einem Rasterschritt
+        // zu beiden Rändern (siehe resolveDiceFromRollInt), NICHT auf
+        // rangeMin/rangeMax selbst. Identische Formel hier, sonst würde die
+        // Default-Config (0/100) fälschlich 0–100 statt 0.01–99.99 anzeigen.
+        boundsFrom: (c) => {
+          const decimals = c.decimals ?? 2;
+          const step = 1 / 10 ** decimals;
+          return { min: (c.rangeMin ?? 0) + step, max: (c.rangeMax ?? 100) - step };
+        },
+      },
       { kind: 'select', name: 'direction', label: 'Richtung', default: 'over', options: [
         { value: 'over', label: 'Über' }, { value: 'under', label: 'Unter' } ] },
     ],
@@ -120,7 +158,15 @@ export const ENGINES: EngineDef[] = [
       outcomes: 'Die Runde zieht eine Zahl: erreicht sie dein Ziel, gewinnst du genau dein Ziel — darunter ist der Einsatz weg.',
     },
     singleControls: [
-      { kind: 'number', name: 'target', label: 'Ziel-Multiplikator (×)', min: 1.01, step: 0.01, default: 2 },
+      {
+        kind: 'number', name: 'target', label: 'Ziel-Multiplikator (×)', min: 1.01, step: 0.01, default: 2,
+        // Nur die Ceiling (maxTargetBps, optional) wird gespiegelt — die
+        // Floor (minTargetBps) wird IMMER echot (Default 10000 = 1.00×) und
+        // würde den statischen min:1.01-Fallback fälschlich auf 1.00
+        // absenken; die 1.01-Schwelle ist eine reine UI-Vorsicht (kein
+        // trivialer 1.00×-„Gewinn"), keine Server-Grenze.
+        boundsFrom: (c) => (c.maxTargetBps ? { max: c.maxTargetBps / 10000 } : {}),
+      },
     ],
     buildSingleParams: (v) => ({ targetMultiplierBps: Math.round(num(v, 'target', 2) * 10000) }),
   },
@@ -158,7 +204,10 @@ export const ENGINES: EngineDef[] = [
       outcomes: 'Richtig: der Multiplikator wächst (unwahrscheinliche Tipps stärker); jederzeit Cashout. Falsch oder Gleichstand: Einsatz weg. Kette endet nach 20 Schritten.',
     },
     singleControls: [
-      { kind: 'number', name: 'card', label: 'Aktuelle Karte (1–13)', min: 1, max: 13, step: 1, default: 7 },
+      {
+        kind: 'number', name: 'card', label: 'Aktuelle Karte (1–13)', min: 1, max: 13, step: 1, default: 7,
+        boundsFrom: (c) => ({ min: 1, max: c.cards ?? 13 }),
+      },
       { kind: 'select', name: 'guess', label: 'Tipp', default: 'higher', options: [
         { value: 'higher', label: 'Höher' }, { value: 'lower', label: 'Tiefer' } ] },
     ],
@@ -179,8 +228,15 @@ export const ENGINES: EngineDef[] = [
       inputs: 'Kugel fallen lassen — Reihen und Risikoprofil legt das Spiel fest.',
       outcomes: 'Die Kugel landet in einem Multiplikator-Fach: außen zahlt groß, die Mitte klein — teils weniger als der Einsatz.',
     },
-    singleControls: [],
-    buildSingleParams: () => ({}),
+    singleControls: [
+      // Optionen bis maxBalls werden vom Client gefiltert (siehe
+      // SingleBetGame); Default-Config (maxBalls 1) blendet die Auswahl
+      // ganz aus — identisch zu heute (kein Multi-Shot-Control).
+      { kind: 'select', name: 'balls', label: 'Bälle', default: '1', options: [
+        { value: '1', label: '1 Kugel' }, { value: '3', label: '3 Kugeln' },
+        { value: '10', label: '10 Kugeln' }, { value: '100', label: '100 Kugeln' } ] },
+    ],
+    buildSingleParams: (v) => ({ balls: Number(v.balls ?? 1) }),
   },
   {
     key: 'wheel',
@@ -242,7 +298,13 @@ export const ENGINES: EngineDef[] = [
         { value: 'low', label: '1–18' }, { value: 'high', label: '19–36' },
         { value: 'dozen', label: 'Dutzend (value 0–2)' }, { value: 'column', label: 'Kolonne (value 0–2)' },
         { value: 'straight', label: 'Zahl (value 0–36)' } ] },
-      { kind: 'number', name: 'value', label: 'value (nur straight/dozen/column)', min: 0, max: 36, step: 1, default: 0 },
+      {
+        kind: 'number', name: 'value', label: 'value (nur straight/dozen/column)', min: 0, max: 36, step: 1, default: 0,
+        // straight geht auf dem amerikanischen Rad (pocketCount 38) bis 37
+        // ('00'); pocketCount wird IMMER echot (Default 37 → max 36,
+        // identisch zum statischen Fallback).
+        boundsFrom: (c) => ({ max: (c.pocketCount ?? 37) - 1 }),
+      },
     ],
     buildSingleParams: (v) => {
       const betType = v.betType ?? 'red';
@@ -274,10 +336,16 @@ export const ENGINES: EngineDef[] = [
       outcomes: 'Jede sichere Etage erhöht den Multiplikator; jederzeit Cashout. Bombe getroffen = Einsatz weg. Oberste Etage = Maximum.',
     },
     session: {
-      // Fallback max: 2 = Server-Default (3 Spalten, Indizes 0–2). Die echte
-      // Spaltenzahl (2–4) kommt aus der Server-Config via boundsFrom.
+      // Fallback max: 2 = Server-Default (3 Spalten, Indizes 0–2). Bevorzugt
+      // wird die PRO-ETAGEN-Config (`floors[currentStep].columns`, Pro-Config
+      // mit variierenden Spaltenzahlen je Etage); fehlt `floors` (alte,
+      // uniforme Configs), fällt dies auf den Skalar `columns` zurück —
+      // identisch zum bisherigen Verhalten.
       step: { kind: 'index', label: 'Spalte', min: 0, max: 2,
-        boundsFrom: (c) => ({ min: 0, max: (c.columns ?? 3) - 1 }) },
+        boundsFrom: (c, currentStep) => {
+          const columns = towersFloorColumns(c, currentStep ?? 0) ?? c.columns ?? 3;
+          return { min: 0, max: columns - 1 };
+        } },
       buildStep: (i) => ({ column: i.value ?? 0 }),
       hint: 'Pro Etage eine Spalte wählen; jederzeit cashout.',
     },

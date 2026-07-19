@@ -22,7 +22,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `dice` | instant | ✓ | | `{ target: 0.01–99.99, direction: "over"\|"under" }` |
 | `limbo` | instant | ✓ | | `{ targetMultiplierBps: ≥10000 }` |
 | `scratch` | instant | ✓ | | `{}` |
-| `plinko` | interactive | ✓ | | `{}` |
+| `plinko` | interactive | ✓ | | `{ balls?: 1\|3\|10\|100 }` (multi-shot, clamped to `config.maxBalls`) |
 | `wheel` | interactive | ✓ | | `{}` |
 | `mines` | interactive | ✓ | ✓ | `{ tiles: number[] }` |
 | `hilo` | interactive | ✓ | ✓ | `{ card: 1–13, guess: "higher"\|"lower" }` |
@@ -63,6 +63,25 @@ are auto-banked with their current score.
 `GET /api/meta` → `engineConfig` (e.g. towers `{ levels, columns }`, mines `{ gridSize, mineCount }`),
 and every `SessionView` carries `engine.config`. The generic UI derives its buttons from these values
 (`boundsFrom` in `lib/engines.ts`); an out-of-range step is rejected with `API-204` + `validRange`.
+
+## Pro-config-aware controls (Engine PRO 2.0)
+
+Since creators can now tune per-engine Pro config, several inputs are no longer fixed constants in
+the client — they read their bounds from the server config on every render (`boundsFrom` per engine
+in `lib/engines.ts`). Never hardcode the old fixed values (0–100, 1–13, uniform column counts, …):
+
+| Engine | Control | Source of the bound |
+|---|---|---|
+| `dice` | target slider/input range | `boundsFrom`: `[config.rangeMin ?? 0, config.rangeMax ?? 100]` (both always echoed by the server, even at their defaults) |
+| `limbo` | target multiplier input | floor is always `config.minTargetBps` (default 1.00×, always echoed); ceiling only appears if the creator set `config.maxTargetBps` |
+| `hilo` | card picker | `[1, config.cards ?? 13]` instead of the old fixed 1–13 |
+| `keno` | number picker | `[1, config.pool ?? 40]` instead of the old fixed 1–40 |
+| `roulette` | straight-bet value picker | `[0, pocketCount − 1]`, where `pocketCount` is 37 (european) or 38 (american) from `config.wheelType` |
+| `plinko` | ball-count select (`params.balls`) | options are filtered to what's ≤ `config.maxBalls` (1/3/10/100); the whole control is hidden when `maxBalls` is 1 (the default) |
+| `towers` | per-floor column buttons (session step) | **per-step**, not a single constant: `floors[currentStep].columns` when the game has a `floors` array (per-floor Pro config), else the legacy uniform `columns` — see `boundsFrom(cfg, currentStep)` in `lib/engines.ts` |
+
+All of these are **display/UX conveniences only** — the server re-validates every param/step against
+its own resolved config regardless of what the client sends (out-of-range ⇒ `API-204` + `validRange`).
 
 ## What the player puts in — and what can come out
 

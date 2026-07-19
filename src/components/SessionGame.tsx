@@ -56,11 +56,15 @@ export function SessionGame({
 
   // Grenzen des Index-Schritts: bevorzugt aus der laufenden Session, sonst
   // aus /api/meta; ohne beides greifen die Engine-DEFAULTS (nie das Maximum).
+  // `view?.steps` (bereits absolvierte Schritte) geht als currentStep mit —
+  // towers' boundsFrom nutzt das, um PRO ETAGE die richtige Spaltenzahl aus
+  // `floors[currentStep]` zu lesen (Pro-Config mit variierenden Etagen);
+  // Engines ohne Bedarf (mines) ignorieren den Parameter.
   const cfg = view?.engine?.config ?? engineConfig ?? null;
   const idxStep = sess.step.kind === 'index' ? sess.step : null;
   const bounds =
     idxStep &&
-    (cfg && idxStep.boundsFrom ? idxStep.boundsFrom(cfg) : { min: idxStep.min, max: idxStep.max });
+    (cfg && idxStep.boundsFrom ? idxStep.boundsFrom(cfg, view?.steps) : { min: idxStep.min, max: idxStep.max });
   const boundsAssumed = !!idxStep?.boundsFrom && !cfg;
 
   const finishIfEnded = useCallback(

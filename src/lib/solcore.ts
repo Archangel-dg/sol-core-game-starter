@@ -240,3 +240,76 @@ export function tournamentStep(id: string, risk: 'safe' | 'medium' | 'risky'): P
 export function tournamentStop(id: string): Promise<TournamentRunView> {
   return request<TournamentRunView>(`/api/game/tournament/run/${id}/stop`, { method: 'POST' });
 }
+
+// ── Demo-Modus (simulierter Saldo 3 SOL, echt verifiziert, kein Geldfluss) ──
+// Spiegelt die echten Endpunkte 1:1 unter /api/game/demo/*. Kein Solana-Wallet
+// nötig — die Demo-Wallet ist eine server-generierte ID mit simuliertem Saldo.
+
+export interface DemoStart {
+  demoWallet: string;
+  balanceLamports: string;
+  startLamports: string;
+}
+export function demoStart(): Promise<DemoStart> {
+  return request<DemoStart>('/api/game/demo/start', { method: 'POST', body: JSON.stringify({}) });
+}
+export function demoBalance(wallet: string): Promise<{ wallet: string; balanceLamports: string; rounds: number }> {
+  return request(`/api/game/demo/balance/${wallet}`);
+}
+
+export function demoBet(input: {
+  gameId: string;
+  playerWallet: string;
+  betLamports: string;
+  params: Record<string, unknown>;
+  clientSeed?: string;
+}): Promise<BetResult & { balanceLamports: string; demo: true }> {
+  return request('/api/game/demo/bet', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function demoSessionStart(input: {
+  gameId: string;
+  playerWallet: string;
+  betLamports: string;
+  clientSeed?: string;
+}): Promise<SessionView> {
+  return request<SessionView>('/api/game/demo/session/start', { method: 'POST', body: JSON.stringify(input) });
+}
+export function demoSessionGet(id: string): Promise<SessionView> {
+  return request<SessionView>(`/api/game/demo/session/${id}`);
+}
+export function demoSessionStep(id: string, body: Record<string, unknown>): Promise<SessionView> {
+  return request<SessionView>(`/api/game/demo/session/${id}/step`, { method: 'POST', body: JSON.stringify(body) });
+}
+export function demoSessionCashout(id: string): Promise<SessionView> {
+  return request<SessionView>(`/api/game/demo/session/${id}/cashout`, { method: 'POST' });
+}
+
+/** Turnier-Demo ist ein Übungslauf (kein Pot/Leaderboard) — eigene Form. */
+export interface DemoRunView {
+  runId: string;
+  gameId: string;
+  mode: string;
+  status: 'active' | 'busted' | 'stopped';
+  steps: number;
+  maxSteps: number;
+  score: number;
+  history: { step: number; risk: string; roll: number; survived: boolean; points: number }[];
+  proof: { serverSeedHash: string; clientSeed: string; nonce: number };
+  engine: { mode: string; config: Record<string, number> };
+  balanceLamports: string;
+  serverSeed?: string;
+  demo: true;
+}
+export function demoTournamentEnter(input: { playerWallet: string; clientSeed?: string }): Promise<DemoRunView> {
+  return request<DemoRunView>('/api/game/demo/tournament/enter', { method: 'POST', body: JSON.stringify(input) });
+}
+export function demoTournamentRun(id: string): Promise<DemoRunView> {
+  return request<DemoRunView>(`/api/game/demo/tournament/run/${id}`);
+}
+export function demoTournamentStep(id: string, risk: 'safe' | 'medium' | 'risky'): Promise<DemoRunView> {
+  return request<DemoRunView>(`/api/game/demo/tournament/run/${id}/step`, { method: 'POST', body: JSON.stringify({ risk }) });
+}
+export function demoTournamentStop(id: string): Promise<DemoRunView> {
+  return request<DemoRunView>(`/api/game/demo/tournament/run/${id}/stop`, { method: 'POST' });
+}

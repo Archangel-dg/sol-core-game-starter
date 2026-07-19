@@ -4,7 +4,7 @@ import type { RoundLog } from './SingleBetGame';
 import { toSol } from '@/lib/lamports';
 
 /** Letzte Runden (lokal im State). Design-Zone. */
-export function History({ rounds, apiUrl }: { rounds: RoundLog[]; apiUrl: string }) {
+export function History({ rounds, apiUrl, demo = false }: { rounds: RoundLog[]; apiUrl: string; demo?: boolean }) {
   if (rounds.length === 0) return null;
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
@@ -16,7 +16,7 @@ export function History({ rounds, apiUrl }: { rounds: RoundLog[]; apiUrl: string
               {(r.multiplierBps / 10000).toFixed(2)}× {r.win ? `+${toSol(r.payoutLamports)} ◎` : 'verloren'}
             </span>
             <a
-              href={`${apiUrl}/api/game/verify/${r.roundId}`}
+              href={`${apiUrl}/api/game/${demo ? 'demo/verify' : 'verify'}/${r.roundId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-white/30 underline underline-offset-2 hover:text-white/60"

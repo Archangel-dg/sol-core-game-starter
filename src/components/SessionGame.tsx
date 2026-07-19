@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { usePlayer, useDemo } from './DemoProvider';
 import type { EngineDef } from '@/lib/engines';
 import type { SessionView } from '@/lib/solcore';
 import { solToLamports, toSol } from '@/lib/lamports';
@@ -46,12 +46,13 @@ export function SessionGame({
   onRound: (serverSeedHash: string, roundId: string) => void;
   onLog: (r: RoundLog) => void;
 }) {
-  const { publicKey, connected } = useWallet();
+  const { wallet, connected, apiBase, demo } = usePlayer();
+  const { refreshDemoBalance } = useDemo();
   const [bet, setBet] = useState('0.01');
   const [view, setView] = useState<SessionView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const storeKey = `sc_session_${gameId}`;
+  const storeKey = `sc_session_${gameId}${demo ? '_demo' : ''}`;
   const sess = engine.session!;
 
   // Grenzen des Index-Schritts: bevorzugt aus der laufenden Session, sonst
@@ -71,6 +72,7 @@ export function SessionGame({
     (v: SessionView) => {
       if (v.status !== 'active') {
         localStorage.removeItem(storeKey);
+        if (demo) void refreshDemoBalance();
         if (v.roundId) {
           onRound(v.proof.serverSeedHash, v.roundId);
           onLog({
@@ -89,7 +91,7 @@ export function SessionGame({
   useEffect(() => {
     const id = typeof window !== 'undefined' ? localStorage.getItem(storeKey) : null;
     if (!id) return;
-    fetch(`/api/session/${id}`)
+    fetch(`${apiBase}/session/${id}`)
       .then((r) => r.json())
       .then((v: SessionView & { error?: unknown }) => {
         if (!v.error) {
@@ -126,9 +128,9 @@ export function SessionGame({
   };
 
   const start = async () => {
-    if (!publicKey) return;
-    const v = await call('/api/session/start', {
-      playerWallet: publicKey.toBase58(),
+    if (!wallet) return;
+    const v = await call(`${apiBase}/session/start`, {
+      playerWallet: wallet,
       betLamports: solToLamports(bet).toString(),
     });
     if (v) {
@@ -139,7 +141,7 @@ export function SessionGame({
 
   const step = async (arg: { value?: number; guess?: 'higher' | 'lower' }) => {
     if (!view) return;
-    const v = await call(`/api/session/${view.sessionId}/step`, sess.buildStep(arg));
+    const v = await call(`${apiBase}/session/${view.sessionId}/step`, sess.buildStep(arg));
     if (v) {
       setView(v);
       finishIfEnded(v);
@@ -148,7 +150,7 @@ export function SessionGame({
 
   const cashout = async () => {
     if (!view) return;
-    const v = await call(`/api/session/${view.sessionId}/cashout`);
+    const v = await call(`${apiBase}/session/${view.sessionId}/cashout`);
     if (v) {
       setView(v);
       finishIfEnded(v);

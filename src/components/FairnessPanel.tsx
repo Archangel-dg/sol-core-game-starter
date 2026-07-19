@@ -8,10 +8,12 @@ export function FairnessPanel({
   apiUrl,
   serverSeedHash,
   roundId,
+  demo = false,
 }: {
   apiUrl: string;
   serverSeedHash: string | null;
   roundId: string | null;
+  demo?: boolean;
 }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
@@ -21,7 +23,7 @@ export function FairnessPanel({
       </div>
       {roundId && (
         <a
-          href={`${apiUrl}/api/game/verify/${roundId}`}
+          href={`${apiUrl}/api/game/${demo ? 'demo/verify' : 'verify'}/${roundId}`}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-1 inline-block text-accent underline underline-offset-2"

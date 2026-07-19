@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { usePlayer, useDemo } from './DemoProvider';
 import type { Control, EngineDef } from '@/lib/engines';
 import { solToLamports } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
@@ -59,7 +59,8 @@ export function SingleBetGame({
   onRound: (serverSeedHash: string, roundId: string) => void;
   onLog: (r: RoundLog) => void;
 }) {
-  const { publicKey, connected } = useWallet();
+  const { wallet, connected, apiBase, demo } = usePlayer();
+  const { refreshDemoBalance } = useDemo();
   const [bet, setBet] = useState('0.01');
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -81,17 +82,17 @@ export function SingleBetGame({
   const { pool: kenoPool, maxPicks: kenoMaxPicks } = kenoBounds(engine, engineConfig);
 
   const play = async () => {
-    if (!publicKey) return;
+    if (!wallet) return;
     setBusy(true);
     setError(null);
     setResult(null);
     try {
       const params = engine.buildSingleParams ? engine.buildSingleParams(values) : {};
-      const r = await fetch('/api/play', {
+      const r = await fetch(`${apiBase}/play`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          playerWallet: publicKey.toBase58(),
+          playerWallet: wallet,
           betLamports: solToLamports(bet).toString(),
           params,
         }),
@@ -116,6 +117,7 @@ export function SingleBetGame({
         payoutLamports: r.result.payoutLamports,
         roundId: r.roundId,
       });
+      if (demo) void refreshDemoBalance();
     } catch (e) {
       setError((e as Error).message);
     } finally {

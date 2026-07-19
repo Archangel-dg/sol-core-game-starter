@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react';
 import { WalletButton } from '@/components/WalletButton';
 import { BalanceBar } from '@/components/BalanceBar';
+import { DemoBar } from '@/components/DemoBar';
+import { DemoProvider, useDemo } from '@/components/DemoProvider';
 import { SingleBetGame, type RoundLog } from '@/components/SingleBetGame';
 import { SessionGame } from '@/components/SessionGame';
 import { TournamentGame } from '@/components/TournamentGame';
+import { DemoTournamentGame } from '@/components/DemoTournamentGame';
 import { FairnessPanel } from '@/components/FairnessPanel';
 import { History } from '@/components/History';
 import { getEngine } from '@/lib/engines';
@@ -18,26 +21,32 @@ interface Meta {
   apiUrl: string;
   devMock: boolean;
   network: string;
-  /** Aufgelöste Engine-Dimensionen vom Server (null bei altem API-Stand). */
   engineConfig?: Record<string, number> | null;
   serverMode?: string | null;
-  /** 'engine_mismatch' → Server-Registrierung ≠ NEXT_PUBLIC_ENGINE. */
   warning?: string;
   error?: { message: string };
 }
 
 export default function Home() {
   const [meta, setMeta] = useState<Meta | null>(null);
-  const [seedHash, setSeedHash] = useState<string | null>(null);
-  const [roundId, setRoundId] = useState<string | null>(null);
-  const [history, setHistory] = useState<RoundLog[]>([]);
-
   useEffect(() => {
     fetch('/api/meta')
       .then((r) => r.json())
       .then(setMeta)
       .catch(() => setMeta({ error: { message: 'Backend nicht erreichbar' } } as Meta));
   }, []);
+  return (
+    <DemoProvider>
+      <HomeInner meta={meta} />
+    </DemoProvider>
+  );
+}
+
+function HomeInner({ meta }: { meta: Meta | null }) {
+  const { demo } = useDemo();
+  const [seedHash, setSeedHash] = useState<string | null>(null);
+  const [roundId, setRoundId] = useState<string | null>(null);
+  const [history, setHistory] = useState<RoundLog[]>([]);
 
   const engine = meta && !meta.error ? getEngine(meta.engine) : undefined;
   const onRound = (h: string, r: string) => {
@@ -80,11 +89,17 @@ export default function Home() {
               fehlschlagen — Env-Variablen an die Registrierung anpassen.
             </div>
           )}
-          <BalanceBar devMock={meta.devMock} />
+
+          {/* Demo-Einstieg / -Saldo. Im Demo-Modus zählt die simulierte Wallet. */}
+          <DemoBar />
+          {!demo && <BalanceBar devMock={meta.devMock} />}
+
           {meta.mechanic === 'tournament' ? (
-            // Turnier bringt Countdown/Pot/Leaderboard/Proof selbst mit —
-            // Verify läuft über /api/game/tournament/verify/:runId.
-            <TournamentGame engine={engine} />
+            demo ? (
+              <DemoTournamentGame engine={engine} />
+            ) : (
+              <TournamentGame engine={engine} />
+            )
           ) : meta.mechanic === 'session' ? (
             <SessionGame
               engine={engine}
@@ -101,14 +116,17 @@ export default function Home() {
               onLog={onLog}
             />
           )}
+
           {meta.mechanic !== 'tournament' && (
             <>
-              <FairnessPanel apiUrl={meta.apiUrl} serverSeedHash={seedHash} roundId={roundId} />
-              <History rounds={history} apiUrl={meta.apiUrl} />
+              <FairnessPanel apiUrl={meta.apiUrl} serverSeedHash={seedHash} roundId={roundId} demo={demo} />
+              <History rounds={history} apiUrl={meta.apiUrl} demo={demo} />
             </>
           )}
           <p className="pt-2 text-center text-[11px] text-white/30">
-            Ergebnisse kommen ausschließlich vom Sol-Core-Server. Nur Devnet-Test-SOL.
+            {demo
+              ? 'Demo-Modus — simuliertes Guthaben, jeder Spin ist echt provably-fair. Kein echtes Geld.'
+              : 'Ergebnisse kommen ausschließlich vom Sol-Core-Server. Nur Devnet-Test-SOL.'}
           </p>
         </div>
       )}

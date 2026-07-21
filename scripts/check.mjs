@@ -39,7 +39,7 @@ const SINGLE_PARAMS = {
   limbo: { targetMultiplierBps: 20000 },
   mines: { tiles: [0] },
   hilo: { card: 7, guess: 'higher' },
-  plinko: {}, wheel: {}, scratch: {}, 'slots-3x3': {},
+  plinko: {}, wheel: {}, scratch: {}, 'slots-3x3': {}, 'slots-modular': {},
   keno: { picks: [1, 2, 3] },
   roulette: { betType: 'red' },
 };

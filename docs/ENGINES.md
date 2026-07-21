@@ -29,6 +29,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `keno` | table | ✓ | | `{ picks: number[] }` (1–10 of 1–40) |
 | `roulette` | table | ✓ | | `{ betType, value? }` |
 | `slots-3x3` | slot | ✓ | | `{}` |
+| `slots-modular` | slot | ✓ | | `{}` |
 | `towers` | chain | | ✓ | — (session) |
 | `pump` | curve | | ✓ | — (session) |
 | `gauntlet` | tournament | | | — (tournament) |
@@ -101,6 +102,7 @@ shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
 | `keno` | 1–10 of 40 numbers | more hits = more payout | top tier at all hits |
 | `roulette` | classic bet | fixed payouts (2×/3×/36×) | 36× straight (RTP 97.3%) |
 | `slots-3x3` | — (spin) | centre line: triple/pair pays | top triple of the reel |
+| `slots-modular` | — (spin) | up to 20 lines pay 3/4/5-of-a-kind left-to-right (wild substitutes); 3+ scatters pay anywhere; all hits of a spin sum | `lineCount·maxPay + scatterMax` (conservative bound) |
 | `towers` | one column per floor (2–4, from config) | each safe floor multiplies; bomb = loss; cash out any time | `(1−edge)·(c/(c−1))^levels` |
 | `pump` | pump again or cash out | each pump grows the multiplier; burst = loss | `growth^maxPumps` |
 | `gauntlet` | a risk tier per step, bank in time | entry feeds the pot; bust zeroes the run; best score per wallet ranks — top ranks split the pot at cycle end | pot share of rank 1 |
@@ -109,6 +111,37 @@ shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
 
 `red · black · odd · even · low (1–18) · high (19–36)` (no `value`) ·
 `dozen`/`column` (`value` 0–2) · `straight` (`value` 0–36).
+
+## `slots-modular` renderSpec + result `details`
+
+Unlike the other engines, `slots-modular`'s `engineConfig` (from `GET /api/meta`) carries the
+**full render spec** the client needs to draw the reels itself — no separate lookup:
+
+- `reels: 5`, `rows: 3`, `lineCount` (1–20, how many of the 20-line catalog are active).
+- `symbols`: `{ id, wild, scatter, paysBps: [3oak, 4oak, 5oak] }[]` — read defensively
+  (`Array.isArray`/`typeof id === 'string'`); an unknown/missing symbol id falls back to a
+  deterministic placeholder glyph (see `src/lib/symbolArt.ts`), never a client-side guess at the
+  symbol's identity.
+- `paylines`: `number[][]` — one row-index array (length 5, one per reel) per active line, same
+  order as `lineWins[].line` below.
+- `scatterPaysBps`: `[3, 4, 5]`-scatter payout tiers (informational; the server already applies
+  them in `result.details`).
+
+`result.details` (present only on the newer API; older responses omit it) carries the **resolved**
+grid for that spin:
+
+- `grid`: `string[][]` indexed `grid[reel][row]` — the symbol id landing in each of the 15 cells.
+- `lineWins`: `{ line, symbol, count, payBps }[]` — one entry per line that paid (`line` indexes
+  into `paylines` above).
+- `scatterCount` / `scatterPayBps`: how many scatters landed and what they paid (`0` if fewer
+  than 3).
+
+`src/components/SlotGrid.tsx` renders this: with no `details` (idle) it shows a paytable preview
+built purely from `engineConfig.symbols`; with `details.grid` present it draws the resolved grid
+and highlights the winning lines/scatters. It never derives an outcome — every cell comes straight
+from the server's `details.grid`; the column stagger is a pure reveal animation, not a draw. A
+`result` **without** `details.grid` (old API) falls back to the plain `ResultView` in
+`SingleBetGame.tsx`.
 
 ## Notes
 

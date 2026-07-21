@@ -7,6 +7,7 @@ import { solToLamports } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
 import { EngineControls } from './EngineControls';
 import { ResultView } from './ResultView';
+import { SlotGrid } from './SlotGrid';
 
 export interface RoundLog {
   win: boolean;
@@ -70,6 +71,7 @@ export function SingleBetGame({
     multiplierBps: number;
     payoutLamports: string;
     roll: number | null;
+    details: Record<string, unknown> | null;
   } | null>(null);
 
   // Render-Grenzen aus der Server-Config — ändert NICHT die params-Struktur
@@ -109,6 +111,7 @@ export function SingleBetGame({
         multiplierBps: r.result.multiplierBps,
         payoutLamports: r.result.payoutLamports,
         roll: r.result.roll,
+        details: r.result.details ?? null,
       });
       onRound(r.proof.serverSeedHash, r.roundId);
       onLog({
@@ -128,19 +131,41 @@ export function SingleBetGame({
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
       <div className="mb-4">
-        {result ? (
-          <ResultView {...result} />
-        ) : (
-          <div className="grid min-h-28 place-items-center rounded-xl bg-night px-4 py-3 text-center">
-            <div>
-              <p className="text-white/40">{engine.blurb}</p>
-              {/* Income/Outcome in einfachen Worten — was man tut, was passieren kann. */}
-              <p className="mt-2 text-xs text-white/30">
-                {engine.playerFacts.inputs} {engine.playerFacts.outcomes}
-              </p>
+        {(() => {
+          const slotsDetails =
+            engine.key === 'slots-modular' && result && Array.isArray((result.details as { grid?: unknown } | null)?.grid)
+              ? (result.details as Record<string, unknown>)
+              : null;
+          if (engine.key === 'slots-modular' && !result) {
+            // Idle: Paytable-Vorschau aus dem renderSpec.
+            return <SlotGrid engineConfig={engineConfig ?? null} details={null} />;
+          }
+          if (slotsDetails) {
+            return (
+              <SlotGrid
+                engineConfig={engineConfig ?? null}
+                details={slotsDetails}
+                win={result!.win}
+                multiplierBps={result!.multiplierBps}
+                payoutLamports={result!.payoutLamports}
+              />
+            );
+          }
+          return result ? (
+            <ResultView {...result} />
+          ) : (
+            /* bisheriger Idle-Block unverändert (nicht-slots Engines) */
+            <div className="grid min-h-28 place-items-center rounded-xl bg-night px-4 py-3 text-center">
+              <div>
+                <p className="text-white/40">{engine.blurb}</p>
+                {/* Income/Outcome in einfachen Worten — was man tut, was passieren kann. */}
+                <p className="mt-2 text-xs text-white/30">
+                  {engine.playerFacts.inputs} {engine.playerFacts.outcomes}
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       <label className="block text-xs text-white/50">

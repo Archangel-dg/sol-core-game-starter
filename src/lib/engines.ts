@@ -326,6 +326,21 @@ export const ENGINES: EngineDef[] = [
     buildSingleParams: () => ({}),
   },
   {
+    key: 'slots-modular',
+    label: 'Slots Modular',
+    category: 'Slot',
+    mechanics: ['single'],
+    blurb: '5×3-Video-Slot: Linien, Wilds, Scatter.',
+    playerFacts: {
+      inputs: 'Walzen drehen — ein Einsatz, keine weitere Auswahl.',
+      outcomes:
+        'Bis zu 20 Gewinnlinien zahlen 3/4/5 gleiche Symbole von links (Wild ersetzt); ' +
+        '3+ Scatter zahlen überall. Alle Treffer eines Spins summieren sich — sonst ist der Einsatz weg.',
+    },
+    singleControls: [],
+    buildSingleParams: () => ({}),
+  },
+  {
     key: 'towers',
     label: 'Towers',
     category: 'Chain',

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { toSol } from '@/lib/lamports';
 import { symbolArt } from '@/lib/symbolArt';
 import type { EngineConfig } from '@/lib/engines';
@@ -39,6 +40,15 @@ export function SlotGrid({
   payoutLamports?: string;
 }) {
   const { symbols, paylines } = specFrom(engineConfig);
+
+  // Mount-Transition fürs Spalten-Stagger-Reveal: blendet NUR die Optik ein
+  // (opacity/scale) — das Server-Grid selbst ändert sich dadurch nie.
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    setRevealed(false);
+    const t = requestAnimationFrame(() => setRevealed(true));
+    return () => cancelAnimationFrame(t);
+  }, [details]);
 
   // Idle: Paytable-Vorschau aus dem renderSpec (degradiert leer, wenn absent).
   if (!details) {
@@ -96,9 +106,11 @@ export function SlotGrid({
               <div
                 key={`${reel}:${row}`}
                 className={`grid aspect-square place-items-center rounded-lg text-2xl transition-all duration-300 ${
+                  revealed ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+                } ${
                   isHot ? 'bg-accent/20 ring-2 ring-accent' : isScatter ? 'bg-white/10 ring-2 ring-purple-400' : 'bg-white/[0.05]'
                 }`}
-                style={{ color: art.tint, animationDelay: `${reel * 80}ms` }}
+                style={{ color: art.tint, transitionDelay: `${reel * 80}ms` }}
               >
                 {art.glyph}
               </div>

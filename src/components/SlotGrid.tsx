@@ -12,18 +12,31 @@ import type { EngineConfig } from '@/lib/engines';
  * Spalten-Stagger-Animation blendet nur zum Server-Grid ÜBER.
  */
 interface RenderSymbol { id: string; wild?: number; scatter?: number; paysBps?: number[] }
+interface FreeSpinsSpec { triggerScatterCount: number; maxTotalSpins: number; multiplierBps: number }
 
 function specFrom(cfg: EngineConfig | null): {
-  symbols: RenderSymbol[]; paylines: number[][];
+  symbols: RenderSymbol[]; paylines: number[][]; freeSpins: FreeSpinsSpec | null;
 } {
-  const raw = cfg as unknown as { symbols?: unknown; paylines?: unknown } | null;
+  const raw = cfg as unknown as { symbols?: unknown; paylines?: unknown; freeSpins?: unknown } | null;
   const symbols = Array.isArray(raw?.symbols)
     ? (raw!.symbols as RenderSymbol[]).filter((s) => typeof s?.id === 'string')
     : [];
   const paylines = Array.isArray(raw?.paylines)
     ? (raw!.paylines as number[][]).filter((l) => Array.isArray(l) && l.length === 5)
     : [];
-  return { symbols, paylines };
+  const fsRaw = raw?.freeSpins as Record<string, unknown> | undefined;
+  const freeSpins =
+    fsRaw && typeof fsRaw === 'object' &&
+    typeof fsRaw.triggerScatterCount === 'number' &&
+    typeof fsRaw.maxTotalSpins === 'number' &&
+    typeof fsRaw.multiplierBps === 'number'
+      ? {
+          triggerScatterCount: fsRaw.triggerScatterCount,
+          maxTotalSpins: fsRaw.maxTotalSpins,
+          multiplierBps: fsRaw.multiplierBps,
+        }
+      : null;
+  return { symbols, paylines, freeSpins };
 }
 
 export function SlotGrid({
@@ -39,7 +52,7 @@ export function SlotGrid({
   multiplierBps?: number;
   payoutLamports?: string;
 }) {
-  const { symbols, paylines } = specFrom(engineConfig);
+  const { symbols, paylines, freeSpins } = specFrom(engineConfig);
 
   // Mount-Transition fürs Spalten-Stagger-Reveal: blendet NUR die Optik ein
   // (opacity/scale) — das Server-Grid selbst ändert sich dadurch nie.
@@ -69,6 +82,12 @@ export function SlotGrid({
               );
             })}
           </div>
+        )}
+        {freeSpins && (
+          <p className="mt-2 text-center text-[11px] text-white/40">
+            Free Spins: {freeSpins.triggerScatterCount}+ Scatter → bis zu {freeSpins.maxTotalSpins} Spins ×
+            {freeSpins.multiplierBps / 10000}
+          </p>
         )}
       </div>
     );
@@ -131,6 +150,17 @@ export function SlotGrid({
             {scatterPayBps > 0 ? `${lineWins.length ? ' · ' : ''}${scatterCount} Scatter (${(scatterPayBps / 10000).toFixed(2)}×)` : ''}
           </div>
         )}
+        {(() => {
+          const fs = details.freeSpins as { totalSpins?: number; totalWinBps?: number } | undefined;
+          if (!fs) return null;
+          const totalSpins = typeof fs.totalSpins === 'number' ? fs.totalSpins : 0;
+          const totalWinBps = typeof fs.totalWinBps === 'number' ? fs.totalWinBps : 0;
+          return (
+            <div className="mt-1 text-xs text-purple-300">
+              🎁 {totalSpins} Free Spins · +{(totalWinBps / 10000).toFixed(2)}×
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

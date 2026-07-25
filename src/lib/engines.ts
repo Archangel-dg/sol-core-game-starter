@@ -3,7 +3,7 @@
 // params-Bauer (für /bet bzw. Session-Steps) und Ergebnis-Text. Datengesteuert,
 // damit eine generische UI jede Engine bedienen kann.
 
-export type Mechanic = 'single' | 'session' | 'tournament';
+export type Mechanic = 'single' | 'session' | 'tournament' | 'live';
 
 /**
  * Aufgelöste Engine-Dimensionen des konkreten Spiels (vom Server, via
@@ -73,6 +73,12 @@ export interface EngineDef {
     buildStep: (input: { risk: 'safe' | 'medium' | 'risky' }) => Record<string, unknown>;
     hint: string;
   };
+  // ── Live (geteilte Wettrunden auf Operator-Streams) ──
+  /** Live-Runde: Outcome wählen + Einsatz während des Wettfensters; das
+   * Ergebnis zieht der Server für ALLE Skins des Streams identisch. Die
+   * Controls sind datengetrieben aus /api/live/state (Outcomes + Quoten),
+   * nicht statisch — daher hier nur der Hinweistext. */
+  live?: { hint: string };
 }
 
 const num = (v: Record<string, string>, k: string, d = 0): number => {
@@ -397,6 +403,22 @@ export const ENGINES: EngineDef[] = [
       step: { kind: 'action', label: 'Pump' },
       buildStep: () => ({}),
       hint: 'Jeder Pump erhöht den Multiplikator; rechtzeitig cashen.',
+    },
+  },
+  {
+    key: 'live-odds',
+    label: 'Live Betting',
+    category: 'Live',
+    mechanics: ['live'],
+    blurb: 'Geteilte Live-Runden: auf ein Outcome setzen — überall gewinnt dasselbe.',
+    playerFacts: {
+      inputs:
+        'Während des Wettfensters auf ein Outcome setzen (z. B. Starter 1–4 eines Rennens), feste Quote pro Outcome. Mehrere Bets pro Runde erlaubt.',
+      outcomes:
+        'Nach Ablauf des Countdowns zieht der Server EIN Ergebnis für alle Spiele dieses Streams (provably fair, Hash vor Wettbeginn committed). Treffer zahlt Einsatz × Quote — die Gutschrift ist sofort auf dem Konto, die Anzeige folgt der Reveal-Animation.',
+    },
+    live: {
+      hint: 'Outcome wählen, Einsatz setzen, Countdown abwarten — das Rennen zeigt das Ergebnis.',
     },
   },
 ];

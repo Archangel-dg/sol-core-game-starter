@@ -14,6 +14,21 @@ result animation.
 
 None of this touches the money flow — reshape it freely.
 
+## Live reveal animations (`LiveResultView.tsx`)
+
+The live design zone. Build the race/reveal of your theme (horses, cars, rockets …) on top of the
+same props contract: `{ outcomes, resultIndex, phase, revealProgress, myBets }`.
+
+Binding rules:
+
+1. The animation must be a **pure function** of `resultIndex` + `revealProgress` (+ outcomes) — no
+   `Math.random()`, no own timers deciding positions. Every skin of the stream must
+   deterministically show the same winner.
+2. The winner must stand at `revealProgress = 1` at the latest; end your animation no later.
+3. Results come only from the props (the server) — never derive or guess them client-side.
+4. Don't remove the balance-freeze wiring (`lib/balance-freeze.tsx` + `BalanceBar`): it keeps the
+   balance display from spoiling the result mid-animation.
+
 ## Build your own engine visuals
 
 Want a real animation for your engine (a rising pump curve, flipping hi-lo cards) instead of the

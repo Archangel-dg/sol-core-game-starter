@@ -9,14 +9,16 @@ import { SingleBetGame, type RoundLog } from '@/components/SingleBetGame';
 import { SessionGame } from '@/components/SessionGame';
 import { TournamentGame } from '@/components/TournamentGame';
 import { DemoTournamentGame } from '@/components/DemoTournamentGame';
+import { LiveGame } from '@/components/LiveGame';
 import { FairnessPanel } from '@/components/FairnessPanel';
 import { History } from '@/components/History';
+import { BalanceFreezeProvider } from '@/lib/balance-freeze';
 import { getEngine } from '@/lib/engines';
 
 interface Meta {
   gameName: string;
   engine: string;
-  mechanic: 'single' | 'session' | 'tournament';
+  mechanic: 'single' | 'session' | 'tournament' | 'live';
   gameId: string;
   apiUrl: string;
   devMock: boolean;
@@ -64,6 +66,7 @@ function HomeInner({ meta }: { meta: Meta | null }) {
             Devnet · {engine?.label ?? meta?.engine ?? '…'}
             {meta?.mechanic === 'session' ? ' · Session' : ''}
             {meta?.mechanic === 'tournament' ? ' · Turnier' : ''}
+            {meta?.mechanic === 'live' ? ' · Live' : ''}
           </p>
         </div>
         <WalletButton />
@@ -80,55 +83,64 @@ function HomeInner({ meta }: { meta: Meta | null }) {
       ) : !meta || !engine ? (
         <p className="text-white/40">Lädt…</p>
       ) : (
-        <div className="space-y-4">
-          {meta.warning === 'engine_mismatch' && (
-            <div className="rounded-xl border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-200">
-              <strong>Engine-Konflikt:</strong> Dieses Spiel ist auf dem Server als{' '}
-              <code>{meta.serverMode}</code> registriert, die App ist aber als{' '}
-              <code>{meta.engine}</code> konfiguriert (NEXT_PUBLIC_ENGINE). Jede Runde wird
-              fehlschlagen — Env-Variablen an die Registrierung anpassen.
-            </div>
-          )}
+        <BalanceFreezeProvider>
+          <div className="space-y-4">
+            {meta.warning === 'engine_mismatch' && (
+              <div className="rounded-xl border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-200">
+                <strong>Engine-Konflikt:</strong> Dieses Spiel ist auf dem Server als{' '}
+                <code>{meta.serverMode}</code> registriert, die App ist aber als{' '}
+                <code>{meta.engine}</code> konfiguriert (NEXT_PUBLIC_ENGINE). Jede Runde wird
+                fehlschlagen — Env-Variablen an die Registrierung anpassen.
+              </div>
+            )}
 
-          {/* Demo-Einstieg / -Saldo. Im Demo-Modus zählt die simulierte Wallet. */}
-          <DemoBar />
-          {!demo && <BalanceBar devMock={meta.devMock} />}
+            {/* Demo-Einstieg / -Saldo. Im Demo-Modus zählt die simulierte Wallet.
+                Live-Runden laufen immer echt — dort gibt es keinen Demo-Modus. */}
+            {meta.mechanic !== 'live' && <DemoBar />}
+            {(!demo || meta.mechanic === 'live') && <BalanceBar devMock={meta.devMock} />}
 
-          {meta.mechanic === 'tournament' ? (
-            demo ? (
-              <DemoTournamentGame engine={engine} />
+            {meta.mechanic === 'live' ? (
+              // Live bringt Countdown/Runden/Ergebnis-Ticker selbst mit —
+              // Verify läuft über /api/game/live/verify/:roundId.
+              <LiveGame engine={engine} />
+            ) : meta.mechanic === 'tournament' ? (
+              // Turnier bringt Countdown/Pot/Leaderboard/Proof selbst mit —
+              // Verify läuft über /api/game/tournament/verify/:runId.
+              demo ? (
+                <DemoTournamentGame engine={engine} />
+              ) : (
+                <TournamentGame engine={engine} />
+              )
+            ) : meta.mechanic === 'session' ? (
+              <SessionGame
+                engine={engine}
+                gameId={meta.gameId}
+                engineConfig={meta.engineConfig}
+                onRound={onRound}
+                onLog={onLog}
+              />
             ) : (
-              <TournamentGame engine={engine} />
-            )
-          ) : meta.mechanic === 'session' ? (
-            <SessionGame
-              engine={engine}
-              gameId={meta.gameId}
-              engineConfig={meta.engineConfig}
-              onRound={onRound}
-              onLog={onLog}
-            />
-          ) : (
-            <SingleBetGame
-              engine={engine}
-              engineConfig={meta.engineConfig}
-              onRound={onRound}
-              onLog={onLog}
-            />
-          )}
+              <SingleBetGame
+                engine={engine}
+                engineConfig={meta.engineConfig}
+                onRound={onRound}
+                onLog={onLog}
+              />
+            )}
 
-          {meta.mechanic !== 'tournament' && (
-            <>
-              <FairnessPanel apiUrl={meta.apiUrl} serverSeedHash={seedHash} roundId={roundId} demo={demo} />
-              <History rounds={history} apiUrl={meta.apiUrl} demo={demo} />
-            </>
-          )}
-          <p className="pt-2 text-center text-[11px] text-white/30">
-            {demo
-              ? 'Demo-Modus — simuliertes Guthaben, jeder Spin ist echt provably-fair. Kein echtes Geld.'
-              : 'Ergebnisse kommen ausschließlich vom Sol-Core-Server. Nur Devnet-Test-SOL.'}
-          </p>
-        </div>
+            {meta.mechanic !== 'tournament' && meta.mechanic !== 'live' && (
+              <>
+                <FairnessPanel apiUrl={meta.apiUrl} serverSeedHash={seedHash} roundId={roundId} demo={demo} />
+                <History rounds={history} apiUrl={meta.apiUrl} demo={demo} />
+              </>
+            )}
+            <p className="pt-2 text-center text-[11px] text-white/30">
+              {demo && meta.mechanic !== 'live'
+                ? 'Demo-Modus — simuliertes Guthaben, jeder Spin ist echt provably-fair. Kein echtes Geld.'
+                : 'Ergebnisse kommen ausschließlich vom Sol-Core-Server. Nur Devnet-Test-SOL.'}
+            </p>
+          </div>
+        </BalanceFreezeProvider>
       )}
     </main>
   );

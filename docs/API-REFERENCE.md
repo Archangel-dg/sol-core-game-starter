@@ -117,6 +117,38 @@ Rules the UI MUST reflect:
 - **15 min inactivity** → auto-bank (no refund — the entry fed the pot at purchase).
 - The creator can't play their own tournament (`API-303`).
 
+## Live layer (live-odds) — shared rounds on an operator stream
+
+Every game ("skin") referencing the same stream sees identical rounds and results — one designs a
+horse race, another a car race, and everywhere runner #3 wins. Fixed odds per outcome, fee-on-top
+like `/bet`. Winners are credited **at the draw**; the reveal window afterwards is for the skins'
+animations only.
+
+- `GET /api/game/live/state` — stream config + current round (cached ~1 s):
+  `{ stream: { id, slug, displayName, outcomes: [{ index, label, oddsBps, weight }],
+  bettingSeconds, revealSeconds, intermissionSeconds, maxBetLamports, maxBetsPerPlayer },
+  round: { roundId, roundNo, status, opensAt, locksAt, revealsUntil, serverSeedHash, clientSeed,
+  outcomes, result }|null, lastRound, nextOpensAt, serverTime }`
+  — `result` is **structurally null** until `status: "revealing"` (no early leak possible).
+- `GET /api/game/live/recent?limit=20` — last settled results (cached ~5 s) for the ticker.
+- `POST /api/game/live/bet` — `{ playerWallet, roundId, outcomeIndex, betLamports }` →
+  `{ betId, roundNo, oddsBps, potentialPayoutLamports, fees, locksAt, proof }`. The `roundId` must
+  be the currently displayed round (`API-204 round_mismatch` otherwise); after `locksAt` the server
+  rejects with `API-204 betting_locked`.
+- `GET /api/game/live/me/:wallet?roundId=` — own bets of a round for THIS game + totals.
+- `GET /api/game/live/history?wallet=&limit=` — own settled bets for THIS game.
+- `GET /api/game/live/round/:roundId` — full round view.
+- `GET /api/game/live/verify/:roundId` — **public** provably-fair check: seed hash was committed
+  before betting opened; message is `live:<streamId>:<roundNo>` at nonce 0; outcome recomputed
+  from the committed weights (`edge` boundaries included in the response).
+
+Rules the UI MUST reflect:
+- Bets bind to the displayed round; countdowns come from server timestamps + clock offset.
+- During `revealing` the balance display is **frozen** (`lib/balance-freeze.tsx`) and own-bet
+  results are not shown — the animation reveals the winner, then everything refreshes.
+- `API-302 live_exposure_cap` = this outcome's book is full for the round — smaller stake or a
+  different outcome.
+
 ## Player balance (program mode; hide when `devMock: true`)
 
 - `GET /api/game/balance/:wallet` → `{ wallet, devMock, balanceLamports: string|null }`

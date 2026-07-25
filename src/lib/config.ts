@@ -42,8 +42,15 @@ export function publicConfig(): PublicConfig {
       `NEXT_PUBLIC_ENGINE="${engine}" ist unbekannt. Erlaubt: siehe docs/ENGINES.md.`,
     );
   }
-  if (mechanic !== 'single' && mechanic !== 'session' && mechanic !== 'tournament') {
-    throw new Error(`NEXT_PUBLIC_MECHANIC muss "single", "session" oder "tournament" sein.`);
+  if (
+    mechanic !== 'single' &&
+    mechanic !== 'session' &&
+    mechanic !== 'tournament' &&
+    mechanic !== 'live'
+  ) {
+    throw new Error(
+      `NEXT_PUBLIC_MECHANIC muss "single", "session", "tournament" oder "live" sein.`,
+    );
   }
   if (!engineSupports(engine, mechanic)) {
     throw new Error(

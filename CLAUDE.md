@@ -41,8 +41,16 @@ them only if the user explicitly asks and you are certain the contract with the 
 
 - Change design/styling; build the result animation (in `ResultView` or a replacement with the same
   props).
+- Build the live reveal animation (in `LiveResultView` or a replacement with the same props) —
+  it must be a pure function of `resultIndex` + `revealProgress` (deterministic replay across all
+  skins of a stream), and the winner must stand at `revealProgress = 1`.
 - Add purely visual components in the design zone.
 - Adjust copy/language.
+
+Live-specific contract additions: `src/lib/balance-freeze.tsx` and the freeze wiring in
+`BalanceBar` are system contract — they keep the balance display from leaking a live result
+mid-animation (the server credits winners at the draw). Never remove them, never show live win/loss
+before the reveal window ends.
 
 ## Before every commit
 

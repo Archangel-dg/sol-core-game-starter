@@ -1,18 +1,28 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { buildDepositTx } from '@/lib/player-program';
 import { toSol, solToLamports } from '@/lib/lamports';
+import { useBalanceFreeze } from '@/lib/balance-freeze';
 
 /**
  * Guthaben-Leiste: interne Balance (Poll alle 10 s) + Einzahlen (on-chain) +
  * Auszahlen. Wird bei devMock automatisch ausgeblendet (Feature-Flag).
  * Design frei anpassbar; die Geld-Logik (Deposit-Tx, Endpunkte) ist Vertrag.
+ *
+ * Balance-Freeze (Live-Reveals, Systemvertrag — nie entfernen): Solange
+ * `frozen` gilt, werden Poll-Ergebnisse VERWORFEN und der letzte Wert
+ * gehalten — sonst würde der 10s-Poll den Gewinn mitten in der Reveal-
+ * Animation verraten. Serverseitig ist die Balance längst korrekt;
+ * Einzahlen/Auszahlen bleiben deshalb aktiv.
  */
 export function BalanceBar({ devMock }: { devMock: boolean }) {
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
+  const { frozen } = useBalanceFreeze();
+  const frozenRef = useRef(frozen);
+  frozenRef.current = frozen;
   const [balance, setBalance] = useState<string | null>(null);
   const [amount, setAmount] = useState('0.1');
   const [busy, setBusy] = useState<'deposit' | 'withdraw' | null>(null);
@@ -22,6 +32,7 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
     if (!publicKey) return;
     try {
       const r = await fetch(`/api/balance/${publicKey.toBase58()}`).then((x) => x.json());
+      if (frozenRef.current) return; // Anzeige eingefroren — Ergebnis verwerfen
       setBalance(r.balanceLamports ?? null);
     } catch {
       /* still */
@@ -33,6 +44,11 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
     const id = setInterval(() => void refresh(), 10_000);
     return () => clearInterval(id);
   }, [refresh]);
+
+  // Freigabe nach dem Reveal → sofort den echten Stand nachladen.
+  useEffect(() => {
+    if (!frozen) void refresh();
+  }, [frozen, refresh]);
 
   const deposit = useCallback(async () => {
     if (!publicKey) return;

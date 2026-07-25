@@ -313,3 +313,130 @@ export function demoTournamentStep(id: string, risk: 'safe' | 'medium' | 'risky'
 export function demoTournamentStop(id: string): Promise<DemoRunView> {
   return request<DemoRunView>(`/api/game/demo/tournament/run/${id}/stop`, { method: 'POST' });
 }
+
+// ── Live-Schicht (geteilte Wettrunden auf Operator-Streams: live-odds) ──────
+
+export interface LiveOutcomeInfo {
+  index: number;
+  label: string;
+  oddsBps: number;
+  weight: number;
+}
+
+export interface LiveRoundInfo {
+  roundId: string;
+  streamId: string;
+  roundNo: string;
+  status: 'betting' | 'drawing' | 'revealing' | 'settled' | 'void';
+  opensAt: string;
+  locksAt: string;
+  revealsUntil: string | null;
+  settledAt: string | null;
+  serverSeedHash: string;
+  clientSeed: string;
+  entropyMix: string | null;
+  outcomes: LiveOutcomeInfo[];
+  revealSeconds: number;
+  intermissionSeconds: number;
+  betsCount: number;
+  betLamportsTotal: string;
+  /** Erst ab Status `revealing` gefüllt — vorher strukturell null. */
+  result: {
+    outcomeIndex: number;
+    roll: number | null;
+    serverSeed: string | null;
+    payoutLamportsTotal: string;
+  } | null;
+}
+
+export interface LiveStateInfo {
+  stream: {
+    id: string;
+    slug: string;
+    displayName: string;
+    bettingModel: string;
+    status: string;
+    outcomes: LiveOutcomeInfo[];
+    bettingSeconds: number;
+    revealSeconds: number;
+    intermissionSeconds: number;
+    maxBetLamports: string | null;
+    maxBetsPerPlayer: number;
+  };
+  round: LiveRoundInfo | null;
+  lastRound: LiveRoundInfo | null;
+  nextOpensAt: string | null;
+  /** Server-Uhr — Basis des Clock-Offsets für alle Countdowns. */
+  serverTime: string;
+}
+
+export interface LiveBetView {
+  betId: string;
+  roundId: string;
+  roundNo: string;
+  outcomeIndex: number;
+  oddsBps: number;
+  betLamports: string;
+  potentialPayoutLamports: string;
+  payoutLamports: string;
+  status: string;
+  locksAt: string;
+  proof: { serverSeedHash: string; clientSeed: string; nonce: number };
+  fees: {
+    platformFeeLamports: string;
+    treasuryLamports: string;
+    privateLamports: string;
+    creatorFeeLamports: string;
+    totalChargeLamports: string;
+  };
+}
+
+export interface LiveMyBets {
+  roundId: string | null;
+  bets: {
+    betId: string;
+    roundId: string;
+    outcomeIndex: number;
+    oddsBps: number;
+    betLamports: string;
+    potentialPayoutLamports: string;
+    payoutLamports: string;
+    status: string;
+    createdAt: string;
+    settledAt: string | null;
+  }[];
+  totalBetLamports: string;
+  totalPayoutLamports: string;
+}
+
+export function liveState(): Promise<LiveStateInfo> {
+  return request<LiveStateInfo>('/api/game/live/state');
+}
+
+export function liveRecent(limit = 20): Promise<{
+  streamId: string;
+  results: { roundId: string; roundNo: string; outcomeIndex: number; roll: number | null; settledAt: string | null }[];
+}> {
+  return request(`/api/game/live/recent?limit=${limit}`);
+}
+
+export function liveBet(input: {
+  playerWallet: string;
+  roundId: string;
+  outcomeIndex: number;
+  betLamports: string;
+}): Promise<LiveBetView> {
+  return request<LiveBetView>('/api/game/live/bet', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function liveMe(wallet: string, roundId?: string): Promise<LiveMyBets> {
+  const q = roundId ? `?roundId=${encodeURIComponent(roundId)}` : '';
+  return request<LiveMyBets>(`/api/game/live/me/${wallet}${q}`);
+}
+
+export function liveRound(roundId: string): Promise<LiveRoundInfo> {
+  return request<LiveRoundInfo>(`/api/game/live/round/${roundId}`);
+}

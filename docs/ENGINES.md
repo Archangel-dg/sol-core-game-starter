@@ -13,6 +13,12 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
   goes into the cycle pot; the run itself pays nothing. Players collect a score (all rolls are
   pre-committed at enter, provably-fair); at cycle end the pot is paid out 100% to the top ranks.
   Re-entries are allowed — the best score per wallet counts.
+- **live** — shared timed betting rounds on an operator stream (`/api/game/live/*`): during the
+  betting window players bet on one of N outcomes at fixed odds; at lock the server draws ONE
+  result for **every** game on the stream (seed hash committed before betting opened). Winners are
+  credited at the draw; the skins then play their reveal animation while the balance display is
+  frozen. Your game references the stream via its server config — the outcomes/odds/durations all
+  come from `GET /api/game/live/state`, never hardcode them.
 
 ## Overview
 
@@ -27,12 +33,13 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `mines` | interactive | ✓ | ✓ | `{ tiles: number[] }` |
 | `hilo` | interactive | ✓ | ✓ | `{ card: 1–13, guess: "higher"\|"lower" }` |
 | `keno` | table | ✓ | | `{ picks: number[] }` (1–10 of 1–40) |
-| `roulette` | table | ✓ | | `{ betType, value? }` |
+| `roulette` | table | ✓ | | Easy: `{ betType, value? }` · Pro: `{ bets: [{ betType, value?, stakeLamports }] }` (see below) |
 | `slots-3x3` | slot | ✓ | | `{}` |
 | `slots-modular` | slot | ✓ | | `{}` |
 | `towers` | chain | | ✓ | — (session) |
 | `pump` | curve | | ✓ | — (session) |
 | `gauntlet` | tournament | | | — (tournament) |
+| `live-odds` | live | | | — (live; outcomes/odds from `/live/state`) |
 
 ## Session steps (`step` body)
 
@@ -59,6 +66,22 @@ Equal expected value per tier (9 points/step) — the choice is pure variance st
 the live leaderboard. `maxSteps` (10–100) comes from the cycle config
 (`GET /tournament/cycle` → `maxSteps`). Runs idle for 15 minutes (or still active at cycle end)
 are auto-banked with their current score.
+
+## Live rounds (`live-odds`)
+
+Flow: poll `GET /live/state` (1 s in hot phases — last 10 s of betting and during the reveal —
+else 2 s is fine) → `POST /live/bet` with `{ playerWallet, roundId, outcomeIndex, betLamports }`
+binding the bet to the **displayed** round → at `revealing` play the animation from
+`result.outcomeIndex` + the reveal window → at `settled` refresh `GET /live/me/:wallet`.
+
+Round states: `betting → drawing → revealing → settled` (or `void` = refunded). Countdowns come
+from `locksAt` / `revealsUntil` minus your clock offset (derive it from `serverTime` in every
+state payload — never trust the device clock). Multiple bets per player per round are allowed
+(different outcomes or stacking the same one).
+
+**The result is credited server-side at the draw** — the reveal is pure theater. The template's
+balance-freeze hook (`lib/balance-freeze.tsx`) holds the displayed balance during the reveal so a
+background poll can't spoil the winner; never remove it.
 
 **Never hardcode the grid/column count.** The real dimensions come from the server:
 `GET /api/meta` → `engineConfig` (e.g. towers `{ levels, columns }`, mines `{ gridSize, mineCount }`),
@@ -109,8 +132,32 @@ shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
 
 ## Roulette `betType`
 
+Two variants, chosen by the creator via `config.betMode` (`easy` default | `pro`):
+
+**Easy (single bet)** — `params = { betType, value? }`, one classic bet per spin:
 `red · black · odd · even · low (1–18) · high (19–36)` (no `value`) ·
-`dozen`/`column` (`value` 0–2) · `straight` (`value` 0–36).
+`dozen`/`column` (`value` 1–2, i.e. 1-based dozen/column index sent as 0-2 is
+clamped) · `straight` (`value` 0–36, or 0–37 on an american wheel for `00`).
+
+**Pro (multi-bet board)** — `params = { bets: [{ betType, value?, stakeLamports }, …] }`.
+One spin resolves EVERY chip; the payout is the exact sum of the winning chips
+and `betLamports` must equal `Σ stakeLamports`. In addition to the outside/group
+bets above, Pro adds the classic inside bets, all paying `36/k ×` over their `k`
+covered pockets (so RTP stays a uniform `36/pocketCount` for any distribution):
+
+| betType | covered | pays | `value` |
+|---|---|---|---|
+| `straight` | 1 | 36× | pocket `0..pocketCount-1` |
+| `split` | 2 | 18× | layout index (grid splits, then zero splits) |
+| `street` | 3 | 12× | layout index (12 rows, then zero trios) |
+| `corner` | 4 | 9× | layout index (22 corners) |
+| `six-line` | 6 | 6× | layout index (11 double-streets) |
+| `basket` | 4 | 9× | european only (`0-1-2-3`) |
+
+Constraints (server-enforced, `API-306` on violation): each `betType` must be in
+the allow-list, `value` in range for its type/wheel, `stakeLamports` a positive
+integer string, at most `ROULETTE_MAX_CHIPS` (20) chips, and `Σ stakeLamports ===
+betLamports`. The american 5-number top-line is intentionally not offered.
 
 ## `slots-modular` renderSpec + result `details`
 

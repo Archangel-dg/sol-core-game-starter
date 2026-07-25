@@ -4,6 +4,12 @@ The official, universal template for building a game on the **Sol-Core** platfor
 security, money flow, provably-fair, error handling, session reconnect, on-chain deposits — are done.
 You design the interface and (optionally) the result animation, set `.env`, and deploy.
 
+Before you start changing something about the design/animation/feeling etc., read these things through:
+- www.sol-core.com
+- https://github.com/Archangel-dg/Manual-and-knowledge-for-three.js--animations-and-visualizations
+- https://github.com/Archangel-dg/Manual-and-knowledge-for-AAA-online-games-with-RNGs
+- https://github.com/Archangel-dg/Casino-Game-Master-v1
+
 Built with **Next.js (App Router) + TypeScript + Tailwind**. Deployable on Vercel in minutes.
 
 ## Deploy without code

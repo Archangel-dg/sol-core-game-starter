@@ -1,6 +1,6 @@
 // ⚠ Nicht ändern — Systemvertrag.
 import { NextResponse } from 'next/server';
-import { withdraw, SolcoreError } from '@/lib/solcore';
+import { playerTokenFrom, withdraw, SolcoreError } from '@/lib/solcore';
 
 export async function POST(req: Request) {
   try {
@@ -8,7 +8,8 @@ export async function POST(req: Request) {
     if (!body.playerWallet || !body.amountLamports) {
       return NextResponse.json({ error: { code: 'API-204' } }, { status: 400 });
     }
-    const data = await withdraw(body.playerWallet, body.amountLamports);
+    // Spieler-Token durchreichen — sonst könnte fremdes Guthaben ausgezahlt werden.
+    const data = await withdraw(body.playerWallet, body.amountLamports, playerTokenFrom(req));
     return NextResponse.json(data);
   } catch (err) {
     if (err instanceof SolcoreError) {

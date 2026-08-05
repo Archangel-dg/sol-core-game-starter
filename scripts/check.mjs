@@ -92,8 +92,11 @@ if (MECHANIC === 'session') {
   });
   const b = await j(r);
   const code = b?.error?.code;
-  const reachable = r.ok || ['API-305', 'API-302', 'API-303', 'API-304'].includes(code);
-  ok(reachable, r.ok ? `Session-Start ok (sessionId=${b.sessionId})` : `Session erreichbar (${code} — erwartet ohne Guthaben)`);
+  // API-402 = Spieler-Token fehlt (PLAYER_AUTH_MODE=enforce, Mainnet-Standard).
+  // Dieser Selbsttest hat keinen Wallet-Schlüssel und kann keins lösen — die
+  // Antwort beweist trotzdem, dass der Pfad lebt und die Auth-Schicht greift.
+  const reachable = r.ok || ['API-305', 'API-302', 'API-303', 'API-304', 'API-402'].includes(code);
+  ok(reachable, r.ok ? `Session-Start ok (sessionId=${b.sessionId})` : `Session erreichbar (${code} — erwartet ohne Guthaben/Spieler-Token)`);
 } else {
   const params = SINGLE_PARAMS[ENGINE] ?? {};
   const r = await fetch(`${API}/api/game/bet`, {
@@ -103,8 +106,9 @@ if (MECHANIC === 'session') {
   });
   const b = await j(r);
   const code = b?.error?.code;
-  const reachable = r.ok || ['API-305', 'API-302', 'API-303', 'API-304'].includes(code);
-  ok(reachable, r.ok ? `Test-Bet ok (roundId=${b.roundId})` : `Bet-Pfad erreichbar (${code} — erwartet ohne Guthaben)`);
+  // API-402: s. Kommentar im Session-Zweig (Selbsttest ohne Spieler-Token).
+  const reachable = r.ok || ['API-305', 'API-302', 'API-303', 'API-304', 'API-402'].includes(code);
+  ok(reachable, r.ok ? `Test-Bet ok (roundId=${b.roundId})` : `Bet-Pfad erreichbar (${code} — erwartet ohne Guthaben/Spieler-Token)`);
   if (r.ok) roundId = b.roundId;
 }
 

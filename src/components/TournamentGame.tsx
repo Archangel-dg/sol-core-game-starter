@@ -6,6 +6,7 @@ import type { EngineDef } from '@/lib/engines';
 import type { TournamentCycleInfo, TournamentLeaderboardEntry, TournamentRunView } from '@/lib/solcore';
 import { toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
+import { usePlayerAuth } from '@/lib/player-auth';
 
 /**
  * Turnier-Flow (gauntlet): enter (fester Einsatz → Pot) → step* (Risikostufe)
@@ -40,6 +41,8 @@ function useCountdown(endsAt: string | undefined): string {
 
 export function TournamentGame({ engine }: { engine: EngineDef }) {
   const { publicKey, connected } = useWallet();
+  // Geld-Routen laufen ausschließlich über moneyFetch (hängt das Spieler-Token an).
+  const { moneyFetch } = usePlayerAuth();
   const wallet = publicKey?.toBase58() ?? null;
   const [cycle, setCycle] = useState<TournamentCycleInfo['cycle']>(null);
   const [board, setBoard] = useState<TournamentLeaderboardEntry[]>([]);
@@ -93,11 +96,7 @@ export function TournamentGame({ engine }: { engine: EngineDef }) {
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(path, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined,
-      }).then((x) => x.json());
+      const r = await moneyFetch(path, body);
       if (r.error) {
         const details = r.error.details as Record<string, unknown> | undefined;
         const reason = typeof details?.reason === 'string' ? details.reason : (r.error.reason as string | undefined);

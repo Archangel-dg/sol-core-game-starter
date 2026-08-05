@@ -20,7 +20,13 @@ export class SolcoreError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * @param playerToken Spieler-Token (aus `POST /api/game/authorize`). Pflicht
+ *   auf allen Geld-Routen, sobald der Server im Modus `PLAYER_AUTH_MODE=enforce`
+ *   läuft (Mainnet immer). Ohne Token identifiziert der Server den Spieler nur
+ *   über das Body-Wallet — das lässt er nur auf Devnet im `warn`-Modus zu.
+ */
+async function request<T>(path: string, init?: RequestInit, playerToken?: string): Promise<T> {
   const cfg = serverConfig();
   const res = await fetch(`${cfg.apiUrl}${path}`, {
     ...init,
@@ -29,6 +35,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       // (Fastify) einen leeren application/json-Body ab (z. B. bodyloser Cashout).
       ...(init?.body != null ? { 'content-type': 'application/json' } : {}),
       'x-api-key': cfg.apiKey,
+      ...(playerToken ? { authorization: `Bearer ${playerToken}` } : {}),
       ...(init?.headers ?? {}),
     },
     cache: 'no-store',
@@ -47,6 +54,49 @@ export async function health(): Promise<{ devMock: boolean; network: string }> {
   const cfg = serverConfig();
   const res = await fetch(`${cfg.apiUrl}/health`, { cache: 'no-store' });
   return (await res.json()) as { devMock: boolean; network: string };
+}
+
+// ── Spieler-Autorisierung (Bearer-Token für alle Geld-Routen) ──────────────
+// Der API-Key identifiziert nur das SPIEL, nicht den Spieler — und er liegt in
+// jedem Browser, der das Spiel lädt. Ohne Spieler-Token könnte damit jeder im
+// Namen einer fremden Wallet wetten. Deshalb löst der Spieler einmalig per
+// Wallet-Signatur ein kurzlebiges Token (15 min), das an (Wallet, Spiel)
+// gebunden ist; es geht als `Authorization: Bearer …` auf jede Geld-Route mit.
+
+/**
+ * Die kanonische Nachricht, die das Spieler-Wallet signiert. Format ist
+ * Systemvertrag mit dem Server — Zeitstempel in SEKUNDEN, max. 5 Minuten
+ * Abweichung von der Serverzeit.
+ */
+export function canonicalPlayerAuthMessage(
+  gameId: string,
+  wallet: string,
+  unixSeconds: number,
+): string {
+  return `sol-core:player-auth:v1:${gameId}:${wallet}:${unixSeconds}`;
+}
+
+/**
+ * POST /api/game/authorize — tauscht die Wallet-Signatur gegen ein Token.
+ * Die gameId steht bewusst NICHT im Body: der Server nimmt sie aus dem
+ * API-Key-Kontext. `expiresAt` ist ein Unix-Timestamp in MILLISEKUNDEN.
+ */
+export function authorizePlayer(input: {
+  wallet: string;
+  message: string;
+  signature: string;
+}): Promise<{ token: string; expiresAt: number }> {
+  return request('/api/game/authorize', { method: 'POST', body: JSON.stringify(input) });
+}
+
+/**
+ * Liest das Spieler-Token aus dem `Authorization`-Header der Browser-Anfrage
+ * an DIESE App. Die Route reicht es unverändert an Sol-Core weiter — der
+ * API-Key kommt erst hier im Server dazu und bleibt server-seitig.
+ */
+export function playerTokenFrom(req: Request): string | undefined {
+  const m = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i);
+  return m?.[1]?.trim() || undefined;
 }
 
 /** Aufgelöste Engine-Config des registrierten Spiels (z. B. towers columns). */
@@ -81,25 +131,37 @@ export interface BetResult {
   };
 }
 
-export function placeBet(input: {
-  gameId: string;
-  playerWallet: string;
-  betLamports: string;
-  params: Record<string, unknown>;
-  clientSeed?: string;
-}): Promise<BetResult> {
-  return request<BetResult>('/api/game/bet', { method: 'POST', body: JSON.stringify(input) });
+export function placeBet(
+  input: {
+    gameId: string;
+    playerWallet: string;
+    betLamports: string;
+    params: Record<string, unknown>;
+    clientSeed?: string;
+  },
+  playerToken?: string,
+): Promise<BetResult> {
+  return request<BetResult>(
+    '/api/game/bet',
+    { method: 'POST', body: JSON.stringify(input) },
+    playerToken,
+  );
 }
 
 export function getBalance(wallet: string): Promise<{ devMock: boolean; balanceLamports: string | null }> {
   return request(`/api/game/balance/${wallet}`);
 }
 
-export function withdraw(playerWallet: string, amountLamports: string): Promise<{ signature: string | null }> {
-  return request('/api/game/withdraw', {
-    method: 'POST',
-    body: JSON.stringify({ playerWallet, amountLamports }),
-  });
+export function withdraw(
+  playerWallet: string,
+  amountLamports: string,
+  playerToken?: string,
+): Promise<{ signature: string | null }> {
+  return request(
+    '/api/game/withdraw',
+    { method: 'POST', body: JSON.stringify({ playerWallet, amountLamports }) },
+    playerToken,
+  );
 }
 
 // ── Session-Schicht (progressive Spiele: mines/hilo/towers/pump) ────────────
@@ -124,31 +186,40 @@ export interface SessionView {
   capped?: boolean;
 }
 
-export function sessionStart(input: {
-  gameId: string;
-  playerWallet: string;
-  betLamports: string;
-  clientSeed?: string;
-}): Promise<SessionView> {
-  return request<SessionView>('/api/game/session/start', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+export function sessionStart(
+  input: {
+    gameId: string;
+    playerWallet: string;
+    betLamports: string;
+    clientSeed?: string;
+  },
+  playerToken?: string,
+): Promise<SessionView> {
+  return request<SessionView>(
+    '/api/game/session/start',
+    { method: 'POST', body: JSON.stringify(input) },
+    playerToken,
+  );
 }
 
 export function sessionGet(id: string): Promise<SessionView> {
   return request<SessionView>(`/api/game/session/${id}`);
 }
 
-export function sessionStep(id: string, body: Record<string, unknown>): Promise<SessionView> {
-  return request<SessionView>(`/api/game/session/${id}/step`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+export function sessionStep(
+  id: string,
+  body: Record<string, unknown>,
+  playerToken?: string,
+): Promise<SessionView> {
+  return request<SessionView>(
+    `/api/game/session/${id}/step`,
+    { method: 'POST', body: JSON.stringify(body) },
+    playerToken,
+  );
 }
 
-export function sessionCashout(id: string): Promise<SessionView> {
-  return request<SessionView>(`/api/game/session/${id}/cashout`, { method: 'POST' });
+export function sessionCashout(id: string, playerToken?: string): Promise<SessionView> {
+  return request<SessionView>(`/api/game/session/${id}/cashout`, { method: 'POST' }, playerToken);
 }
 
 // ── Turnier-Schicht (Pot-basierte Highscore-Läufe: gauntlet) ────────────────
@@ -216,29 +287,42 @@ export function tournamentMe(wallet: string): Promise<{
   return request(`/api/game/tournament/me/${wallet}`);
 }
 
-export function tournamentEnter(input: {
-  playerWallet: string;
-  clientSeed?: string;
-}): Promise<TournamentRunView> {
-  return request<TournamentRunView>('/api/game/tournament/enter', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+export function tournamentEnter(
+  input: {
+    playerWallet: string;
+    clientSeed?: string;
+  },
+  playerToken?: string,
+): Promise<TournamentRunView> {
+  return request<TournamentRunView>(
+    '/api/game/tournament/enter',
+    { method: 'POST', body: JSON.stringify(input) },
+    playerToken,
+  );
 }
 
 export function tournamentRun(id: string): Promise<TournamentRunView> {
   return request<TournamentRunView>(`/api/game/tournament/run/${id}`);
 }
 
-export function tournamentStep(id: string, risk: 'safe' | 'medium' | 'risky'): Promise<TournamentRunView> {
-  return request<TournamentRunView>(`/api/game/tournament/run/${id}/step`, {
-    method: 'POST',
-    body: JSON.stringify({ risk }),
-  });
+export function tournamentStep(
+  id: string,
+  risk: 'safe' | 'medium' | 'risky',
+  playerToken?: string,
+): Promise<TournamentRunView> {
+  return request<TournamentRunView>(
+    `/api/game/tournament/run/${id}/step`,
+    { method: 'POST', body: JSON.stringify({ risk }) },
+    playerToken,
+  );
 }
 
-export function tournamentStop(id: string): Promise<TournamentRunView> {
-  return request<TournamentRunView>(`/api/game/tournament/run/${id}/stop`, { method: 'POST' });
+export function tournamentStop(id: string, playerToken?: string): Promise<TournamentRunView> {
+  return request<TournamentRunView>(
+    `/api/game/tournament/run/${id}/stop`,
+    { method: 'POST' },
+    playerToken,
+  );
 }
 
 // ── Demo-Modus (simulierter Saldo 3 SOL, echt verifiziert, kein Geldfluss) ──
@@ -420,16 +504,20 @@ export function liveRecent(limit = 20): Promise<{
   return request(`/api/game/live/recent?limit=${limit}`);
 }
 
-export function liveBet(input: {
-  playerWallet: string;
-  roundId: string;
-  outcomeIndex: number;
-  betLamports: string;
-}): Promise<LiveBetView> {
-  return request<LiveBetView>('/api/game/live/bet', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+export function liveBet(
+  input: {
+    playerWallet: string;
+    roundId: string;
+    outcomeIndex: number;
+    betLamports: string;
+  },
+  playerToken?: string,
+): Promise<LiveBetView> {
+  return request<LiveBetView>(
+    '/api/game/live/bet',
+    { method: 'POST', body: JSON.stringify(input) },
+    playerToken,
+  );
 }
 
 export function liveMe(wallet: string, roundId?: string): Promise<LiveMyBets> {

@@ -6,6 +6,7 @@ import type { EngineDef } from '@/lib/engines';
 import type { SessionView } from '@/lib/solcore';
 import { solToLamports, toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
+import { usePlayerAuth } from '@/lib/player-auth';
 import type { RoundLog } from './SingleBetGame';
 
 /** towers-Reveal: `bombColumns` ist `number[][]` (eine Spalten-Menge je
@@ -48,6 +49,10 @@ export function SessionGame({
 }) {
   const { wallet, connected, apiBase, demo } = usePlayer();
   const { refreshDemoBalance } = useDemo();
+  // Echte Geld-Routen laufen ausschließlich über moneyFetch (hängt das
+  // Spieler-Token an). Der Demo-Pfad (/api/demo/*) bewegt kein Geld und hat
+  // kein Solana-Wallet, das signieren könnte — er bleibt bewusst tokenlos.
+  const { moneyFetch } = usePlayerAuth();
   const [bet, setBet] = useState('0.01');
   const [view, setView] = useState<SessionView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -106,11 +111,13 @@ export function SessionGame({
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(path, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined,
-      }).then((x) => x.json());
+      const r = demo
+        ? await fetch(path, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: body ? JSON.stringify(body) : undefined,
+          }).then((x) => x.json())
+        : await moneyFetch(path, body);
       if (r.error) {
         const details = r.error.details as Record<string, unknown> | undefined;
         const reason = typeof details?.reason === 'string' ? details.reason : undefined;

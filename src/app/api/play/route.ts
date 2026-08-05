@@ -1,6 +1,6 @@
 // ⚠ Nicht ändern — Systemvertrag.
 import { NextResponse } from 'next/server';
-import { placeBet, SolcoreError } from '@/lib/solcore';
+import { placeBet, playerTokenFrom, SolcoreError } from '@/lib/solcore';
 import { serverConfig } from '@/lib/config';
 
 /** POST → Sol-Core /api/game/bet. Das Ergebnis kommt IMMER vom Server. */
@@ -16,13 +16,18 @@ export async function POST(req: Request) {
     if (!body.playerWallet || !body.betLamports) {
       return NextResponse.json({ error: { code: 'API-204' } }, { status: 400 });
     }
-    const result = await placeBet({
-      gameId: cfg.gameId,
-      playerWallet: body.playerWallet,
-      betLamports: body.betLamports,
-      params: body.params ?? {},
-      clientSeed: body.clientSeed,
-    });
+    // Spieler-Token aus dem Browser durchreichen (der API-Key kommt erst hier
+    // dazu und bleibt server-seitig).
+    const result = await placeBet(
+      {
+        gameId: cfg.gameId,
+        playerWallet: body.playerWallet,
+        betLamports: body.betLamports,
+        params: body.params ?? {},
+        clientSeed: body.clientSeed,
+      },
+      playerTokenFrom(req),
+    );
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof SolcoreError) {

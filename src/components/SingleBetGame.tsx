@@ -5,6 +5,7 @@ import { usePlayer, useDemo } from './DemoProvider';
 import type { Control, EngineDef } from '@/lib/engines';
 import { solToLamports } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
+import { usePlayerAuth } from '@/lib/player-auth';
 import { EngineControls } from './EngineControls';
 import { ResultView } from './ResultView';
 import { SlotGrid } from './SlotGrid';
@@ -63,6 +64,10 @@ export function SingleBetGame({
 }) {
   const { wallet, connected, apiBase, demo } = usePlayer();
   const { refreshDemoBalance } = useDemo();
+  // Echte Geld-Routen laufen ausschließlich über moneyFetch (hängt das
+  // Spieler-Token an). Der Demo-Pfad (/api/demo/*) bewegt kein Geld und hat
+  // kein Solana-Wallet, das signieren könnte — er bleibt bewusst tokenlos.
+  const { moneyFetch } = usePlayerAuth();
   const [bet, setBet] = useState('0.01');
   const [values, setValues] = useState<Record<string, string>>({});
   /** Roulette: gewählte Wettfelder (Easy = genau eins, Pro = mehrere Chips). */
@@ -153,15 +158,18 @@ export function SingleBetGame({
       } else {
         params = engine.buildSingleParams ? engine.buildSingleParams(values) : {};
       }
-      const r = await fetch(`${apiBase}/play`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          playerWallet: wallet,
-          betLamports: betLamports.toString(),
-          params,
-        }),
-      }).then((x) => x.json());
+      const payload = {
+        playerWallet: wallet,
+        betLamports: betLamports.toString(),
+        params,
+      };
+      const r = demo
+        ? await fetch(`${apiBase}/play`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          }).then((x) => x.json())
+        : await moneyFetch(`${apiBase}/play`, payload);
       if (r.error) {
         const details = r.error.details as Record<string, unknown> | undefined;
         const reason = typeof details?.reason === 'string' ? details.reason : undefined;

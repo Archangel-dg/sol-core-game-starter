@@ -1,6 +1,6 @@
 // ⚠ Nicht ändern — Systemvertrag.
 import { NextResponse } from 'next/server';
-import { tournamentStep, SolcoreError } from '@/lib/solcore';
+import { playerTokenFrom, tournamentStep, SolcoreError } from '@/lib/solcore';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -8,7 +8,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (body.risk !== 'safe' && body.risk !== 'medium' && body.risk !== 'risky') {
       return NextResponse.json({ error: { code: 'API-204' } }, { status: 400 });
     }
-    return NextResponse.json(await tournamentStep(params.id, body.risk));
+    // Spieler-Token durchreichen: es bindet den Schritt an den Lauf-Eigner.
+    return NextResponse.json(await tournamentStep(params.id, body.risk, playerTokenFrom(req)));
   } catch (err) {
     if (err instanceof SolcoreError) {
       return NextResponse.json({ error: { code: err.code, message: err.message, reason: err.reason } }, { status: err.status });

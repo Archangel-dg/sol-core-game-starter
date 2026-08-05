@@ -1,6 +1,6 @@
 // ⚠ Nicht ändern — Systemvertrag.
 import { NextResponse } from 'next/server';
-import { sessionStart, SolcoreError } from '@/lib/solcore';
+import { playerTokenFrom, sessionStart, SolcoreError } from '@/lib/solcore';
 import { serverConfig } from '@/lib/config';
 
 export async function POST(req: Request) {
@@ -10,12 +10,16 @@ export async function POST(req: Request) {
     if (!body.playerWallet || !body.betLamports) {
       return NextResponse.json({ error: { code: 'API-204' } }, { status: 400 });
     }
-    const view = await sessionStart({
-      gameId: cfg.gameId,
-      playerWallet: body.playerWallet,
-      betLamports: body.betLamports,
-      clientSeed: body.clientSeed,
-    });
+    // Spieler-Token aus dem Browser durchreichen (siehe lib/player-auth.ts).
+    const view = await sessionStart(
+      {
+        gameId: cfg.gameId,
+        playerWallet: body.playerWallet,
+        betLamports: body.betLamports,
+        clientSeed: body.clientSeed,
+      },
+      playerTokenFrom(req),
+    );
     return NextResponse.json(view);
   } catch (err) {
     if (err instanceof SolcoreError) {

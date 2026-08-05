@@ -1,6 +1,6 @@
 // ⚠ Nicht ändern — Systemvertrag.
 import { NextResponse } from 'next/server';
-import { tournamentEnter, SolcoreError } from '@/lib/solcore';
+import { playerTokenFrom, tournamentEnter, SolcoreError } from '@/lib/solcore';
 
 export async function POST(req: Request) {
   try {
@@ -8,10 +8,11 @@ export async function POST(req: Request) {
     if (!body.playerWallet) {
       return NextResponse.json({ error: { code: 'API-204' } }, { status: 400 });
     }
-    const view = await tournamentEnter({
-      playerWallet: body.playerWallet,
-      clientSeed: body.clientSeed,
-    });
+    // Spieler-Token aus dem Browser durchreichen (siehe lib/player-auth.ts).
+    const view = await tournamentEnter(
+      { playerWallet: body.playerWallet, clientSeed: body.clientSeed },
+      playerTokenFrom(req),
+    );
     return NextResponse.json(view);
   } catch (err) {
     if (err instanceof SolcoreError) {

@@ -7,6 +7,7 @@ import type { LiveMyBets, LiveStateInfo } from '@/lib/solcore';
 import { solToLamports, toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
 import { useBalanceFreeze } from '@/lib/balance-freeze';
+import { usePlayerAuth } from '@/lib/player-auth';
 import { LiveResultView } from './LiveResultView';
 
 /**
@@ -28,6 +29,8 @@ export function LiveGame({ engine }: { engine: EngineDef }) {
   const { publicKey, connected } = useWallet();
   const wallet = publicKey?.toBase58() ?? null;
   const { freezeUntil, release } = useBalanceFreeze();
+  // Geld-Routen laufen ausschließlich über moneyFetch (hängt das Spieler-Token an).
+  const { moneyFetch } = usePlayerAuth();
 
   const [state, setState] = useState<LiveStateInfo | null>(null);
   const [offsetMs, setOffsetMs] = useState(0);
@@ -159,16 +162,12 @@ export function LiveGame({ engine }: { engine: EngineDef }) {
     setMsg(null);
     try {
       const lamports = solToLamports(amount);
-      const r = await fetch('/api/live/bet', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          playerWallet: wallet,
-          roundId: round.roundId,
-          outcomeIndex,
-          betLamports: lamports.toString(),
-        }),
-      }).then((x) => x.json());
+      const r = await moneyFetch('/api/live/bet', {
+        playerWallet: wallet,
+        roundId: round.roundId,
+        outcomeIndex,
+        betLamports: lamports.toString(),
+      });
       if (r.error) {
         const reason = typeof r.error.reason === 'string' ? r.error.reason : undefined;
         if (reason === 'betting_locked') setMsg('Wettfenster gerade geschlossen — nächste Runde.');

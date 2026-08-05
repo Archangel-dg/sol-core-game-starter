@@ -1,6 +1,6 @@
 // ⚠ Nicht ändern — Systemvertrag.
 import { NextResponse } from 'next/server';
-import { liveBet, SolcoreError } from '@/lib/solcore';
+import { liveBet, playerTokenFrom, SolcoreError } from '@/lib/solcore';
 
 export async function POST(req: Request) {
   try {
@@ -18,12 +18,16 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json({ error: { code: 'API-204' } }, { status: 400 });
     }
-    const view = await liveBet({
-      playerWallet: body.playerWallet,
-      roundId: body.roundId,
-      outcomeIndex: body.outcomeIndex,
-      betLamports: body.betLamports,
-    });
+    // Spieler-Token aus dem Browser durchreichen (siehe lib/player-auth.ts).
+    const view = await liveBet(
+      {
+        playerWallet: body.playerWallet,
+        roundId: body.roundId,
+        outcomeIndex: body.outcomeIndex,
+        betLamports: body.betLamports,
+      },
+      playerTokenFrom(req),
+    );
     return NextResponse.json(view);
   } catch (err) {
     if (err instanceof SolcoreError) {

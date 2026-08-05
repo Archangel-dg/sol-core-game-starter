@@ -29,9 +29,57 @@ Game config is immutable after creation → cache the response indefinitely. The
 to the client via `GET /api/meta` (`engineConfig`, `serverMode`, `warning: "engine_mismatch"` when
 `NEXT_PUBLIC_ENGINE` differs from the registration).
 
+## Player authorization (required on every money route)
+
+The API key identifies the **game**, not the player — and it is shipped to every browser that loads
+the game. Without a second proof, anyone holding it could bet in the name of a foreign wallet.
+So the player signs once with their wallet and receives a short-lived token (15 min) bound to
+`(wallet, gameId)`.
+
+`POST /api/game/authorize` (X-API-Key)
+```json
+{ "wallet": "<base58>", "message": "sol-core:player-auth:v1:<gameId>:<wallet>:<unixSeconds>",
+  "signature": "<base58>" }
+```
+- The `gameId` is **not** in the body — the server takes it from the API-key context.
+- `unixSeconds` must be within ±5 min of server time; one signature issues exactly one token
+  (replay-protected); rate limit 30/min.
+- Response: `{ "token": "…", "expiresAt": 1720000900000 }` — `expiresAt` is in **milliseconds**.
+- Errors: `API-103` (401) — message/wallet/gameId mismatch, expired timestamp, bad or reused
+  signature.
+
+Send the token as `Authorization: Bearer <token>` on `/bet`, `/withdraw`, `/session/start`,
+`/session/:id/step`, `/session/:id/cashout`, `/tournament/enter`, `/tournament/run/:id/step`,
+`/tournament/run/:id/stop` and `/live/bet`. A token that IS sent is always validated strictly;
+a *missing* token is only tolerated while the server runs with `PLAYER_AUTH_MODE=warn`
+(devnet) — on mainnet `enforce` is mandatory and enforced by a boot guard. `API-402` (401) means
+missing/invalid/mismatched token → `lib/errors.ts` maps it to `action: 'lock'`.
+
+**How the starter implements it** (`lib/player-auth.ts` + `app/api/authorize/route.ts`):
+
+```
+Browser                          your Next.js server            Sol-Core API
+  GET  /api/authorize?wallet=…  ──▶ builds canonical message
+                                ◀── { message }
+  signMessage(message)  (wallet popup)
+  POST /api/authorize {wallet,message,signature}
+                                ──▶ + X-API-Key ──▶ POST /api/game/authorize
+                                ◀── { token, expiresAt } ◀──
+  POST /api/play  + Authorization: Bearer <token>
+                                ──▶ + X-API-Key ──▶ POST /api/game/bet
+```
+
+The API key never leaves the server; the token lives in browser memory only and is renewed
+automatically (also on `API-402`, once). Use `usePlayerAuth().moneyFetch(path, body)` for **every**
+money call — never a plain `fetch`.
+
+The demo layer (`app/api/demo/*` → `/api/game/demo/*`) is deliberately exempt: it has no wallet that
+could sign, moves no money, and is therefore not token-gated. `SingleBetGame`/`SessionGame` switch
+on `usePlayer().demo` and use `moneyFetch` only on the real-money path.
+
 ## Single bet
 
-`POST /api/game/bet`
+`POST /api/game/bet` (X-API-Key + `Authorization: Bearer <player token>`)
 ```json
 { "gameId": "<uuid>", "playerWallet": "<base58>", "betLamports": "100000000",
   "params": { …per engine, see ENGINES.md… }, "clientSeed": "optional" }

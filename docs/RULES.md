@@ -27,9 +27,17 @@ payout-ready game — automatically.
 
 8. **Never play with the creator wallet** (self-bet is blocked, `API-303`).
 
+9. **Every money call carries a player token.** The API key only identifies the game — the player
+   proves who they are with a wallet signature (`POST /api/game/authorize`, token valid 15 min,
+   bound to wallet + game). In the browser always use `usePlayerAuth().moneyFetch(…)`, never a raw
+   `fetch` to a money route; the server routes forward the token as `Authorization: Bearer`.
+   On mainnet the backend runs with `PLAYER_AUTH_MODE=enforce` and rejects untokenized money
+   calls with `API-402`. See API-REFERENCE.md → "Player authorization".
+   The demo layer (`/api/demo/*`) is the one exception — it moves no money and needs no token.
+
 ## Off-limits files (they work — don't rebuild them)
 
 `app/api/*` · `lib/solcore.ts` · `lib/config.ts` · `lib/lamports.ts` · `lib/errors.ts` ·
-`lib/engines.ts` · `lib/player-program.ts` · `components/Providers.tsx`
+`lib/engines.ts` · `lib/player-program.ts` · `lib/player-auth.ts` · `components/Providers.tsx`
 
 They carry the `// ⚠ Nicht ändern — Systemvertrag` (do-not-edit / system-contract) marker.

@@ -5,6 +5,7 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { buildDepositTx } from '@/lib/player-program';
 import { toSol, solToLamports } from '@/lib/lamports';
 import { useBalanceFreeze } from '@/lib/balance-freeze';
+import { usePlayerAuth } from '@/lib/player-auth';
 
 /**
  * Guthaben-Leiste: interne Balance (Poll alle 10 s) + Einzahlen (on-chain) +
@@ -21,6 +22,10 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
   const { frozen } = useBalanceFreeze();
+  // Auszahlen ist eine Geld-Route → Spieler-Token Pflicht (moneyFetch).
+  // Die Leiste erscheint nur ausserhalb des Demo-Modus (siehe app/page.tsx),
+  // also gibt es hier nie einen tokenlosen Demo-Pfad.
+  const { moneyFetch } = usePlayerAuth();
   const frozenRef = useRef(frozen);
   frozenRef.current = frozen;
   const [balance, setBalance] = useState<string | null>(null);
@@ -74,11 +79,10 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
     setMsg(null);
     try {
       const lamports = solToLamports(amount);
-      const r = await fetch('/api/withdraw', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ playerWallet: publicKey.toBase58(), amountLamports: lamports.toString() }),
-      }).then((x) => x.json());
+      const r = await moneyFetch('/api/withdraw', {
+        playerWallet: publicKey.toBase58(),
+        amountLamports: lamports.toString(),
+      });
       if (r.error) setMsg(`Auszahlung: ${r.error.code}`);
       else {
         setMsg(r.signature ? 'Auszahlung gesendet.' : 'Auszahlung verbucht.');
@@ -89,7 +93,7 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
     } finally {
       setBusy(null);
     }
-  }, [publicKey, amount, refresh]);
+  }, [publicKey, amount, refresh, moneyFetch]);
 
   if (devMock) {
     return (

@@ -1,10 +1,11 @@
 // ⚠ Nicht ändern — Systemvertrag.
 import { NextResponse } from 'next/server';
-import { sessionCashout, SolcoreError } from '@/lib/solcore';
+import { playerTokenFrom, sessionCashout, SolcoreError } from '@/lib/solcore';
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
-    return NextResponse.json(await sessionCashout(params.id));
+    // Spieler-Token durchreichen: es bindet den Cashout an den Session-Eigner.
+    return NextResponse.json(await sessionCashout(params.id, playerTokenFrom(req)));
   } catch (err) {
     if (err instanceof SolcoreError) {
       return NextResponse.json({ error: { code: err.code, message: err.message, reason: err.reason } }, { status: err.status });

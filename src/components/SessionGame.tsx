@@ -24,10 +24,45 @@ function formatTowersBombs(bombColumns: unknown): string {
   return rows.length ? `Bomben je Etage — ${rows.join(' · ')}` : '';
 }
 
+/** steps: Stufen-Fortschritt + Leiter defensiv aus Fortschritt und
+ * Engine-Config lesen. Bei dieser Engine zählt `SessionView.steps` die
+ * VERSUCHE — die aktuelle Stufe steht in `progress.currentStep`; Leiter,
+ * Checkpoints und Versuchs-Vorrat kommen als aufgelöstes Server-Echo in der
+ * Engine-Config (`ladderBps`/`checkpoints`/`maxClimbs`). Alles `unknown`-
+ * tolerant gelesen (Muster: `towersFloorColumns`). */
+function stepsInfo(
+  progress: unknown,
+  cfg: Record<string, unknown> | null,
+): {
+  rung: number;
+  ladderBps: number[];
+  checkpoints: number[];
+  maxClimbs: number | null;
+  climbsUsed: number;
+  lastFall: { from: number; to: number } | null;
+} | null {
+  const p = progress && typeof progress === 'object' ? (progress as Record<string, unknown>) : {};
+  const c = cfg ?? {};
+  const nums = (v: unknown): number[] =>
+    Array.isArray(v) ? v.filter((n): n is number => typeof n === 'number' && Number.isFinite(n)) : [];
+  const ladderBps = nums((c as Record<string, unknown>).ladderBps);
+  const rung = typeof p.currentStep === 'number' && Number.isFinite(p.currentStep) ? p.currentStep : 0;
+  const climbsUsed = typeof p.climbsUsed === 'number' && Number.isFinite(p.climbsUsed) ? p.climbsUsed : 0;
+  const rawMax = (c as Record<string, unknown>).maxClimbs;
+  const maxClimbs = typeof rawMax === 'number' && Number.isFinite(rawMax) ? rawMax : null;
+  const fall = p.lastFall && typeof p.lastFall === 'object' ? (p.lastFall as Record<string, unknown>) : null;
+  const lastFall =
+    fall && typeof fall.from === 'number' && typeof fall.to === 'number'
+      ? { from: fall.from, to: fall.to }
+      : null;
+  if (ladderBps.length === 0 && rung === 0 && climbsUsed === 0) return null;
+  return { rung, ladderBps, checkpoints: nums((c as Record<string, unknown>).checkpoints), maxClimbs, climbsUsed, lastFall };
+}
+
 /**
- * Generischer Session-Flow (mines/hilo/towers/pump): start → step* → cashout.
- * Reconnect nach Reload über localStorage. Ergebnisse kommen vom Server;
- * die UI hier ist bewusst schlicht — Design-Zone.
+ * Generischer Session-Flow (mines/hilo/towers/pump/steps): start → step* →
+ * cashout. Reconnect nach Reload über localStorage. Ergebnisse kommen vom
+ * Server; die UI hier ist bewusst schlicht — Design-Zone.
  *
  * Index-Schritte (towers/mines) rendern ein Button-Feld, dessen Größe aus der
  * Server-Config kommt (engineConfig aus /api/meta, bzw. view.engine.config in
@@ -168,6 +203,10 @@ export function SessionGame({
   const ended = view && view.status !== 'active';
   const towersBombText =
     view && view.status === 'busted' && engine.key === 'towers' ? formatTowersBombs(view.reveal?.bombColumns) : '';
+  const steps = engine.key === 'steps' && view ? stepsInfo(view.progress, cfg) : null;
+  // steps: Cashout erst ab Stufe 1 sinnvoll (der Server lehnt am Boden ohnehin
+  // ab — nach einem Fall wäre `view.steps ≥ 1`, aber die Auszahlung 0).
+  const cashoutBlocked = steps ? steps.rung < 1 : false;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
@@ -179,10 +218,18 @@ export function SessionGame({
               {(view.multiplierBps / 10000).toFixed(2)}×
             </div>
             <div className="mt-1 text-sm text-white/70">
-              {active && `Schritt ${view.steps} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
+              {active && steps &&
+                `Stufe ${steps.rung}${steps.maxClimbs !== null ? ` · Versuch ${steps.climbsUsed}/${steps.maxClimbs}` : ''} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
+              {active && !steps && `Schritt ${view.steps} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
               {view.status === 'busted' && 'Geplatzt — verloren'}
               {view.status === 'cashed_out' && `Cashout ${toSol(view.payoutLamports ?? '0')} ◎`}
             </div>
+            {active && steps?.lastFall && (
+              <div className="mt-1 text-[11px] text-amber-300/80">
+                Abgestürzt: Stufe {steps.lastFall.from} → {steps.lastFall.to}
+                {steps.lastFall.to > 0 ? ' (Checkpoint fängt dich)' : ' (Boden)'}
+              </div>
+            )}
             {ended && view.capped && <div className="text-xs text-white/40">Payout-Limit erreicht</div>}
             {towersBombText && <div className="mt-1 text-[11px] text-white/30">{towersBombText}</div>}
           </div>
@@ -267,6 +314,33 @@ export function SessionGame({
               </div>
             </div>
           )}
+          {steps && steps.ladderBps.length > 0 && (
+            // Stufenleiter (Design-Zone): oberste Stufe zuerst, Checkpoints
+            // mit ⚑, aktuelle Stufe hervorgehoben — die Leiter kommt 1:1 aus
+            // dem Server-Echo, hier wird nichts gerechnet.
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-night p-2">
+              {steps.ladderBps.map((bps, i) => steps.ladderBps.length - i).map((rung) => {
+                const bps = steps.ladderBps[rung - 1]!;
+                const isCurrent = rung === steps.rung;
+                const isCheckpoint = steps.checkpoints.includes(rung);
+                return (
+                  <div
+                    key={rung}
+                    className={`flex items-center justify-between rounded px-2 py-1 text-xs tabular-nums ${
+                      isCurrent
+                        ? 'bg-accent/15 text-accent ring-1 ring-accent/50'
+                        : rung < steps.rung
+                          ? 'text-white/50'
+                          : 'text-white/25'
+                    }`}
+                  >
+                    <span>{isCheckpoint ? '⚑ ' : ''}Stufe {rung}</span>
+                    <span>{(bps / 10000).toFixed(2)}×</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {sess.step.kind === 'action' && (
             <button type="button" disabled={busy} onClick={() => void step({})}
               className="w-full rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{sess.step.label}</button>
@@ -274,10 +348,10 @@ export function SessionGame({
           <button
             type="button"
             onClick={() => void cashout()}
-            disabled={busy || view.steps < 1}
+            disabled={busy || view.steps < 1 || cashoutBlocked}
             className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
           >
-            Cashout {view.steps >= 1 ? `(${toSol(view.potentialPayoutLamports)} ◎)` : ''}
+            Cashout {view.steps >= 1 && !cashoutBlocked ? `(${toSol(view.potentialPayoutLamports)} ◎)` : ''}
           </button>
         </div>
       )}

@@ -372,6 +372,29 @@ export const ENGINES: EngineDef[] = [
     },
   },
   {
+    key: 'steps',
+    label: 'Steps',
+    category: 'Chain',
+    mechanics: ['session'],
+    blurb: 'Stufe für Stufe hoch — klettern oder cashen.',
+    playerFacts: {
+      inputs:
+        'Eine Wahl pro Zug: Cashout oder eine Stufe hochklettern (ein Knopf). Jeder Versuch gelingt mit einer festen, vom Spiel gesetzten Chance.',
+      outcomes:
+        'Jede Stufe zahlt einen festen Leiter-Multiplikator; Cashout jederzeit ab der Mindest-Stufe. Ohne Checkpoints verliert ein Absturz den Einsatz; MIT Checkpoints fällst du nur auf den letzten Checkpoint zurück und die Runde läuft weiter — bis der Versuchs-Vorrat aufgebraucht ist (Settlement am Boden = Einsatz weg).',
+    },
+    session: {
+      // Leerer Step-Body wie pump — „Klettern" ist die einzige Aktion. Die
+      // Leiter (`ladderBps`), Checkpoints und der Versuchs-Vorrat kommen als
+      // aufgelöste Engine-Config vom Server (publicEngineConfig-Echo);
+      // die aktuelle STUFE steht in `progress.currentStep` — `steps` im
+      // SessionView zählt bei dieser Engine die VERSUCHE.
+      step: { kind: 'action', label: 'Klettern' },
+      buildStep: () => ({}),
+      hint: 'Klettern oder cashen — bei Checkpoints fängt dich der letzte Haltepunkt.',
+    },
+  },
+  {
     key: 'gauntlet',
     label: 'Gauntlet',
     category: 'Tournament',

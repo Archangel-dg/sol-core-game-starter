@@ -38,6 +38,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `slots-modular` | slot | ✓ | | `{}` |
 | `towers` | chain | | ✓ | — (session) |
 | `pump` | curve | | ✓ | — (session) |
+| `steps` | chain | | ✓ | — (session) |
 | `gauntlet` | tournament | | | — (tournament) |
 | `live-odds` | live | | | — (live; outcomes/odds from `/live/state`) |
 
@@ -49,6 +50,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `towers` | `{ column: 0–(columns−1) }` |
 | `hilo` | `{ guess: "higher"\|"lower" }` (a tie loses; ends after 20 steps) |
 | `pump` | `{}` (just pump again) |
+| `steps` | `{}` (one climb attempt). Note: `SessionView.steps` counts climb ATTEMPTS for this engine — the current rung is `progress.currentStep`; the ladder (`ladderBps`), `checkpoints` and `maxClimbs` arrive via the resolved engine config |
 
 ## Tournament steps (`gauntlet`)
 

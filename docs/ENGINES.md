@@ -30,8 +30,8 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `scratch` | instant | ✓ | | `{}` |
 | `plinko` | interactive | ✓ | | `{ balls?: 1\|3\|10\|100 }` (multi-shot, clamped to `config.maxBalls`) |
 | `wheel` | interactive | ✓ | | `{}` |
-| `mines` | interactive | ✓ | ✓ | `{ tiles: number[] }` |
-| `hilo` | interactive | ✓ | ✓ | `{ card: 1–13, guess: "higher"\|"lower" }` |
+| `mines` | interactive | — | ✓ | session only (the single-bet variant was retired) |
+| `hilo` | interactive | — | ✓ | session only (the single-bet variant was retired) |
 | `keno` | table | ✓ | | `{ picks: number[] }` (1–10 of 1–40) |
 | `roulette` | table | ✓ | | Easy: `{ betType, value? }` · Pro: `{ bets: [{ betType, value?, stakeLamports }] }` (see below) |
 | `slots-3x3` | slot | ✓ | | `{}` |
@@ -100,7 +100,7 @@ in `lib/engines.ts`). Never hardcode the old fixed values (0–100, 1–13, unif
 |---|---|---|
 | `dice` | target slider/input range | `boundsFrom`: `[config.rangeMin ?? 0, config.rangeMax ?? 100]` (both always echoed by the server, even at their defaults) |
 | `limbo` | target multiplier input | floor is always `config.minTargetBps` (default 1.00×, always echoed); ceiling only appears if the creator set `config.maxTargetBps` |
-| `hilo` | card picker | `[1, config.cards ?? 13]` instead of the old fixed 1–13 |
+| `hilo` | — | session only; the card is dealt by the game, not entered by the player |
 | `keno` | number picker | `[1, config.pool ?? 40]` instead of the old fixed 1–40 |
 | `roulette` | straight-bet value picker | `[0, pocketCount − 1]`, where `pocketCount` is 37 (european) or 38 (american) from `config.wheelType` |
 | `plinko` | ball-count select (`params.balls`) | options are filtered to what's ≤ `config.maxBalls` (1/3/10/100); the whole control is hidden when `maxBalls` is 1 (the default) |
@@ -122,8 +122,8 @@ shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
 | `scratch` | — (buy a ticket) | prize table from blank to jackpot | top prize of the paytable |
 | `plinko` | — (drop the ball) | slot decides; edges pay big | edge slot of the paytable |
 | `wheel` | — (spin) | one segment wins | top segment of the paytable |
-| `mines` | safe tiles on the grid | each safe pick grows the multiplier; mine = loss; cash out any time | compounds per pick |
-| `hilo` | higher/lower | right guess grows the multiplier; tie/wrong = loss; ≤ 20 steps | compounds per step |
+| `mines` | one safe tile per move (session) | each safe pick grows the multiplier; mine = loss; cash out after every pick | compounds per pick |
+| `hilo` | higher/lower on the dealt card (session) | right guess grows the multiplier; tie/wrong = loss; chain ends after the configured steps | compounds per step |
 | `keno` | 1–10 of 40 numbers | more hits = more payout | top tier at all hits |
 | `roulette` | classic bet | fixed payouts (2×/3×/36×) | 36× straight (RTP 97.3%) |
 | `slots-3x3` | — (spin) | centre line: triple/pair pays | top triple of the reel |
@@ -199,3 +199,17 @@ from the server's `details.grid`; the column stagger is a pure reveal animation,
 - Session rules (bust, auto-cashout, 15-minute timeout) — see `API-REFERENCE.md`.
 - Which engine your game runs is fixed by the **creator when the game is registered** — the `.env`
   here must match it.
+
+## Retired: single-bet `mines` and `hilo`
+
+Both engines used to exist as a single bet **and** as a session. The single-bet variants were
+strictly worse and impossible to tell apart from their session twins in the catalog:
+
+- `mines` / single let the player pre-pick every tile — all-or-nothing, no cash-out, i.e. the game
+  without the one decision that makes it Mines.
+- `hilo` / single let the player type their own starting card, so they picked their own win chance.
+  That is `dice` with a card skin.
+
+They are therefore **session only**. Sol-Core still serves `/bet` for games that were already live
+(`GET /api/public/engines` marks them with `singleBetLegacy: true`), but new games are session only —
+set `NEXT_PUBLIC_MECHANIC=session`.

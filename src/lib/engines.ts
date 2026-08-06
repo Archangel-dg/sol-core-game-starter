@@ -180,18 +180,17 @@ export const ENGINES: EngineDef[] = [
     key: 'mines',
     label: 'Mines',
     category: 'Interactive',
-    mechanics: ['single', 'session'],
+    // NUR Session: die frühere Einzelwetten-Variante ließ den Spieler alle
+    // Felder VORHER wählen (alles-oder-nichts, kein Cashout) — dasselbe Spiel
+    // ohne die eine Entscheidung, die Mines ausmacht. Der Server bedient
+    // `/bet` für bereits live stehende Spiele weiter (Legacy), neu gebaut
+    // wird Mines ausschließlich als Session.
+    mechanics: ['session'],
     blurb: 'Felder aufdecken ohne auf eine Mine zu treffen.',
     playerFacts: {
-      inputs: 'Felder auf dem Raster aufdecken (Größe legt das Spiel fest, Standard 5×5) — eins pro Schritt oder vorab als Einzel-Bet.',
-      outcomes: 'Jedes sichere Feld erhöht den Multiplikator; jederzeit Cashout. Mine getroffen = Einsatz weg.',
+      inputs: 'Pro Zug EIN Feld auf dem Raster aufdecken (Größe legt das Spiel fest, Standard 5×5).',
+      outcomes: 'Jedes sichere Feld erhöht den Multiplikator; nach jedem Feld kannst du cashen. Mine getroffen = Einsatz weg.',
     },
-    singleControls: [
-      { kind: 'intlist', name: 'tiles', label: 'Felder (kommagetrennt)', min: 0, max: 24, maxCount: 64,
-        hint: 'z. B. 0,1,2 — alle vorab gewählten Felder werden aufgedeckt.',
-        boundsFrom: (c) => ({ min: 0, max: (c.gridSize ?? 25) - 1 }) },
-    ],
-    buildSingleParams: (v) => ({ tiles: intList(v, 'tiles') }),
     session: {
       step: { kind: 'index', label: 'Feld', min: 0, max: 24,
         boundsFrom: (c) => ({ min: 0, max: (c.gridSize ?? 25) - 1 }) },
@@ -203,21 +202,16 @@ export const ENGINES: EngineDef[] = [
     key: 'hilo',
     label: 'Hi-Lo',
     category: 'Interactive',
-    mechanics: ['single', 'session'],
+    // NUR Session: bei der früheren Einzelwette tippte der Spieler seine
+    // eigene Startkarte ein und wählte damit seine eigene Gewinnchance —
+    // das ist `dice` mit Karten-Optik, nicht Hi-Lo. In der Session teilt das
+    // Spiel die Karte aus, und der Multiplikator wächst über die Kette.
+    mechanics: ['session'],
     blurb: 'Höher oder tiefer als die aktuelle Karte?',
     playerFacts: {
-      inputs: 'Tippen, ob die nächste Karte (1–13) höher oder tiefer ist als die aktuelle.',
-      outcomes: 'Richtig: der Multiplikator wächst (unwahrscheinliche Tipps stärker); jederzeit Cashout. Falsch oder Gleichstand: Einsatz weg. Kette endet nach 20 Schritten.',
+      inputs: 'Das Spiel deckt eine Karte auf; du tippst, ob die nächste höher oder tiefer ist.',
+      outcomes: 'Richtig: der Multiplikator wächst (unwahrscheinliche Tipps stärker); jederzeit Cashout. Falsch oder Gleichstand: Einsatz weg. Kette endet nach der im Spiel gesetzten Schrittzahl.',
     },
-    singleControls: [
-      {
-        kind: 'number', name: 'card', label: 'Aktuelle Karte (1–13)', min: 1, max: 13, step: 1, default: 7,
-        boundsFrom: (c) => ({ min: 1, max: c.cards ?? 13 }),
-      },
-      { kind: 'select', name: 'guess', label: 'Tipp', default: 'higher', options: [
-        { value: 'higher', label: 'Höher' }, { value: 'lower', label: 'Tiefer' } ] },
-    ],
-    buildSingleParams: (v) => ({ card: num(v, 'card', 7), guess: v.guess ?? 'higher' }),
     session: {
       step: { kind: 'guess' },
       buildStep: (i) => ({ guess: i.guess ?? 'higher' }),
@@ -279,11 +273,16 @@ export const ENGINES: EngineDef[] = [
     label: 'Scratch',
     category: 'Instant',
     mechanics: ['single'],
-    blurb: 'Rubbellos — ein Preis wird aufgedeckt.',
+    blurb: 'Rubbellos — ein Los, eine Ziehung aus der Gewinntabelle.',
     playerFacts: {
-      inputs: 'Los kaufen — keine weitere Auswahl nötig.',
-      outcomes: 'Ein Preis aus der Preistabelle des Spiels wird aufgedeckt — von Niete (Einsatz weg) bis Jackpot.',
+      inputs: 'Los kaufen — es gibt nichts zu wählen.',
+      outcomes:
+        'Eine Ziehung aus der Gewinntabelle des Spiels entscheidet die Runde: jede Gewinnklasse hat ein Gewicht (wie oft sie kommt) und einen Multiplikator (was sie zahlt). Die meisten Lose sind Nieten — Einsatz weg. Das Rubbeln ist Optik: der Preis steht fest, bevor das erste Feld freigelegt wird.',
     },
+    // `fields`/`reveals` aus der Engine-Config sind REINE Präsentation für
+    // dein eigenes Frontend (wie viele Rubbelfelder gezeichnet und wie viele
+    // davon freigelegt werden). Der Server liest sie im Resolver nicht —
+    // Chancen, Auszahlung und RTP hängen ausschließlich an der Gewinntabelle.
     singleControls: [],
     buildSingleParams: () => ({}),
   },

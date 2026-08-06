@@ -213,8 +213,10 @@ export function SessionGame({
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      {/* HUD */}
-      <div className="mb-4 grid h-28 place-items-center rounded-xl bg-night text-center">
+      {/* HUD — min-Höhe statt fixer Höhe: die Engine-Erklärtexte (playerFacts,
+          z. B. steps' Leben/Safe-Point-Regeln) sind unterschiedlich lang und
+          liefen bei h-28 sichtbar über Einsatz-Feld und Button hinaus. */}
+      <div className="mb-4 grid min-h-[7rem] place-items-center rounded-xl bg-night px-2 py-3 text-center">
         {view ? (
           <div>
             <div className={`text-3xl font-bold tabular-nums ${ended && view.status === 'busted' ? 'text-red-400' : 'text-accent'}`}>

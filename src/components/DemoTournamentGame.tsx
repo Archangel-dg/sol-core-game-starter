@@ -100,7 +100,7 @@ export function DemoTournamentGame({ engine }: { engine: EngineDef }) {
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      <div className="mb-4 grid h-28 place-items-center rounded-xl bg-night text-center">
+      <div className="mb-4 grid min-h-[7rem] place-items-center rounded-xl bg-night px-2 py-3 text-center">
         {view ? (
           <div>
             <div className={`text-3xl font-bold tabular-nums ${view.status === 'busted' ? 'text-red-400' : 'text-accent'}`}>

@@ -381,17 +381,18 @@ export const ENGINES: EngineDef[] = [
       inputs:
         'Eine Wahl pro Zug: Cashout oder eine Stufe hochklettern (ein Knopf). Jeder Versuch gelingt mit einer festen, vom Spiel gesetzten Chance.',
       outcomes:
-        'Jede Stufe zahlt einen festen Leiter-Multiplikator; Cashout jederzeit ab der Mindest-Stufe. Ohne Checkpoints verliert ein Absturz den Einsatz; MIT Checkpoints fällst du nur auf den letzten Checkpoint zurück und die Runde läuft weiter — bis der Versuchs-Vorrat aufgebraucht ist (Settlement am Boden = Einsatz weg).',
+        'Jede Stufe zahlt einen festen Leiter-Multiplikator; Cashout jederzeit ab der Mindest-Stufe. Ohne Safe-Points verliert ein Absturz den Einsatz. MIT Safe-Points hast du Leben: nur Fehlschläge kosten eins — je nach Spiel bleibst du auf dem Safe-Point stehen oder fällst auf den nächsttieferen. Ein Fehlschlag ohne Restleben verliert den Einsatz.',
     },
     session: {
       // Leerer Step-Body wie pump — „Klettern" ist die einzige Aktion. Die
-      // Leiter (`ladderBps`), Checkpoints und der Versuchs-Vorrat kommen als
-      // aufgelöste Engine-Config vom Server (publicEngineConfig-Echo);
-      // die aktuelle STUFE steht in `progress.currentStep` — `steps` im
-      // SessionView zählt bei dieser Engine die VERSUCHE.
+      // Leiter (`ladderBps`), Safe-Points (`checkpoints`), Leben (`lives`)
+      // und die Fall-Regel (`dropMode`) kommen als aufgelöste Engine-Config
+      // vom Server (publicEngineConfig-Echo); die Restleben stehen live in
+      // `progress.livesLeft`, die aktuelle STUFE in `progress.currentStep` —
+      // `steps` im SessionView zählt bei dieser Engine die VERSUCHE.
       step: { kind: 'action', label: 'Klettern' },
       buildStep: () => ({}),
-      hint: 'Klettern oder cashen — bei Checkpoints fängt dich der letzte Haltepunkt.',
+      hint: 'Klettern oder cashen — Safe-Points und Leben fangen Fehlschläge ab, bis der Schutz verbraucht ist.',
     },
   },
   {

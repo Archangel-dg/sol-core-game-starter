@@ -23,7 +23,7 @@ render exactly this geometry, never guessed values:
 | `mines` | `{ gridSize, mineCount }` |
 | `pump` | `{ growthBps, maxPumps }` |
 | `hilo` | `{ maxSteps: 20 }` |
-| `steps` | `{ steps, winChanceBps, minSteps, failMode, ladderBps[] }` (+ `maxClimbs`, `checkpoints[]` in checkpoint mode) |
+| `steps` | `{ steps, winChanceBps, minSteps, failMode, ladderBps[], maxWinBps? }` (+ `lives`, `dropMode`, `checkpoints[]` in checkpoint mode) |
 | others | `{}` |
 
 Game config is immutable after creation → cache the response indefinitely. The starter exposes it

@@ -27,9 +27,10 @@ function formatTowersBombs(bombColumns: unknown): string {
 /** steps: Stufen-Fortschritt + Leiter defensiv aus Fortschritt und
  * Engine-Config lesen. Bei dieser Engine zählt `SessionView.steps` die
  * VERSUCHE — die aktuelle Stufe steht in `progress.currentStep`; Leiter,
- * Checkpoints und Versuchs-Vorrat kommen als aufgelöstes Server-Echo in der
- * Engine-Config (`ladderBps`/`checkpoints`/`maxClimbs`). Alles `unknown`-
- * tolerant gelesen (Muster: `towersFloorColumns`). */
+ * Safe-Points und Leben kommen als aufgelöstes Server-Echo in der
+ * Engine-Config (`ladderBps`/`checkpoints`/`lives`), die Restleben live in
+ * `progress.livesLeft`. Alles `unknown`-tolerant gelesen (Muster:
+ * `towersFloorColumns`). */
 function stepsInfo(
   progress: unknown,
   cfg: Record<string, unknown> | null,
@@ -37,7 +38,8 @@ function stepsInfo(
   rung: number;
   ladderBps: number[];
   checkpoints: number[];
-  maxClimbs: number | null;
+  lives: number | null;
+  livesLeft: number | null;
   climbsUsed: number;
   lastFall: { from: number; to: number } | null;
 } | null {
@@ -48,15 +50,16 @@ function stepsInfo(
   const ladderBps = nums((c as Record<string, unknown>).ladderBps);
   const rung = typeof p.currentStep === 'number' && Number.isFinite(p.currentStep) ? p.currentStep : 0;
   const climbsUsed = typeof p.climbsUsed === 'number' && Number.isFinite(p.climbsUsed) ? p.climbsUsed : 0;
-  const rawMax = (c as Record<string, unknown>).maxClimbs;
-  const maxClimbs = typeof rawMax === 'number' && Number.isFinite(rawMax) ? rawMax : null;
+  const rawLives = (c as Record<string, unknown>).lives;
+  const lives = typeof rawLives === 'number' && Number.isFinite(rawLives) ? rawLives : null;
+  const livesLeft = typeof p.livesLeft === 'number' && Number.isFinite(p.livesLeft) ? p.livesLeft : null;
   const fall = p.lastFall && typeof p.lastFall === 'object' ? (p.lastFall as Record<string, unknown>) : null;
   const lastFall =
     fall && typeof fall.from === 'number' && typeof fall.to === 'number'
       ? { from: fall.from, to: fall.to }
       : null;
   if (ladderBps.length === 0 && rung === 0 && climbsUsed === 0) return null;
-  return { rung, ladderBps, checkpoints: nums((c as Record<string, unknown>).checkpoints), maxClimbs, climbsUsed, lastFall };
+  return { rung, ladderBps, checkpoints: nums((c as Record<string, unknown>).checkpoints), lives, livesLeft, climbsUsed, lastFall };
 }
 
 /**
@@ -219,7 +222,7 @@ export function SessionGame({
             </div>
             <div className="mt-1 text-sm text-white/70">
               {active && steps &&
-                `Stufe ${steps.rung}${steps.maxClimbs !== null ? ` · Versuch ${steps.climbsUsed}/${steps.maxClimbs}` : ''} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
+                `Stufe ${steps.rung}${steps.livesLeft !== null ? ` · Leben ${steps.livesLeft}${steps.lives !== null ? `/${steps.lives}` : ''}` : ''} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
               {active && !steps && `Schritt ${view.steps} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
               {view.status === 'busted' && 'Geplatzt — verloren'}
               {view.status === 'cashed_out' && `Cashout ${toSol(view.payoutLamports ?? '0')} ◎`}
@@ -227,7 +230,7 @@ export function SessionGame({
             {active && steps?.lastFall && (
               <div className="mt-1 text-[11px] text-amber-300/80">
                 Abgestürzt: Stufe {steps.lastFall.from} → {steps.lastFall.to}
-                {steps.lastFall.to > 0 ? ' (Checkpoint fängt dich)' : ' (Boden)'}
+                {steps.lastFall.to > 0 ? ' (Safe-Point fängt dich)' : ' (Boden)'}
               </div>
             )}
             {ended && view.capped && <div className="text-xs text-white/40">Payout-Limit erreicht</div>}

@@ -50,7 +50,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `towers` | `{ column: 0–(columns−1) }` |
 | `hilo` | `{ guess: "higher"\|"lower" }` (a tie loses; ends after 20 steps) |
 | `pump` | `{}` (just pump again) |
-| `steps` | `{}` (one climb attempt). Note: `SessionView.steps` counts climb ATTEMPTS for this engine — the current rung is `progress.currentStep`; the ladder (`ladderBps`), `checkpoints` and `maxClimbs` arrive via the resolved engine config |
+| `steps` | `{}` (one climb attempt). Note: `SessionView.steps` counts climb ATTEMPTS for this engine — the current rung is `progress.currentStep` and remaining lives are `progress.livesLeft`; the ladder (`ladderBps`), `checkpoints`, `lives` and `dropMode` arrive via the resolved engine config |
 
 ## Tournament steps (`gauntlet`)
 

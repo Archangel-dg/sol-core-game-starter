@@ -19,6 +19,14 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
   credited at the draw; the skins then play their reveal animation while the balance display is
   frozen. Your game references the stream via its server config — the outcomes/odds/durations all
   come from `GET /api/game/live/state`, never hardcode them.
+- **pvp** — player vs. player with a lobby system (`/api/game/pvp/*`): create or join a lobby,
+  set a stake, both players mark ready; the server flips one provably-fair coin and the winner
+  takes the whole pot. **Money is only charged at the start (both ready), never when the lobby is
+  created** — leaving before the start is free. Stake bounds / PIN policy come from the resolved
+  engine config; wallet-bound actions (create/join/leave/kick/ready/unready/stake/chat) need a
+  player token, and the membership-checked lobby-room state poll (`GET /pvp/lobby/:id`) is
+  **token-bound too** (a non-member gets `API-700`). A demo mode (`/api/demo/pvp/*`) plays an instant
+  match against the server bot with simulated SOL.
 
 ## Overview
 
@@ -41,6 +49,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `steps` | chain | | ✓ | — (session) |
 | `gauntlet` | tournament | | | — (tournament) |
 | `live-odds` | live | | | — (live; outcomes/odds from `/live/state`) |
+| `pvp-coinflip` | pvp | | | — (pvp; lobby → ready-check → server draw for the pot) |
 
 ## Session steps (`step` body)
 
@@ -84,6 +93,31 @@ state payload — never trust the device clock). Multiple bets per player per ro
 **The result is credited server-side at the draw** — the reveal is pure theater. The template's
 balance-freeze hook (`lib/balance-freeze.tsx`) holds the displayed balance during the reveal so a
 background poll can't spoil the winner; never remove it.
+
+## PvP rounds (`pvp-coinflip`)
+
+Flow: **create** a lobby (`POST /pvp/lobby` with `{ playerWallet, stakeLamports, pin?, clientSeed? }`)
+or **join** an open one (`POST /pvp/lobby/:id/join`) → in the lobby room chat
+(`POST /pvp/lobby/:id/chat`), the host may change the stake (`POST /pvp/lobby/:id/stake`, which
+un-readies everyone) or kick (`POST /pvp/lobby/:id/kick`) → each player marks **ready**
+(`POST /pvp/lobby/:id/ready`, sending their hex `clientSeed`) → when **both** are ready the server
+locks, debits both seats and draws; at `settled` the winner is paid the whole pot.
+
+- **Poll the lobby room** with `GET /pvp/lobby/:id?since=<chatCursor>` — this is **membership-checked
+  and token-bound**: the poll must carry the player's Bearer token (the starter uses
+  `usePlayerAuth().authFetch`), a non-member gets `API-700`. The open-lobby list
+  (`GET /pvp/lobbies`), match view (`GET /pvp/match/:id`), W/L stats (`GET /pvp/me/:wallet`) and
+  verify (`GET /pvp/verify/:matchId`) are plain reads.
+- **Money is only charged at the lock** (both ready), not at lobby creation; leaving before the
+  start is free. Fees are taken on top of the stake and always kept — the winner receives the whole
+  pot (both clean stakes).
+- The reveal animation is deterministic from the lobby state's `match.drawAt` + `serverTime` offset
+  (same clock-offset pattern as live), with the balance frozen until the result shows. The winner is
+  paid server-side even if a tab closed. Provably fair:
+  `roll = HMAC-SHA256(serverSeed, seat1Seed:seat2Seed:matchId:nonce)`, `roll < 50 → seat 1` (host).
+- **Demo:** `POST /api/demo/pvp/lobby` plays an instant match vs. the server bot on the simulated
+  balance (`GET /api/demo/pvp/match/:id` re-reads it) — token-free, isolated from the real tables.
+- Stake bounds / PIN policy come from the resolved engine config — never hardcode them.
 
 **Never hardcode the grid/column count.** The real dimensions come from the server:
 `GET /api/meta` → `engineConfig` (e.g. towers `{ levels, columns }`, mines `{ gridSize, mineCount }`),

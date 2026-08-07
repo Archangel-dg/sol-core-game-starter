@@ -97,6 +97,21 @@ if (MECHANIC === 'session') {
   // Antwort beweist trotzdem, dass der Pfad lebt und die Auth-Schicht greift.
   const reachable = r.ok || ['API-305', 'API-302', 'API-303', 'API-304', 'API-402'].includes(code);
   ok(reachable, r.ok ? `Session-Start ok (sessionId=${b.sessionId})` : `Session erreichbar (${code} — erwartet ohne Guthaben/Spieler-Token)`);
+} else if (MECHANIC === 'pvp') {
+  // PvP: die Lobby-Erstellung ist wallet-gebunden (apiKeyAuth + Spieler-Token).
+  // Der Selbsttest hält keinen Wallet-Schlüssel → API-402 (kein Token) beweist,
+  // dass der Pfad lebt und die Auth-Schicht greift. Ohne Guthaben käme beim Lock
+  // API-305; ein Einsatz außerhalb der Grenzen ⇒ API-706 — beides ebenfalls
+  // „erreichbar". Es wird nichts debitiert (Geld fließt erst beim Lock).
+  const r = await fetch(`${API}/api/game/pvp/lobby`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': KEY },
+    body: JSON.stringify({ playerWallet: PLAYER, stakeLamports: '10000000' }),
+    signal: AbortSignal.timeout(90000),
+  });
+  const b = await j(r);
+  const code = b?.error?.code;
+  const reachable = r.ok || ['API-305', 'API-302', 'API-303', 'API-304', 'API-402', 'API-704', 'API-706', 'API-709', 'API-201', 'API-202'].includes(code);
+  ok(reachable, r.ok ? `PvP-Lobby erstellt (lobbyId=${b.lobbyId})` : `PvP erreichbar (${code} — erwartet ohne Guthaben/Spieler-Token)`);
 } else {
   const params = SINGLE_PARAMS[ENGINE] ?? {};
   const r = await fetch(`${API}/api/game/bet`, {

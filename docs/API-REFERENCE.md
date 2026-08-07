@@ -198,6 +198,39 @@ Rules the UI MUST reflect:
 - `API-302 live_exposure_cap` = this outcome's book is full for the round — smaller stake or a
   different outcome.
 
+## PvP layer (pvp-coinflip) — lobby → ready-check → server draw for the pot
+
+Wallet-bound actions need a player token (same as `/bet`); the lobby-room state poll is
+**membership-checked and token-bound too** — send the Bearer token on it, a non-member gets
+`API-700`. The open-lobby list, match view, W/L stats and verify are plain reads.
+
+- `POST /api/game/pvp/lobby` — `{ playerWallet, stakeLamports, pin?, clientSeed? }` → `PvpLobbyView`
+  (creates a lobby; **no money moves yet**). `API-704` = already in another lobby (details `lobbyId`).
+- `POST /api/game/pvp/lobby/:id/join` — `{ playerWallet, pin?, clientSeed? }` → `PvpLobbyView`
+  (wrong PIN → `API-703`, full → `API-701`, expired → `API-702`).
+- `POST /api/game/pvp/lobby/:id/leave` — `{ playerWallet }` → `{ left, dissolved }`.
+- `POST /api/game/pvp/lobby/:id/kick` — `{ playerWallet (host), wallet (target) }` → `PvpLobbyView`
+  (host only, `API-710` otherwise).
+- `POST /api/game/pvp/lobby/:id/ready` — `{ playerWallet, clientSeed? }` (hex `[0-9a-f]{1,64}`) →
+  `PvpLobbyView`. Both ready → server locks + draws; caller debit failure → `API-708`.
+- `POST /api/game/pvp/lobby/:id/unready` — `{ playerWallet }` → `PvpLobbyView`.
+- `POST /api/game/pvp/lobby/:id/stake` — `{ playerWallet (host), stakeLamports }` → `PvpLobbyView`
+  (host only; **un-readies everyone**; `API-706` if out of range).
+- `POST /api/game/pvp/lobby/:id/chat` — `{ playerWallet, message }` (≤200 chars, 1 msg / 2 s).
+- `GET /api/game/pvp/lobby/:id?since=<chatCursor>` — **token-bound** lobby-room state
+  (`members[]`, `match{…}|null`, `engineConfig`, `serverTime`); poll 1 s; non-member → `API-700`.
+- `GET /api/game/pvp/lobbies` — open lobbies of this game (host wallet truncated).
+- `GET /api/game/pvp/match/:id` — full match view (wallets truncated for non-participants).
+- `GET /api/game/pvp/me/:wallet` — `{ wallet, wins, losses, total, recent:[…] }`.
+- `GET /api/game/pvp/verify/:matchId` — **public** provably-fair check
+  (`roll = HMAC-SHA256(serverSeed, seat1Seed:seat2Seed:matchId:nonce)`, `roll < 50 → seat 1`).
+- **Demo:** `POST /api/game/demo/pvp/lobby` — `{ playerWallet, stakeLamports, clientSeed? }` → an
+  instant settled match vs. the server bot (token-free); `GET /api/game/demo/pvp/match/:id` re-reads it.
+
+Money is only charged at the lock (both ready), never at lobby creation; leaving before the start is
+free. Drive the reveal from `match.drawAt` + `serverTime` offset and freeze the balance until the
+result shows — the winner is paid even if a tab closed.
+
 ## Player balance (program mode; hide when `devMock: true`)
 
 - `GET /api/game/balance/:wallet` → `{ wallet, devMock, balanceLamports: string|null }`
@@ -227,6 +260,13 @@ UI requirement: show the hash BEFORE the round, `roundId` + verify link after.
 | API-304 | 429 | rate limit | disable button + countdown |
 | API-305 | 402 | **insufficient balance** | deposit dialog |
 | API-400 | 400 | creator fee out of level range (game paused) | lock |
+| API-402 | 401 | player token missing/invalid/expired | reconnect wallet |
 | API-500 | 5xx | server error | retry |
+
+PvP-specific (API-7xx): `API-700` lobby not found / not a member · `API-701` full · `API-702`
+expired · `API-703` wrong PIN · `API-704` already in another lobby (details `lobbyId`) · `API-705`
+self-match · `API-706` stake out of range · `API-707` seed rotated (refunded) · `API-708` balance
+too low at lock (refunded) · `API-709` PvP rate limit · `API-710` host-only · `API-711` already
+refunded.
 
 Note: the hosted service may have a ~30–50s cold start after idle — design generous loading states.

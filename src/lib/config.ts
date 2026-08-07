@@ -55,10 +55,11 @@ export function publicConfig(): PublicConfig {
     mechanic !== 'single' &&
     mechanic !== 'session' &&
     mechanic !== 'tournament' &&
-    mechanic !== 'live'
+    mechanic !== 'live' &&
+    mechanic !== 'pvp'
   ) {
     throw new Error(
-      `NEXT_PUBLIC_MECHANIC muss "single", "session", "tournament" oder "live" sein.`,
+      `NEXT_PUBLIC_MECHANIC muss "single", "session", "tournament", "live" oder "pvp" sein.`,
     );
   }
   if (!engineSupports(engine, mechanic)) {

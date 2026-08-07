@@ -528,3 +528,262 @@ export function liveMe(wallet: string, roundId?: string): Promise<LiveMyBets> {
 export function liveRound(roundId: string): Promise<LiveRoundInfo> {
   return request<LiveRoundInfo>(`/api/game/live/round/${roundId}`);
 }
+
+// ── PvP-Schicht (Lobby → Ready-Check → Lock-Debit → Server-Draw: pvp-coinflip) ─
+// Alle wallet-gebundenen Aktionen (create/join/leave/kick/ready/unready/stake/
+// chat) tragen ein Spieler-Token (wie /bet). WICHTIG: `pvpLobbyState` ist
+// EBENFALLS token-gebunden — der Lobby-Raum-State ist serverseitig
+// mitgliedschafts-geprüft (Nicht-Mitglied ⇒ API-700); der Poll MUSS also das
+// Token mitschicken. Die übrigen Reads (Lobby-Liste, Match, W/L, Verify) sind
+// token-frei.
+
+/** Aufgelöste PvP-Engine-Grenzen (publicEngineConfig-Echo): Lamports als
+ * Strings, `allowPin` als 0/1, `playerCounts` als Zahlen-Array. */
+export interface PvpEngineConfigView {
+  minStakeLamports: string;
+  maxStakeLamports: string;
+  waitTimeSeconds: number;
+  allowPin: 0 | 1;
+  lobbyTtlSeconds: number;
+  playerCounts: number[];
+}
+
+export interface PvpMember {
+  wallet: string;
+  seatNo: number;
+  ready: boolean;
+  isHost: boolean;
+  joinedAt: string;
+}
+
+export interface PvpMatchSummary {
+  matchId: string;
+  status: string;
+  drawAt: string | null;
+  winnerSeat: number | null;
+  settledAt: string | null;
+}
+
+/** Chat-Delta-Zeile. Hinweis: der Backend-`getLobbyState` liest den Chat zwar
+ * (Cursor `?since=`), gibt ihn zur Zeit aber noch NICHT im State-Objekt zurück —
+ * der Client konsumiert `chat` defensiv (leeres Array, bis das Backend das Feld
+ * ergänzt). */
+export interface PvpChatMessage {
+  id: string;
+  wallet: string;
+  message: string;
+  createdAt?: string;
+  created_at?: string;
+}
+
+export interface PvpLobbyView {
+  lobbyId: string;
+  gameId: string;
+  status: 'open' | 'full' | 'readying' | 'locked' | 'settled' | 'closed' | 'expired';
+  hostWallet: string;
+  stakeLamports: string;
+  maxPlayers: number;
+  hasPin: boolean;
+  lastError: Record<string, unknown> | null;
+  expiresAt: string;
+  createdAt: string;
+  members: PvpMember[];
+  match: PvpMatchSummary | null;
+  engineConfig: PvpEngineConfigView;
+  serverTime: string;
+  /** Optionaler Chat-Delta — siehe PvpChatMessage (Backend liefert es aktuell noch nicht). */
+  chat?: PvpChatMessage[];
+}
+
+export interface PvpOpenLobby {
+  lobbyId: string;
+  hostWallet: string;
+  stakeLamports: string;
+  playersCurrent: number;
+  playersMax: number;
+  locked: boolean;
+  ageSeconds: number;
+  createdAt: string;
+}
+
+export interface PvpLobbiesView {
+  lobbies: PvpOpenLobby[];
+  serverTime: string;
+}
+
+export interface PvpMatchView {
+  matchId: string;
+  lobbyId: string;
+  gameId: string;
+  status: 'locked' | 'staked' | 'drawing' | 'settled' | 'failed' | 'voided';
+  stakeLamports: string;
+  potLamports: string;
+  totalChargeLamports: string;
+  seats: { seat: number; wallet: string; staked: boolean }[];
+  proof: { serverSeedHash: string; clientSeeds: (string | null)[]; compositeClientSeed: string; nonce: number };
+  drawAt: string | null;
+  lockedAt: string | null;
+  settledAt: string | null;
+  failReason: string | null;
+  result: { roll: number | null; winnerSeat: number; winnerWallet: string; payoutLamports: string } | null;
+  serverTime: string;
+}
+
+export interface PvpStatsView {
+  wallet: string;
+  wins: number;
+  losses: number;
+  total: number;
+  recent: {
+    matchId: string;
+    stakeLamports: string;
+    opponent: string;
+    win: boolean;
+    winnerSeat: number | null;
+    mySeat: number;
+    settledAt: string | null;
+  }[];
+}
+
+// ── Money/Wallet-Aktionen (Spieler-Token Pflicht) ──
+export function pvpCreateLobby(
+  input: { playerWallet: string; stakeLamports: string; pin?: string; clientSeed?: string },
+  playerToken?: string,
+): Promise<PvpLobbyView> {
+  return request<PvpLobbyView>('/api/game/pvp/lobby', { method: 'POST', body: JSON.stringify(input) }, playerToken);
+}
+
+export function pvpJoin(
+  lobbyId: string,
+  input: { playerWallet: string; pin?: string; clientSeed?: string },
+  playerToken?: string,
+): Promise<PvpLobbyView> {
+  return request<PvpLobbyView>(
+    `/api/game/pvp/lobby/${lobbyId}/join`,
+    { method: 'POST', body: JSON.stringify(input) },
+    playerToken,
+  );
+}
+
+export function pvpLeave(
+  lobbyId: string,
+  input: { playerWallet: string },
+  playerToken?: string,
+): Promise<{ left: boolean; dissolved: boolean }> {
+  return request(`/api/game/pvp/lobby/${lobbyId}/leave`, { method: 'POST', body: JSON.stringify(input) }, playerToken);
+}
+
+export function pvpKick(
+  lobbyId: string,
+  input: { playerWallet: string; wallet: string },
+  playerToken?: string,
+): Promise<PvpLobbyView> {
+  return request<PvpLobbyView>(
+    `/api/game/pvp/lobby/${lobbyId}/kick`,
+    { method: 'POST', body: JSON.stringify(input) },
+    playerToken,
+  );
+}
+
+export function pvpReady(
+  lobbyId: string,
+  input: { playerWallet: string; clientSeed?: string },
+  playerToken?: string,
+): Promise<PvpLobbyView> {
+  return request<PvpLobbyView>(
+    `/api/game/pvp/lobby/${lobbyId}/ready`,
+    { method: 'POST', body: JSON.stringify(input) },
+    playerToken,
+  );
+}
+
+export function pvpUnready(
+  lobbyId: string,
+  input: { playerWallet: string },
+  playerToken?: string,
+): Promise<PvpLobbyView> {
+  return request<PvpLobbyView>(
+    `/api/game/pvp/lobby/${lobbyId}/unready`,
+    { method: 'POST', body: JSON.stringify(input) },
+    playerToken,
+  );
+}
+
+export function pvpSetStake(
+  lobbyId: string,
+  input: { playerWallet: string; stakeLamports: string },
+  playerToken?: string,
+): Promise<PvpLobbyView> {
+  return request<PvpLobbyView>(
+    `/api/game/pvp/lobby/${lobbyId}/stake`,
+    { method: 'POST', body: JSON.stringify(input) },
+    playerToken,
+  );
+}
+
+export function pvpChatPost(
+  lobbyId: string,
+  input: { playerWallet: string; message: string },
+  playerToken?: string,
+): Promise<{ id: string; createdAt: string }> {
+  return request(`/api/game/pvp/lobby/${lobbyId}/chat`, { method: 'POST', body: JSON.stringify(input) }, playerToken);
+}
+
+/** Lobby-Raum-State (mitgliedschafts-geprüft ⇒ token-gebunden, nicht token-frei). */
+export function pvpLobbyState(lobbyId: string, since?: string, playerToken?: string): Promise<PvpLobbyView> {
+  const q = since ? `?since=${encodeURIComponent(since)}` : '';
+  return request<PvpLobbyView>(`/api/game/pvp/lobby/${lobbyId}${q}`, undefined, playerToken);
+}
+
+// ── Reads (token-frei) ──
+export function pvpLobbies(): Promise<PvpLobbiesView> {
+  return request<PvpLobbiesView>('/api/game/pvp/lobbies');
+}
+
+export function pvpMatch(matchId: string): Promise<PvpMatchView> {
+  return request<PvpMatchView>(`/api/game/pvp/match/${matchId}`);
+}
+
+export function pvpMe(wallet: string): Promise<PvpStatsView> {
+  return request<PvpStatsView>(`/api/game/pvp/me/${wallet}`);
+}
+
+export function pvpVerify(matchId: string): Promise<Record<string, unknown>> {
+  return request(`/api/game/pvp/verify/${matchId}`);
+}
+
+// ── PvP-Demo (Instant-Match gegen den Server-Bot, Sim-Balance, token-frei) ──
+export interface DemoPvpView {
+  matchId: string;
+  gameId: string;
+  mode: string;
+  status: 'settled';
+  demo: true;
+  stakeLamports: string;
+  totalChargeLamports: string;
+  potLamports: string;
+  seats: { seat: number; wallet: string }[];
+  result: { roll: number; winnerSeat: number; win: boolean; payoutLamports: string };
+  proof: {
+    serverSeedHash: string;
+    serverSeed: string;
+    clientSeeds: string[];
+    compositeClientSeed: string;
+    nonce: number;
+  };
+  balanceLamports: string;
+  engine: { mode: string; config: Record<string, unknown> };
+  createdAt: string;
+}
+
+export function demoPvpPlay(input: {
+  playerWallet: string;
+  stakeLamports: string;
+  clientSeed?: string;
+}): Promise<DemoPvpView> {
+  return request<DemoPvpView>('/api/game/demo/pvp/lobby', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function demoPvpMatch(id: string): Promise<DemoPvpView> {
+  return request<DemoPvpView>(`/api/game/demo/pvp/match/${id}`);
+}

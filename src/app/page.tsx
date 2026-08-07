@@ -10,6 +10,8 @@ import { SessionGame } from '@/components/SessionGame';
 import { TournamentGame } from '@/components/TournamentGame';
 import { DemoTournamentGame } from '@/components/DemoTournamentGame';
 import { LiveGame } from '@/components/LiveGame';
+import { PvpGame } from '@/components/PvpGame';
+import { DemoPvpGame } from '@/components/DemoPvpGame';
 import { FairnessPanel } from '@/components/FairnessPanel';
 import { History } from '@/components/History';
 import { BalanceFreezeProvider } from '@/lib/balance-freeze';
@@ -18,7 +20,7 @@ import { getEngine } from '@/lib/engines';
 interface Meta {
   gameName: string;
   engine: string;
-  mechanic: 'single' | 'session' | 'tournament' | 'live';
+  mechanic: 'single' | 'session' | 'tournament' | 'live' | 'pvp';
   gameId: string;
   apiUrl: string;
   verifierUrl: string;
@@ -46,7 +48,7 @@ export default function Home() {
 }
 
 function HomeInner({ meta }: { meta: Meta | null }) {
-  const { demo } = useDemo();
+  const { demo, startDemo } = useDemo();
   const [seedHash, setSeedHash] = useState<string | null>(null);
   const [roundId, setRoundId] = useState<string | null>(null);
   const [history, setHistory] = useState<RoundLog[]>([]);
@@ -57,6 +59,34 @@ function HomeInner({ meta }: { meta: Meta | null }) {
     setRoundId(r);
   };
   const onLog = (r: RoundLog) => setHistory((h) => [r, ...h].slice(0, 20));
+
+  // PvP bringt sein eigenes Full-Bleed-Layout mit (Header-Bar mit Wallet-Modal +
+  // Menü, Lobby-Browser, Lobby-Raum, Reveal). Im Demo-Modus gegen den Server-Bot
+  // (DemoPvpGame), sonst die echte Lobby-Erfahrung — Fork wie im Turnier-Zweig.
+  if (meta && !meta.error && engine && meta.mechanic === 'pvp') {
+    return (
+      <BalanceFreezeProvider>
+        {demo ? (
+          <DemoPvpGame
+            engine={engine}
+            gameName={meta.gameName}
+            engineConfig={meta.engineConfig}
+            verifierUrl={meta.verifierUrl}
+          />
+        ) : (
+          <PvpGame
+            engine={engine}
+            gameId={meta.gameId}
+            gameName={meta.gameName}
+            engineConfig={meta.engineConfig}
+            verifierUrl={meta.verifierUrl}
+            devMock={meta.devMock}
+            onDemoPlay={startDemo}
+          />
+        )}
+      </BalanceFreezeProvider>
+    );
+  }
 
   return (
     <main className="mx-auto min-h-screen max-w-md px-4 py-8">

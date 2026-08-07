@@ -119,5 +119,29 @@ export function usePlayerAuth() {
     [publicKey, signMessage],
   );
 
-  return { moneyFetch };
+  // `authFetch` — der GET-Zwilling von `moneyFetch`: eine LESENDE Route, die
+  // trotzdem an (Wallet, Spiel) gebunden ist (z. B. der mitgliedschafts-geprüfte
+  // PvP-Lobby-Raum-State GET /api/pvp/lobby/:id). Trägt dasselbe Bearer-Token
+  // (aus dem Cache, nur bei Ablauf neu signiert) und macht denselben EINEN
+  // API-402-Neuversuch. Verändert das bestehende moneyFetch-Verhalten nicht.
+  const authFetch = useCallback(
+    async (path: string): Promise<JsonResponse> => {
+      const wallet = publicKey?.toBase58();
+      if (!wallet) throw new Error('Wallet nicht verbunden.');
+      if (!signMessage) {
+        throw new Error('Diese Wallet kann keine Nachrichten signieren — andere Wallet wählen.');
+      }
+      const send = async (token: string): Promise<JsonResponse> =>
+        fetch(path, { headers: { authorization: `Bearer ${token}` } }).then((r) => r.json());
+      const res = await send(await ensureToken(wallet, signMessage));
+      if (res?.error?.code === 'API-402') {
+        clearPlayerToken();
+        return send(await authorize(wallet, signMessage));
+      }
+      return res;
+    },
+    [publicKey, signMessage],
+  );
+
+  return { moneyFetch, authFetch };
 }

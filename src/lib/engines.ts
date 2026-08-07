@@ -3,7 +3,7 @@
 // params-Bauer (für /bet bzw. Session-Steps) und Ergebnis-Text. Datengesteuert,
 // damit eine generische UI jede Engine bedienen kann.
 
-export type Mechanic = 'single' | 'session' | 'tournament' | 'live';
+export type Mechanic = 'single' | 'session' | 'tournament' | 'live' | 'pvp';
 
 /**
  * Aufgelöste Engine-Dimensionen des konkreten Spiels (vom Server, via
@@ -79,6 +79,12 @@ export interface EngineDef {
    * Controls sind datengetrieben aus /api/live/state (Outcomes + Quoten),
    * nicht statisch — daher hier nur der Hinweistext. */
   live?: { hint: string };
+  // ── PvP (Spieler-gegen-Spieler mit Lobby-System) ──
+  /** PvP-Runde: Lobby erstellen/beitreten → Ready-Check → Server-Draw um den
+   * Pot. Grenzen (Einsatz, PIN) kommen als aufgelöste Engine-Config vom Server
+   * (publicEngineConfig-Echo: minStakeLamports/maxStakeLamports/allowPin/…),
+   * daher hier nur der Hinweistext. */
+  pvp?: { hint: string };
 }
 
 const num = (v: Record<string, string>, k: string, d = 0): number => {
@@ -442,6 +448,22 @@ export const ENGINES: EngineDef[] = [
     },
     live: {
       hint: 'Outcome wählen, Einsatz setzen, Countdown abwarten — das Rennen zeigt das Ergebnis.',
+    },
+  },
+  {
+    key: 'pvp-coinflip',
+    label: 'PvP Coin Flip',
+    category: 'PvP',
+    mechanics: ['pvp'],
+    blurb: 'Spieler gegen Spieler: Münzwurf um den ganzen Pot — 50/50, kein House-Edge.',
+    playerFacts: {
+      inputs:
+        'Lobby mit Einsatz erstellen (optional per PIN sperren) oder einer offenen Lobby beitreten. Beide setzen „Bereit"; der Server wirft dann die Münze.',
+      outcomes:
+        'Der Gewinner erhält den ganzen Pot (beide Einsätze) — Fees bleiben einbehalten. Exakt 50/50 und provably fair; verlierst du, ist dein Einsatz weg. Geld wird erst beim Spielstart (alle bereit) gebucht, nie beim Erstellen der Lobby.',
+    },
+    pvp: {
+      hint: 'Lobby erstellen oder beitreten, „Bereit" setzen — der Server wirft die Münze, sobald beide bereit sind.',
     },
   },
 ];

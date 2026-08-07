@@ -3,8 +3,20 @@
 import type { RoundLog } from './SingleBetGame';
 import { toSol } from '@/lib/lamports';
 
-/** Letzte Runden (lokal im State). Design-Zone. */
-export function History({ rounds, apiUrl, demo = false }: { rounds: RoundLog[]; apiUrl: string; demo?: boolean }) {
+/** Letzte Runden (lokal im State). Design-Zone. Echt-Runden verlinken auf den
+ * Sol-Core Verifier (Browser-Nachrechnung); Demo-Runden auf den rohen
+ * Demo-Endpunkt (der Verifier kennt nur creator_rounds, keine demo_rounds). */
+export function History({
+  rounds,
+  apiUrl,
+  verifierUrl,
+  demo = false,
+}: {
+  rounds: RoundLog[];
+  apiUrl: string;
+  verifierUrl: string;
+  demo?: boolean;
+}) {
   if (rounds.length === 0) return null;
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
@@ -16,7 +28,7 @@ export function History({ rounds, apiUrl, demo = false }: { rounds: RoundLog[]; 
               {(r.multiplierBps / 10000).toFixed(2)}× {r.win ? `+${toSol(r.payoutLamports)} ◎` : 'verloren'}
             </span>
             <a
-              href={`${apiUrl}/api/game/${demo ? 'demo/verify' : 'verify'}/${r.roundId}`}
+              href={demo ? `${apiUrl}/api/game/demo/verify/${r.roundId}` : `${verifierUrl}/verify/${r.roundId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-white/30 underline underline-offset-2 hover:text-white/60"

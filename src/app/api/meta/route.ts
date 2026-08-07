@@ -33,7 +33,8 @@ export async function GET() {
       engine: pub.engine,
       mechanic: pub.mechanic,
       gameId: cfg.gameId,
-      apiUrl: cfg.apiUrl, // öffentlich (nur Basis-URL, kein Key) — für Verify-Link
+      apiUrl: cfg.apiUrl, // öffentlich (nur Basis-URL, kein Key)
+      verifierUrl: cfg.verifierUrl, // menschenlesbare Verifizierungsseite — für den Verify-Link
       devMock: h.devMock,
       network: h.network,
       engineConfig: cachedEngine?.engineConfig ?? null,

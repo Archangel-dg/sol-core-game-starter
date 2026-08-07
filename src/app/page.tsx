@@ -21,6 +21,7 @@ interface Meta {
   mechanic: 'single' | 'session' | 'tournament' | 'live';
   gameId: string;
   apiUrl: string;
+  verifierUrl: string;
   devMock: boolean;
   network: string;
   engineConfig?: Record<string, number> | null;
@@ -130,8 +131,8 @@ function HomeInner({ meta }: { meta: Meta | null }) {
 
             {meta.mechanic !== 'tournament' && meta.mechanic !== 'live' && (
               <>
-                <FairnessPanel apiUrl={meta.apiUrl} serverSeedHash={seedHash} roundId={roundId} demo={demo} />
-                <History rounds={history} apiUrl={meta.apiUrl} demo={demo} />
+                <FairnessPanel apiUrl={meta.apiUrl} verifierUrl={meta.verifierUrl} serverSeedHash={seedHash} roundId={roundId} demo={demo} />
+                <History rounds={history} apiUrl={meta.apiUrl} verifierUrl={meta.verifierUrl} demo={demo} />
               </>
             )}
             <p className="pt-2 text-center text-[11px] text-white/30">

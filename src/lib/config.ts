@@ -6,10 +6,14 @@ export interface ServerConfig {
   apiUrl: string;
   apiKey: string;
   gameId: string;
+  // Basis-URL der menschenlesbaren Verifizierungsseite (Sol-Core Verifier).
+  // KEIN Geheimnis — landet nur in einem öffentlichen Verify-Link.
+  verifierUrl: string;
 }
 
 export function serverConfig(): ServerConfig {
   const apiUrl = process.env.SOLCORE_API_URL ?? 'https://api.sol-core.com';
+  const verifierUrl = process.env.SOLCORE_VERIFIER_URL ?? 'https://sol-core.com';
   const apiKey = process.env.SOLCORE_API_KEY ?? '';
   const gameId = process.env.SOLCORE_GAME_ID ?? '';
   if (!apiKey || !gameId) {
@@ -17,7 +21,12 @@ export function serverConfig(): ServerConfig {
       'SOLCORE_API_KEY und SOLCORE_GAME_ID müssen gesetzt sein (siehe .env.example).',
     );
   }
-  return { apiUrl: apiUrl.replace(/\/$/, ''), apiKey, gameId };
+  return {
+    apiUrl: apiUrl.replace(/\/$/, ''),
+    apiKey,
+    gameId,
+    verifierUrl: verifierUrl.replace(/\/$/, ''),
+  };
 }
 
 // ── Öffentliche Client-Config (Engine/Mechanik) ────────────────────────────

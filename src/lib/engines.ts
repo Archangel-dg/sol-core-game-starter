@@ -377,6 +377,27 @@ export const ENGINES: EngineDef[] = [
     },
   },
   {
+    key: 'dice-ladder',
+    label: 'Dice Ladder',
+    category: 'Chain',
+    mechanics: ['session'],
+    blurb: 'Höher oder tiefer als die aktuelle Augensumme?',
+    playerFacts: {
+      inputs:
+        'Zwei Würfel (Standard) werden geworfen — tippen, ob die Summe des nächsten Wurfs höher oder tiefer ist. Anders als bei Karten sind die Summen NICHT gleich wahrscheinlich: die Mitte kommt oft, die Ränder selten.',
+      outcomes:
+        'Richtig: der Multiplikator wächst — je unwahrscheinlicher der Tipp, desto stärker; jederzeit Cashout. Falsch oder Gleichstand: Einsatz weg. Die Kette endet nach der im Spiel gesetzten Schrittzahl.',
+    },
+    session: {
+      // Identischer Step-Body wie hilo (`{ guess }`) — der Server akzeptiert
+      // zusätzlich 'equal', wenn das Spiel `allowEqual` gesetzt hat; die
+      // generische Starter-UI bietet wie bei hilo nur höher/tiefer an.
+      step: { kind: 'guess' },
+      buildStep: (i) => ({ guess: i.guess ?? 'higher' }),
+      hint: 'Höher/Tiefer auf die nächste Augensumme tippen; Gleichstand verliert (sofern das Spiel nichts anderes setzt).',
+    },
+  },
+  {
     key: 'steps',
     label: 'Steps',
     category: 'Chain',
@@ -480,6 +501,30 @@ export const ENGINES: EngineDef[] = [
     },
     pvp: {
       hint: 'Lobby erstellen oder beitreten, „Bereit" setzen — dann abwechselnd würfeln: wertende Würfel beiseitelegen, weiter würfeln oder sichern. Farkle verliert den Zug.',
+    },
+  },
+  {
+    key: 'pvp-dice-pro',
+    label: 'Dice Pro',
+    category: 'PvP',
+    mechanics: ['pvp'],
+    blurb:
+      'Spieler gegen Spieler: konfigurierbares Würfel-Duell (Einzelwurf-Vergleich oder Push-your-luck) um den ganzen Pot.',
+    // Die aufgelöste Config kommt beim PvP nicht über ein Control mit
+    // `boundsFrom`, sondern als Server-Echo (publicEngineConfig → template,
+    // scoreMode, winCondition, diceCount, faces, targetScore, turnsPerSeat,
+    // lastLicks, minBankPoints, engineVersion). Das Board (DiceProGame) liest
+    // diese Werte direkt aus dem `dicePro`-Block der Match-Sicht und rendert
+    // je Template die passende Steuerung/Wertung — daher hier wie bei allen
+    // PvP-Engines nur der Hinweistext.
+    playerFacts: {
+      inputs:
+        'Lobby mit Einsatz erstellen (optional per PIN sperren) oder einer offenen Lobby beitreten. Beide setzen „Bereit"; dann wird nach dem vom Creator gewählten Format abwechselnd gespielt: Einzelwurf-Vergleich (würfeln, höherer Score gewinnt) oder Push-your-luck-Farkle (wertende Würfel behalten, sichern oder riskieren).',
+      outcomes:
+        'Wer nach dem Format vorn liegt, gewinnt den ganzen Pot (beide Einsätze) — Fees bleiben einbehalten. Siegbedingung: höchster Score über N Züge oder Erster am Ziel (der Gegner bekommt seine Last-Licks-Züge). Gleichstand ⇒ Sudden Death. Provably fair; verlierst du, ist dein Einsatz weg. Geld wird erst beim Spielstart (alle bereit) gebucht.',
+    },
+    pvp: {
+      hint: 'Lobby erstellen oder beitreten, „Bereit" setzen — dann nach Format spielen: Einzelwurf-Vergleich oder Push-your-luck-Farkle (wertende Würfel behalten, sichern oder riskieren).',
     },
   },
 ];

@@ -14,6 +14,8 @@ import { PvpGame } from '@/components/PvpGame';
 import { DemoPvpGame } from '@/components/DemoPvpGame';
 import { DiceDuelGame } from '@/components/DiceDuelGame';
 import { DemoDiceDuelGame } from '@/components/DemoDiceDuelGame';
+import { DiceProGame } from '@/components/DiceProGame';
+import { DemoDiceProGame } from '@/components/DemoDiceProGame';
 import { FairnessPanel } from '@/components/FairnessPanel';
 import { History } from '@/components/History';
 import { BalanceFreezeProvider } from '@/lib/balance-freeze';
@@ -81,6 +83,25 @@ function HomeInner({ meta }: { meta: Meta | null }) {
             />
           ) : (
             <DiceDuelGame
+              engine={engine}
+              gameId={meta.gameId}
+              gameName={meta.gameName}
+              engineConfig={meta.engineConfig}
+              verifierUrl={meta.verifierUrl}
+              devMock={meta.devMock}
+              onDemoPlay={startDemo}
+            />
+          )
+        ) : engine.key === 'pvp-dice-pro' ? (
+          demo ? (
+            <DemoDiceProGame
+              engine={engine}
+              gameName={meta.gameName}
+              engineConfig={meta.engineConfig}
+              verifierUrl={meta.verifierUrl}
+            />
+          ) : (
+            <DiceProGame
               engine={engine}
               gameId={meta.gameId}
               gameName={meta.gameName}

@@ -655,6 +655,62 @@ export interface DiceDuelView {
   decisionLog: DiceDuelEventView[];
 }
 
+/** Ein Ereignis im Dice-Pro-Zugverlauf (Replay + Anzeige). `ev` unterscheidet
+ * den Typ; die übrigen Felder sind je nach `ev` gesetzt (opener/roll/keep/score/
+ * bank/bust/timeout_lost). Werte sind Würfel-AUGEN (1..faces), keine Indizes. */
+export interface DiceProEventView {
+  ev: 'opener' | 'roll' | 'keep' | 'score' | 'bank' | 'bust' | 'timeout_lost';
+  seat?: 1 | 2;
+  turn?: number;
+  scope?: 'match' | 'sudden_death';
+  dice?: number[];
+  keep?: number[];
+  points?: number;
+  hotDice?: boolean;
+  turnScore?: number;
+  seatScoreAfter?: number;
+  lost?: number;
+  forfeited?: number;
+  auto?: boolean;
+}
+
+/** Live-Zustand eines Dice-Pro-Matches (Teil von PvpMatchView; nur bei
+ * pvp-dice-pro gesetzt, sonst null). Spiegelt den `dicePro`-Block des Servers.
+ * `tableDice` sind die aufgelösten Augen (1..faces) des aktuellen Wurfs; die
+ * Match-Regeln (template/scoreMode/winCondition/…) sind der beim Match-Start
+ * eingefrorene Config-Snapshot. `moveDeadline` treibt den Zug-Timer über den
+ * serverTime-Offset; `keep` beim Zug ist die Liste der beiseitegelegten AUGEN
+ * (bei single-roll-compare ungenutzt → leeres Array). */
+export interface DiceProView {
+  template: 'single-roll-compare' | 'push-your-luck';
+  scoreMode: 'sum' | 'high-die' | 'farkle';
+  winCondition: 'highest-score' | 'first-to-target';
+  diceCount: number;
+  faces: number;
+  targetScore: number;
+  turnsPerSeat: number;
+  lastLicks: number;
+  minBankPoints: number;
+  stage: 'regular' | 'closing' | 'sudden_death';
+  activeSeat: 1 | 2 | null;
+  turnNo: number;
+  moveDeadline: string | null;
+  phase: 'awaiting_opener' | 'awaiting_throw' | 'awaiting_move' | 'busted' | 'settled';
+  /** Bei phase==='busted' (push-your-luck-Ruhephase): der in diesem Zug
+   * verlorene Punktestand; sonst null. Nur zur Anzeige der Bust-Enthüllung. */
+  farkleLostScore: number | null;
+  closingSeat: 1 | 2 | null;
+  closingTurnsLeft: number;
+  tableDice: number[];
+  keptThisTurn: number[];
+  turnScore: number;
+  throwsUsed: number;
+  scores: { seat1: number; seat2: number };
+  winnerSeat: number | null;
+  matchOver: boolean;
+  decisionLog: DiceProEventView[];
+}
+
 export interface PvpMatchView {
   matchId: string;
   lobbyId: string;
@@ -671,6 +727,8 @@ export interface PvpMatchView {
   failReason: string | null;
   /** Nur bei pvp-dice-duel gesetzt (sonst null): der rundenbasierte Live-Zustand. */
   diceDuel?: DiceDuelView | null;
+  /** Nur bei pvp-dice-pro gesetzt (sonst null): der rundenbasierte Live-Zustand. */
+  dicePro?: DiceProView | null;
   result: { roll: number | null; winnerSeat: number; winnerWallet: string; payoutLamports: string } | null;
   serverTime: string;
 }
@@ -889,4 +947,34 @@ export function demoPvpMove(
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+/** PvP-Demo für pvp-dice-pro: rundenbasiert gegen den Server-Bot (Sim-Balance,
+ * Seed sofort enthüllt). Struktur wie DemoDiceDuelView, aber mit dem `dicePro`-
+ * Live-Zustand statt `diceDuel`; `status` ist 'playing' oder 'settled'. Die
+ * bestehenden Demo-PvP-Proxy-Routen (/api/game/demo/pvp/*) sind engine-agnostisch
+ * — der Server verzweigt nach game.mode, daher braucht es keine eigenen Funktionen,
+ * nur diesen Rückgabetyp (der Client castet die Antwort entsprechend). */
+export interface DemoDiceProView {
+  matchId: string;
+  gameId: string;
+  mode: string;
+  status: 'playing' | 'settled';
+  demo: true;
+  stakeLamports: string;
+  totalChargeLamports: string;
+  potLamports: string;
+  seats: { seat: number; wallet: string }[];
+  dicePro: DiceProView;
+  result: { winnerSeat: number; win: boolean; payoutLamports: string } | null;
+  proof: {
+    serverSeedHash: string;
+    serverSeed: string;
+    clientSeeds: string[];
+    compositeClientSeed: string;
+    nonce: number;
+  };
+  balanceLamports: string;
+  engine: { mode: string; config: Record<string, unknown> };
+  createdAt: string;
 }

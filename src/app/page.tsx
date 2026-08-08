@@ -12,6 +12,8 @@ import { DemoTournamentGame } from '@/components/DemoTournamentGame';
 import { LiveGame } from '@/components/LiveGame';
 import { PvpGame } from '@/components/PvpGame';
 import { DemoPvpGame } from '@/components/DemoPvpGame';
+import { DiceDuelGame } from '@/components/DiceDuelGame';
+import { DemoDiceDuelGame } from '@/components/DemoDiceDuelGame';
 import { FairnessPanel } from '@/components/FairnessPanel';
 import { History } from '@/components/History';
 import { BalanceFreezeProvider } from '@/lib/balance-freeze';
@@ -64,9 +66,31 @@ function HomeInner({ meta }: { meta: Meta | null }) {
   // Menü, Lobby-Browser, Lobby-Raum, Reveal). Im Demo-Modus gegen den Server-Bot
   // (DemoPvpGame), sonst die echte Lobby-Erfahrung — Fork wie im Turnier-Zweig.
   if (meta && !meta.error && engine && meta.mechanic === 'pvp') {
+    // Erst nach Engine verzweigen (dice-duel = rundenbasiertes Board, sonst
+    // Coin-Flip-Reveal), dann pro Engine nach Demo/echt — beide teilen die
+    // Lobby-Erfahrung. Demo läuft gegen den Server-Bot auf Sim-Balance.
     return (
       <BalanceFreezeProvider>
-        {demo ? (
+        {engine.key === 'pvp-dice-duel' ? (
+          demo ? (
+            <DemoDiceDuelGame
+              engine={engine}
+              gameName={meta.gameName}
+              engineConfig={meta.engineConfig}
+              verifierUrl={meta.verifierUrl}
+            />
+          ) : (
+            <DiceDuelGame
+              engine={engine}
+              gameId={meta.gameId}
+              gameName={meta.gameName}
+              engineConfig={meta.engineConfig}
+              verifierUrl={meta.verifierUrl}
+              devMock={meta.devMock}
+              onDemoPlay={startDemo}
+            />
+          )
+        ) : demo ? (
           <DemoPvpGame
             engine={engine}
             gameName={meta.gameName}

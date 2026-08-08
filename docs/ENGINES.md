@@ -50,6 +50,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `gauntlet` | tournament | | | — (tournament) |
 | `live-odds` | live | | | — (live; outcomes/odds from `/live/state`) |
 | `pvp-coinflip` | pvp | | | — (pvp; lobby → ready-check → server draw for the pot) |
+| `pvp-dice-duel` | pvp | | | — (pvp; lobby → ready-check → turn-based Farkle for the pot) |
 
 ## Session steps (`step` body)
 
@@ -118,6 +119,39 @@ locks, debits both seats and draws; at `settled` the winner is paid the whole po
 - **Demo:** `POST /api/demo/pvp/lobby` plays an instant match vs. the server bot on the simulated
   balance (`GET /api/demo/pvp/match/:id` re-reads it) — token-free, isolated from the real tables.
 - Stake bounds / PIN policy come from the resolved engine config — never hardcode them.
+
+## PvP Dice Duel (`pvp-dice-duel`, "Dice Risk")
+
+Same lobby → ready-check → lock flow as `pvp-coinflip` (create/join/chat/ready/stake/kick, money only
+charged at the lock, winner paid the whole pot). The difference is the **in-match phase**: instead of a
+single coin flip it is a **turn-based Farkle** duel. The template renders this in `DiceDuelGame.tsx`,
+which reuses the entire coin-flip lobby shell (`Hero`, `OpenLobbiesTable`, `LobbyRoom`, wallet/menu/info/
+create dialogs, exported from `PvpGame.tsx`) and only swaps the in-match view.
+
+- **Get the state from the match view**, not the lobby: poll `GET /pvp/match/:id` (plain read) — for a
+  dice-duel match it carries a `diceDuel` block:
+  `{ format, minBankPoints, targetScore, stage, activeSeat, turnNo, moveDeadline, phase, closingSeat,
+  tableDice, keptThisTurn, turnScore, scores:{seat1,seat2}, winnerSeat, matchOver, decisionLog }`.
+  `tableDice` are the **resolved faces 1–6** (never raw HMAC values). The match view also carries
+  `serverTime` (for the move-timer offset).
+- **Make a move**: `POST /api/game/pvp/match/:id/move` with `{ playerWallet, keep, action }` where
+  `keep` is the list of **die values (1–6)** to set aside this throw (min 1, a fully-scoring selection)
+  and `action` is `'roll'` (reroll the rest; all six scored = hot dice → reroll all six, turn score held)
+  or `'bank'` (secure the turn score, end the turn; blocked while `turnScore + selection < minBankPoints`).
+  Only the **active seat** may move (`API-710`); the response is the updated match view.
+- **Rules reflected in the UI**: 6 dice per throw, set aside ≥1 scoring die, then roll or bank. No scoring
+  dice = **Farkle** (turn score lost). Scoring: single 1 = 100 / 5 = 50; three of a kind 1→1000 else X·100;
+  four 1→2000 else 1000; five 1→5000 else X·1000; six = 10000; straight 1-6 = 1000; three pairs = 500.
+  Formats: `quick3` (3 turns each, most points wins) / `race10000` (first to `targetScore` = 10000, the
+  opponent gets one last turn). A **move timer** counts down from `moveDeadline` (server auto-banks on
+  expiry — the UI just keeps polling).
+- **End**: winner + payout + a Verify link to the raw `GET /pvp/verify/:matchId` (same as coin-flip). The
+  balance is frozen during the final settle.
+- **Demo:** `POST /api/demo/pvp/lobby` starts a turn-based match vs. the server bot on the simulated
+  balance; each `POST /api/demo/pvp/match/:id/move` plays the player's turn and the bot's reply in one
+  response — token-free, isolated from the real tables.
+- Engine config echoes `matchFormat`, `minBankPoints`, `targetScore` (10000) and `waitTimeSeconds`
+  (the move timer) in addition to the coin-flip fields.
 
 **Never hardcode the grid/column count.** The real dimensions come from the server:
 `GET /api/meta` → `engineConfig` (e.g. towers `{ levels, columns }`, mines `{ gridSize, mineCount }`),

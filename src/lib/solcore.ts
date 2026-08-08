@@ -611,11 +611,51 @@ export interface PvpLobbiesView {
   serverTime: string;
 }
 
+/** Ein Ereignis im Dice-Duel-Zugverlauf (Replay + Anzeige). `ev` unterscheidet
+ * den Typ; die übrigen Felder sind je nach `ev` gesetzt (roll/keep/bank/farkle/
+ * timeout_lost). Werte sind Würfel-AUGEN (1..6), keine Indizes. */
+export interface DiceDuelEventView {
+  ev: 'roll' | 'keep' | 'bank' | 'farkle' | 'timeout_lost';
+  seat?: 1 | 2;
+  turn?: number;
+  dice?: number[];
+  keep?: number[];
+  points?: number;
+  hotDice?: boolean;
+  turnScore?: number;
+  seatScoreAfter?: number;
+  forfeited?: number;
+  auto?: boolean;
+}
+
+/** Live-Zustand eines Dice-Duel-Matches (Teil von PvpMatchView; bei Coin-Flip
+ * null). `tableDice` sind die aufgelösten Augen (1..6) des aktuellen Wurfs —
+ * NIE Roh-HMAC-Werte. `moveDeadline` treibt den Zug-Timer über den serverTime-
+ * Offset; `keep` beim Zug ist die Liste der beiseitegelegten AUGEN. */
+export interface DiceDuelView {
+  format: 'quick3' | 'race10000';
+  minBankPoints: number;
+  targetScore: number;
+  stage: 'regular' | 'closing' | 'sudden_death';
+  activeSeat: 1 | 2 | null;
+  turnNo: number;
+  moveDeadline: string | null;
+  phase: 'awaiting_move' | 'farkled';
+  closingSeat: 1 | 2 | null;
+  tableDice: number[];
+  keptThisTurn: number[];
+  turnScore: number;
+  scores: { seat1: number; seat2: number };
+  winnerSeat: number | null;
+  matchOver: boolean;
+  decisionLog: DiceDuelEventView[];
+}
+
 export interface PvpMatchView {
   matchId: string;
   lobbyId: string;
   gameId: string;
-  status: 'locked' | 'staked' | 'drawing' | 'settled' | 'failed' | 'voided';
+  status: 'locked' | 'staked' | 'playing' | 'drawing' | 'settled' | 'failed' | 'voided';
   stakeLamports: string;
   potLamports: string;
   totalChargeLamports: string;
@@ -625,6 +665,8 @@ export interface PvpMatchView {
   lockedAt: string | null;
   settledAt: string | null;
   failReason: string | null;
+  /** Nur bei pvp-dice-duel gesetzt (sonst null): der rundenbasierte Live-Zustand. */
+  diceDuel?: DiceDuelView | null;
   result: { roll: number | null; winnerSeat: number; winnerWallet: string; payoutLamports: string } | null;
   serverTime: string;
 }
@@ -748,6 +790,24 @@ export function pvpMe(wallet: string): Promise<PvpStatsView> {
   return request<PvpStatsView>(`/api/game/pvp/me/${wallet}`);
 }
 
+/**
+ * Dice-Duel-Zug (pvp-dice-duel): setzt `keep` (Liste der beiseitegelegten AUGEN,
+ * 1..6, min. 1) beiseite und würfelt danach neu (`action: 'roll'`) oder sichert
+ * die Zugpunkte (`action: 'bank'`). Wallet-gebunden (Spieler-Token Pflicht wie
+ * /bet) — nur der aktive Sitz darf ziehen. Rückgabe: die aktualisierte
+ * Match-Sicht (mit `diceDuel`-Block). */
+export function pvpMove(
+  matchId: string,
+  input: { playerWallet: string; keep: number[]; action: 'roll' | 'bank' },
+  playerToken?: string,
+): Promise<PvpMatchView> {
+  return request<PvpMatchView>(
+    `/api/game/pvp/match/${matchId}/move`,
+    { method: 'POST', body: JSON.stringify(input) },
+    playerToken,
+  );
+}
+
 export function pvpVerify(matchId: string): Promise<Record<string, unknown>> {
   return request(`/api/game/pvp/verify/${matchId}`);
 }
@@ -786,4 +846,43 @@ export function demoPvpPlay(input: {
 
 export function demoPvpMatch(id: string): Promise<DemoPvpView> {
   return request<DemoPvpView>(`/api/game/demo/pvp/match/${id}`);
+}
+
+/** PvP-Demo für pvp-dice-duel: rundenbasiert gegen den Server-Bot (Sim-Balance,
+ * Seed sofort enthüllt). Struktur wie DemoPvpView, plus der `diceDuel`-Live-
+ * Zustand; `status` kann 'playing' (Spieler ist am Zug) oder 'settled' sein. */
+export interface DemoDiceDuelView {
+  matchId: string;
+  gameId: string;
+  mode: string;
+  status: 'playing' | 'settled';
+  demo: true;
+  stakeLamports: string;
+  totalChargeLamports: string;
+  potLamports: string;
+  seats: { seat: number; wallet: string }[];
+  diceDuel: DiceDuelView;
+  result: { winnerSeat: number; win: boolean; payoutLamports: string } | null;
+  proof: {
+    serverSeedHash: string;
+    serverSeed: string;
+    clientSeeds: string[];
+    compositeClientSeed: string;
+    nonce: number;
+  };
+  balanceLamports: string;
+  engine: { mode: string; config: Record<string, unknown> };
+  createdAt: string;
+}
+
+/** Dice-Duel-Demo-Zug (gegen den Server-Bot): keep (Augen) + roll|bank. Kein
+ * Token/echtes Geld — `playerWallet` identifiziert nur die Demo-Sitzung. */
+export function demoPvpMove(
+  matchId: string,
+  input: { playerWallet: string; keep: number[]; action: 'roll' | 'bank' },
+): Promise<DemoDiceDuelView> {
+  return request<DemoDiceDuelView>(`/api/game/demo/pvp/match/${matchId}/move`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }

@@ -227,6 +227,26 @@ Wallet-bound actions need a player token (same as `/bet`); the lobby-room state 
 - **Demo:** `POST /api/game/demo/pvp/lobby` — `{ playerWallet, stakeLamports, clientSeed? }` → an
   instant settled match vs. the server bot (token-free); `GET /api/game/demo/pvp/match/:id` re-reads it.
 
+### Dice Duel move (`pvp-dice-duel` only)
+
+The `pvp-dice-duel` engine shares every lobby endpoint above; the in-match phase is turn-based Farkle
+instead of a single flip. The match view (`GET /api/game/pvp/match/:id`) then carries a `diceDuel`
+block: `{ format, minBankPoints, targetScore, stage:'regular'|'closing'|'sudden_death', activeSeat,
+turnNo, moveDeadline, phase, closingSeat, tableDice, keptThisTurn, turnScore, scores:{seat1,seat2},
+winnerSeat, matchOver, decisionLog }` (plus top-level `serverTime`). `tableDice` are resolved faces
+**1–6** (never raw HMAC values).
+
+- `POST /api/game/pvp/match/:id/move` — `{ playerWallet, keep, action }` → `PvpMatchView` (with the
+  updated `diceDuel` block). `keep` is the list of **die values (1–6)** to set aside this throw
+  (min 1, must be a fully-scoring selection); `action` is `'roll'` (reroll the remaining dice; all
+  six scored = hot dice → reroll all six with the turn score held) or `'bank'` (secure the turn score
+  and end the turn). Wallet-bound (player token, same as `/bet`); **only the active seat** may move.
+  Errors: `API-710` not your turn · `API-204` `invalid_selection` / `dice_not_on_table` /
+  `cannot_bank` · `API-712` stale move (re-fetch the match view) · `API-707` seed rotated (voided +
+  refunded). On move-timer expiry the server auto-banks — the UI just keeps polling.
+- **Demo:** `POST /api/game/demo/pvp/match/:id/move` — same `{ playerWallet, keep, action }` body,
+  token-free; plays the player's turn and the bot's reply in one response.
+
 Money is only charged at the lock (both ready), never at lobby creation; leaving before the start is
 free. Drive the reveal from `match.drawAt` + `serverTime` offset and freeze the balance until the
 result shows — the winner is paid even if a tab closed.
@@ -266,7 +286,8 @@ UI requirement: show the hash BEFORE the round, `roundId` + verify link after.
 PvP-specific (API-7xx): `API-700` lobby not found / not a member · `API-701` full · `API-702`
 expired · `API-703` wrong PIN · `API-704` already in another lobby (details `lobbyId`) · `API-705`
 self-match · `API-706` stake out of range · `API-707` seed rotated (refunded) · `API-708` balance
-too low at lock (refunded) · `API-709` PvP rate limit · `API-710` host-only · `API-711` already
-refunded.
+too low at lock (refunded) · `API-709` PvP rate limit · `API-710` host-only / not the active seat
+(dice-duel move) · `API-711` already refunded · `API-712` stale dice-duel move (re-fetch the match
+view).
 
 Note: the hosted service may have a ~30–50s cold start after idle — design generous loading states.

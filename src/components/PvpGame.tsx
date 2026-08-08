@@ -31,14 +31,16 @@ const SOUND_STORE_KEY = 'sc_pvp_sound';
 const REVEAL_MS = 8_000;
 
 // ── kleine Helfer ────────────────────────────────────────────────────
-function shortWallet(w: string): string {
+// (exportiert, damit DiceDuelGame die Lobby-Hülle 1:1 wiederverwenden kann —
+//  eine Engine-Verzweigung ohne Duplikat der Präsentations-Bausteine.)
+export function shortWallet(w: string): string {
   const s = (w ?? '').trim();
   if (s.length <= 8) return s || '—';
   return `${s.slice(0, 4)}…${s.slice(-4)}`;
 }
 
 /** Client-Seed: Hex [0-9a-f]{1,64} — passt exakt zur Server-Regex (pvpClientSeed). */
-function randomHexSeed(): string {
+export function randomHexSeed(): string {
   const b = new Uint8Array(16);
   crypto.getRandomValues(b);
   return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
@@ -49,7 +51,7 @@ function chatCreatedAt(m: PvpChatMessage): string {
 }
 
 /** Winzige WebAudio-Blips (kein Asset). Fällt still aus, wenn kein AudioContext. */
-function makeBlip() {
+export function makeBlip() {
   let ctx: AudioContext | null = null;
   return (freq: number, ms = 90) => {
     try {
@@ -76,7 +78,7 @@ function makeBlip() {
   };
 }
 
-interface JsonErr {
+export interface JsonErr {
   error?: { code?: string; message?: string; reason?: string; details?: Record<string, unknown> };
 }
 
@@ -650,13 +652,14 @@ export function PvpGame({
 }
 
 // ── Hero ──────────────────────────────────────────────────────────────
-function Hero({
+export function Hero({
   t,
   engine,
   gameName,
   connected,
   onDemoPlay,
   onCreate,
+  icon = '🪙',
 }: {
   t: TFn;
   engine: EngineDef;
@@ -664,11 +667,13 @@ function Hero({
   connected: boolean;
   onDemoPlay?: () => void;
   onCreate: () => void;
+  /** Hero-Emoji (Default 🪙 für Coin-Flip; Dice-Duel setzt 🎲). */
+  icon?: string;
 }) {
   return (
     <section className="mb-6 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-transparent p-6 text-center">
       <div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full border border-accent/40 bg-accent/10 text-3xl">
-        🪙
+        {icon}
       </div>
       <h2 className="text-xl font-bold text-white">{gameName}</h2>
       <p className="mx-auto mt-2 max-w-xs text-sm text-white/50">{engine.blurb}</p>
@@ -698,7 +703,7 @@ function Hero({
 }
 
 // ── Offene Lobbys ─────────────────────────────────────────────────────
-function OpenLobbiesTable({
+export function OpenLobbiesTable({
   t,
   lobbies,
   busy,
@@ -772,7 +777,7 @@ function OpenLobbiesTable({
 }
 
 // ── Lobby-Raum ────────────────────────────────────────────────────────
-function LobbyRoom({
+export function LobbyRoom({
   t,
   lobby,
   wallet,
@@ -1100,7 +1105,7 @@ function CoinFace({
 }
 
 // ── Wallet-Modal (Balance + Deposit/Withdraw + Historie) ──────────────
-function WalletModal({
+export function WalletModal({
   t,
   devMock,
   connected,
@@ -1204,7 +1209,7 @@ function MatchHistory({ t, stats }: { t: TFn; stats: PvpStatsView | null }) {
 }
 
 // ── Menü-Drawer ───────────────────────────────────────────────────────
-function MenuDrawer({
+export function MenuDrawer({
   t,
   lang,
   setLang,
@@ -1317,7 +1322,7 @@ function MenuDrawer({
 }
 
 // ── Info-Modal ────────────────────────────────────────────────────────
-function InfoModal({ t, verifierUrl, onClose }: { t: TFn; verifierUrl: string; onClose: () => void }) {
+export function InfoModal({ t, verifierUrl, onClose }: { t: TFn; verifierUrl: string; onClose: () => void }) {
   return (
     <Overlay onClose={onClose}>
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-night p-5">
@@ -1338,7 +1343,7 @@ function InfoModal({ t, verifierUrl, onClose }: { t: TFn; verifierUrl: string; o
 }
 
 // ── Create-Lobby-Dialog ───────────────────────────────────────────────
-function CreateLobbyDialog({
+export function CreateLobbyDialog({
   t,
   minStake,
   maxStake,
@@ -1441,7 +1446,7 @@ function CreateLobbyDialog({
 }
 
 // ── generische Overlay/Head-Bausteine ─────────────────────────────────
-function Overlay({
+export function Overlay({
   children,
   onClose,
   align = 'center',
@@ -1464,7 +1469,7 @@ function Overlay({
   );
 }
 
-function ModalHead({ title, onClose, closeLabel }: { title: string; onClose: () => void; closeLabel: string }) {
+export function ModalHead({ title, onClose, closeLabel }: { title: string; onClose: () => void; closeLabel: string }) {
   return (
     <div className="mb-4 flex items-center justify-between">
       <h3 className="text-base font-bold text-white">{title}</h3>

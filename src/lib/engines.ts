@@ -466,6 +466,22 @@ export const ENGINES: EngineDef[] = [
       hint: 'Lobby erstellen oder beitreten, „Bereit" setzen — der Server wirft die Münze, sobald beide bereit sind.',
     },
   },
+  {
+    key: 'pvp-dice-duel',
+    label: 'Dice Risk',
+    category: 'PvP',
+    mechanics: ['pvp'],
+    blurb: 'Spieler gegen Spieler: rundenbasiertes Würfel-Risiko (Farkle) um den ganzen Pot.',
+    playerFacts: {
+      inputs:
+        'Lobby mit Einsatz erstellen (optional per PIN sperren) oder einer offenen Lobby beitreten. Beide setzen „Bereit"; dann wird abwechselnd gewürfelt: pro Wurf mindestens einen wertenden Würfel beiseitelegen, dann erneut würfeln oder die Zugpunkte sichern.',
+      outcomes:
+        'Wer mehr sichert, gewinnt den ganzen Pot (beide Einsätze) — Fees bleiben einbehalten. Kein wertender Würfel = Farkle (Zugpunkte verfallen). Format quick3 (3 Züge je Spieler) oder race10000 (bis 10.000). Provably fair; verlierst du, ist dein Einsatz weg. Geld wird erst beim Spielstart (alle bereit) gebucht.',
+    },
+    pvp: {
+      hint: 'Lobby erstellen oder beitreten, „Bereit" setzen — dann abwechselnd würfeln: wertende Würfel beiseitelegen, weiter würfeln oder sichern. Farkle verliert den Zug.',
+    },
+  },
 ];
 
 export function getEngine(key: string): EngineDef | undefined {

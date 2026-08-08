@@ -572,16 +572,23 @@ export function DiceDuelGame({
             onBack={backToLobbies}
           />
         ) : mStatus === 'playing' && dd ? (
-          <DiceDuelBoard
-            t={t}
-            dd={dd}
-            mySeat={mySeat}
-            serverNow={serverNow}
-            busy={moveBusy}
-            reduced={reduced}
-            error={moveError}
-            onMove={(keep, action) => void doMove(keep, action)}
-          />
+          dd.phase === 'farkled' ? (
+            // Ruhephase (~3 s): der gefarkelte Wurf wird enthüllt (Würfel +
+            // Lose-Animation). Der Server schaltet automatisch weiter — hier
+            // KEINE Zug-Steuerung (ein /move wird serverseitig abgelehnt).
+            <DiceDuelFarkle t={t} dd={dd} mySeat={mySeat} reduced={reduced} play={play} />
+          ) : (
+            <DiceDuelBoard
+              t={t}
+              dd={dd}
+              mySeat={mySeat}
+              serverNow={serverNow}
+              busy={moveBusy}
+              reduced={reduced}
+              error={moveError}
+              onMove={(keep, action) => void doMove(keep, action)}
+            />
+          )
         ) : mStatus === 'drawing' ? (
           <StatusCard t={t} label={t('dd.settling')} />
         ) : (
@@ -820,6 +827,117 @@ export function DiceDuelScoreboard({
       {cell(t('dd.you'), myScore, myActive, myActive ? dd.turnScore : 0)}
       {cell(t('dd.opponent'), oppScore, oppActive, oppActive ? dd.turnScore : 0)}
     </div>
+  );
+}
+
+/**
+ * Farkle-Enthüllung (Design-Zone). Wird gezeigt, solange der Server in der
+ * Ruhephase `phase==='farkled'` steht (~3 s): die gefarkelten Tischwürfel
+ * bleiben sichtbar und bekommen eine Lose-Animation (Wackeln + roter Blitz),
+ * darunter „wessen Farkle" + der verlorene Zug-Score. KEINE Zug-Steuerung —
+ * der Server schaltet selbst zum nächsten Zug weiter (Client pollt nur).
+ * `prefers-reduced-motion` ⇒ statisches rotes Farkle-Bild ohne Animation.
+ */
+export function DiceDuelFarkle({
+  t,
+  dd,
+  mySeat,
+  reduced,
+  play,
+}: {
+  t: TFn;
+  dd: DiceDuelView;
+  mySeat: number | null;
+  reduced: boolean;
+  play?: (freq: number, ms?: number) => void;
+}) {
+  const mine = dd.activeSeat === (mySeat ?? 1);
+  const lost = dd.farkleLostScore ?? 0;
+  // Identität dieser Enthüllung: wechselt bei Zug/Sitz → Animation + „Lose"-
+  // Blip starten neu (z. B. eigenes Farkle → direkt danach Gegner-Farkle).
+  const revealKey = `${dd.turnNo}-${dd.activeSeat}`;
+
+  // Tiefer „Lose"-Blip — einmal pro Enthüllung, nur wenn Ton an (play gesetzt).
+  const played = useRef<string | null>(null);
+  useEffect(() => {
+    if (played.current === revealKey) return;
+    played.current = revealKey;
+    play?.(150, 260);
+  }, [revealKey, play]);
+
+  return (
+    <section className="space-y-4" aria-live="polite">
+      {!reduced && (
+        <style>{`
+          @keyframes sc-dd-shake {
+            0%,100% { transform: translateX(0) rotate(0); }
+            15% { transform: translateX(-5px) rotate(-3deg); }
+            30% { transform: translateX(5px) rotate(3deg); }
+            45% { transform: translateX(-4px) rotate(-2deg); }
+            60% { transform: translateX(4px) rotate(2deg); }
+            80% { transform: translateX(-2px) rotate(-1deg); }
+          }
+          @keyframes sc-dd-flash {
+            0% { opacity: 0; }
+            10% { opacity: 1; }
+            100% { opacity: 0.28; }
+          }
+          .sc-dd-shake { animation: sc-dd-shake 0.5s ease-in-out 2 both; }
+          .sc-dd-flash { animation: sc-dd-flash 0.9s ease-out forwards; }
+        `}</style>
+      )}
+
+      {/* Kopf: Format/Ziel + Zug + Scoreboard bleibt sichtbar */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] uppercase tracking-wider text-white/40">{formatLabel(dd, t)}</span>
+          <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/50">
+            {t('dd.turn', { turn: dd.turnNo })}
+          </span>
+        </div>
+        <div className="mt-3">
+          <DiceDuelScoreboard t={t} dd={dd} mySeat={mySeat} />
+        </div>
+      </div>
+
+      {/* Der gefarkelte Wurf — prominent, rot, mit Lose-Animation */}
+      <div
+        key={revealKey}
+        className="relative overflow-hidden rounded-2xl border border-red-400/40 bg-red-500/[0.06] p-6"
+      >
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 bg-red-500/25 ${reduced ? 'opacity-100' : 'sc-dd-flash'}`}
+        />
+        <div className="relative flex flex-col items-center gap-4">
+          <div className={`flex flex-wrap justify-center gap-2 ${reduced ? '' : 'sc-dd-shake'}`}>
+            {dd.tableDice.map((v, i) => (
+              <span
+                key={`farkle-${i}-${v}`}
+                className="grid h-14 w-14 place-items-center rounded-xl border-2 border-red-400/60 bg-red-500/10 text-4xl leading-none text-red-200"
+              >
+                {DIE_PIPS[v] ?? v}
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 text-lg font-black uppercase tracking-wide text-red-300">
+            <span aria-hidden className={reduced ? '' : 'animate-bounce'}>
+              💥
+            </span>
+            <span>{mine ? t('dd.farkleYou') : t('dd.farkleOpp')}</span>
+            <span aria-hidden>❌</span>
+          </div>
+          {lost > 0 && (
+            <p className="text-center text-sm font-semibold tabular-nums text-red-300/90">
+              {t('dd.farkleLost', { points: lost })}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Nicht-interaktiv: der Server übergibt automatisch an den nächsten Zug */}
+      <p className="text-center text-[11px] text-white/30">{t('dd.farkleNext')}</p>
+    </section>
   );
 }
 

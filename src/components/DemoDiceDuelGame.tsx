@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EngineDef } from '@/lib/engines';
 import type { DemoDiceDuelView } from '@/lib/solcore';
 import { toSol, solToLamports } from '@/lib/lamports';
@@ -8,7 +8,7 @@ import { usePvpLang, pvpErrorText, PVP_LANGS } from '@/lib/pvp-i18n';
 import { usePlayer, useDemo } from './DemoProvider';
 // Das Board wird 1:1 aus DiceDuelGame wiederverwendet — die Demo unterscheidet
 // sich nur in der Steuerung (Sim-Balance, Server-Bot statt echter Lobby).
-import { DiceDuelBoard, DiceDuelEnd } from './DiceDuelGame';
+import { DiceDuelBoard, DiceDuelEnd, DiceDuelFarkle } from './DiceDuelGame';
 
 /**
  * PvP-Dice-Duel-DEMO (Plan §6.4): rundenbasiertes Farkle gegen den Server-Bot
@@ -149,6 +149,34 @@ export function DemoDiceDuelGame({
   const dd = match?.diceDuel ?? null;
   const settled = match?.status === 'settled' || (!!dd && dd.matchOver);
 
+  // Farkle-Enthüllung: die Demo pollt (kein Dauer-Poll wie das echte Match). Der
+  // Server ruht ~3 s in phase==='farkled' und schaltet dann selbst weiter — also
+  // hier nach-holen, solange NICHT der interaktive Spielerzug ansteht (eigenes
+  // oder Bot-Farkle bzw. eine kurze Bot-Wartephase). Endet die Ruhephase, ändern
+  // sich die Deps und das Intervall wird abgebaut.
+  const matchId = match?.matchId ?? null;
+  const humansTurn = dd?.phase === 'awaiting_move' && (dd?.activeSeat ?? 1) === 1;
+  const needsPoll = match?.status === 'playing' && !!dd && !humansTurn;
+  useEffect(() => {
+    if (!matchId || !needsPoll) return;
+    let stopped = false;
+    const id = setInterval(async () => {
+      try {
+        const r = (await fetch(`/api/demo/pvp/match/${matchId}`).then((x) => x.json())) as
+          DemoDiceDuelView & JsonErr;
+        if (stopped || r.error) return;
+        setMatch(r);
+        if (r.status === 'settled') void refreshDemoBalance();
+      } catch {
+        /* nächster Tick versucht es erneut */
+      }
+    }, 1000);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [matchId, needsPoll, refreshDemoBalance]);
+
   return (
     <main className="mx-auto min-h-screen max-w-md px-4 pb-10">
       {/* Kopf: Demo-Badge + Saldo + Beenden */}
@@ -194,6 +222,10 @@ export function DemoDiceDuelGame({
               {t('demo.again')}
             </button>
           </>
+        ) : dd.phase === 'farkled' ? (
+          // Ruhephase (~3 s): gefarkelter Wurf + Lose-Animation, keine Steuerung.
+          // Das Poll-Intervall oben schaltet automatisch zum nächsten Zug weiter.
+          <DiceDuelFarkle t={t} dd={dd} mySeat={1} reduced={reduced.current} />
         ) : (
           <DiceDuelBoard
             t={t}

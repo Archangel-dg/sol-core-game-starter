@@ -641,6 +641,10 @@ export interface DiceDuelView {
   turnNo: number;
   moveDeadline: string | null;
   phase: 'awaiting_move' | 'farkled';
+  /** Bei phase==='farkled' (Ruhephase, ~3 s): der in diesem Zug verlorene
+   * Punktestand — mitten im Zug die aufgelaufenen Zugpunkte, bei Eröffnungs-
+   * Farkle 0. Sonst null. Nur zur Anzeige der Verlust-Enthüllung. */
+  farkleLostScore: number | null;
   closingSeat: 1 | 2 | null;
   tableDice: number[];
   keptThisTurn: number[];

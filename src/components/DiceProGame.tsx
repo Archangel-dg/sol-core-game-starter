@@ -824,6 +824,21 @@ function lastEventText(dp: DiceProView, mySeat: number | null, t: TFn): string |
   const log = dp.decisionLog;
   for (let i = log.length - 1; i >= 0; i--) {
     const e = log[i]!;
+    // `fail` (server-entschiedene Fail-Regeln bei points-system) steht noch NICHT
+    // in der eingefrorenen Event-Union (Systemvertrag) — daher lokal verbreitert
+    // gelesen, analog isPointsSystem. `lose-turn` verhält sich wie ein Bust (der
+    // Server setzt phase:'busted' + farkleLostScore → die Bust-Enthüllung greift);
+    // `soft-end` endet den Zug OHNE Reveal, sichert aber die Punkte („safe stop").
+    if ((e.ev as string) === 'fail') {
+      const fe = e as DiceProEventView & { consequence?: string; banked?: number };
+      if (fe.consequence === 'soft-end') {
+        const pts = fe.banked ?? 0;
+        return e.seat === mySeat
+          ? t('dp.failSafeYou', { points: pts })
+          : t('dp.failSafeOpp', { points: pts });
+      }
+      return e.seat === mySeat ? t('dp.bustYou') : t('dp.bustOpp');
+    }
     if (e.ev === 'bust' || e.ev === 'timeout_lost') {
       return e.seat === mySeat ? t('dp.bustYou') : t('dp.bustOpp');
     }

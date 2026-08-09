@@ -197,6 +197,8 @@ const EN: Catalog = {
   'dp.bustOpp': 'Opponent busted.',
   'dp.bustLost': 'Lost: {points} points',
   'dp.bustNext': 'Handing off to the next turn…',
+  'dp.failSafeYou': 'Safe stop — banked {points}.',
+  'dp.failSafeOpp': 'Opponent stopped safe — banked {points}.',
   'dp.rulesSingle':
     'On your turn, roll your dice — the score is added to your total. No keeping, no busting: one throw per turn. Highest total after all turns (or first to the target) wins.',
   'dp.rulesPush':
@@ -382,6 +384,8 @@ const DE: Catalog = {
   'dp.bustOpp': 'Gegner ist gebustet.',
   'dp.bustLost': 'Verloren: {points} Punkte',
   'dp.bustNext': 'Weiter zum nächsten Zug…',
+  'dp.failSafeYou': 'Sicherer Stopp — {points} gesichert.',
+  'dp.failSafeOpp': 'Gegner stoppte sicher — {points} gesichert.',
   'dp.rulesSingle':
     'An deinem Zug würfelst du — der Score wird auf dein Gesamtkonto addiert. Kein Behalten, kein Bust: ein Wurf pro Zug. Der höchste Gesamtstand nach allen Zügen (oder Erster am Ziel) gewinnt.',
   'dp.rulesPush':
@@ -565,6 +569,8 @@ const FR: Catalog = {
   'dp.bustOpp': 'L’adversaire a fait bust.',
   'dp.bustLost': 'Perdu : {points} points',
   'dp.bustNext': 'Passage au tour suivant…',
+  'dp.failSafeYou': 'Arrêt sûr — {points} sécurisés.',
+  'dp.failSafeOpp': 'L’adversaire s’est arrêté — {points} sécurisés.',
   'dp.rulesSingle':
     'À ton tour, lance tes dés — le score s’ajoute à ton total. Pas de conservation, pas de bust : un lancer par tour. Le meilleur total après tous les tours (ou le premier à la cible) gagne.',
   'dp.rulesPush':
@@ -748,6 +754,8 @@ const RU: Catalog = {
   'dp.bustOpp': 'У соперника буст.',
   'dp.bustLost': 'Потеряно: {points} очков',
   'dp.bustNext': 'Переход к следующему ходу…',
+  'dp.failSafeYou': 'Безопасная остановка — записано {points}.',
+  'dp.failSafeOpp': 'Соперник остановился — записано {points}.',
   'dp.rulesSingle':
     'В свой ход вы бросаете кубики — счёт добавляется к вашему итогу. Без откладывания и без буста: один бросок за ход. Побеждает больший итог после всех ходов (или первый до цели).',
   'dp.rulesPush':

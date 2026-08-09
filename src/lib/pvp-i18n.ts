@@ -199,6 +199,8 @@ const EN: Catalog = {
   'dp.bustNext': 'Handing off to the next turn…',
   'dp.failSafeYou': 'Safe stop — banked {points}.',
   'dp.failSafeOpp': 'Opponent stopped safe — banked {points}.',
+  'dp.loseGameYou': 'A match-losing rule triggered — you lose the match.',
+  'dp.loseGameOpp': 'Opponent triggered a match-losing rule — you win the match.',
   'dp.rulesSingle':
     'On your turn, roll your dice — the score is added to your total. No keeping, no busting: one throw per turn. Highest total after all turns (or first to the target) wins.',
   'dp.rulesPush':
@@ -386,6 +388,8 @@ const DE: Catalog = {
   'dp.bustNext': 'Weiter zum nächsten Zug…',
   'dp.failSafeYou': 'Sicherer Stopp — {points} gesichert.',
   'dp.failSafeOpp': 'Gegner stoppte sicher — {points} gesichert.',
+  'dp.loseGameYou': 'Match-Verlust-Regel ausgelöst — du hast das Match verloren.',
+  'dp.loseGameOpp': 'Gegner hat eine Match-Verlust-Regel ausgelöst — du gewinnst das Match.',
   'dp.rulesSingle':
     'An deinem Zug würfelst du — der Score wird auf dein Gesamtkonto addiert. Kein Behalten, kein Bust: ein Wurf pro Zug. Der höchste Gesamtstand nach allen Zügen (oder Erster am Ziel) gewinnt.',
   'dp.rulesPush':
@@ -571,6 +575,8 @@ const FR: Catalog = {
   'dp.bustNext': 'Passage au tour suivant…',
   'dp.failSafeYou': 'Arrêt sûr — {points} sécurisés.',
   'dp.failSafeOpp': 'L’adversaire s’est arrêté — {points} sécurisés.',
+  'dp.loseGameYou': 'Une règle de défaite s’est déclenchée — vous perdez le match.',
+  'dp.loseGameOpp': 'L’adversaire a déclenché une règle de défaite — vous gagnez le match.',
   'dp.rulesSingle':
     'À ton tour, lance tes dés — le score s’ajoute à ton total. Pas de conservation, pas de bust : un lancer par tour. Le meilleur total après tous les tours (ou le premier à la cible) gagne.',
   'dp.rulesPush':
@@ -756,6 +762,8 @@ const RU: Catalog = {
   'dp.bustNext': 'Переход к следующему ходу…',
   'dp.failSafeYou': 'Безопасная остановка — записано {points}.',
   'dp.failSafeOpp': 'Соперник остановился — записано {points}.',
+  'dp.loseGameYou': 'Сработало правило проигрыша матча — вы проиграли.',
+  'dp.loseGameOpp': 'У соперника сработало правило проигрыша — вы выиграли матч.',
   'dp.rulesSingle':
     'В свой ход вы бросаете кубики — счёт добавляется к вашему итогу. Без откладывания и без буста: один бросок за ход. Побеждает больший итог после всех ходов (или первый до цели).',
   'dp.rulesPush':

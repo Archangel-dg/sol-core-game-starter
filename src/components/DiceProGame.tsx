@@ -837,6 +837,13 @@ function lastEventText(dp: DiceProView, mySeat: number | null, t: TFn): string |
           ? t('dp.failSafeYou', { points: pts })
           : t('dp.failSafeOpp', { points: pts });
       }
+      // `lose-game` beendet das GANZE Match: der fehlbare Sitz verliert sofort,
+      // der Gegner gewinnt den Pot (Match-terminal → Status springt auf 'settled',
+      // KEIN Bust-Reveal). Die Sieger-/Verlierer-Schlagzeile trägt die Settled-
+      // Sicht (DiceProEnd); hier nur die per-Sitz Grund-Zeile (analog soft-end).
+      if (fe.consequence === 'lose-game') {
+        return e.seat === mySeat ? t('dp.loseGameYou') : t('dp.loseGameOpp');
+      }
       return e.seat === mySeat ? t('dp.bustYou') : t('dp.bustOpp');
     }
     if (e.ev === 'bust' || e.ev === 'timeout_lost') {
@@ -847,6 +854,29 @@ function lastEventText(dp: DiceProView, mySeat: number | null, t: TFn): string |
       return e.seat === mySeat ? t('dd.bankedYou', { points: pts }) : t('dd.bankedOpp', { points: pts });
     }
     if (e.ev === 'roll' || e.ev === 'keep' || e.ev === 'score') return null; // mitten im Zug
+  }
+  return null;
+}
+
+/** Grund-Zeile für die Settled-Sicht, WENN das Match durch eine `lose-game`-Fail-
+ * Regel beendet wurde (Match-terminal: der fehlbare Sitz verliert sofort, der
+ * Gegner gewinnt den Pot). Sonst null → normaler Match-Ausgang, kein Zusatztext.
+ * Nötig, weil `lastEventText` nur am Board (Status 'playing') sichtbar ist, ein
+ * lose-game aber direkt auf 'settled' schaltet (DiceProEnd, kein Board). Die
+ * Sieger-/Verlierer-Schlagzeile bleibt der bestehenden Settled-Sicht überlassen. */
+function loseGameEndText(dp: DiceProView | null, mySeat: number | null, t: TFn): string | null {
+  if (!dp) return null;
+  const log = dp.decisionLog;
+  for (let i = log.length - 1; i >= 0; i--) {
+    const e = log[i]!;
+    if ((e.ev as string) === 'fail') {
+      const fe = e as DiceProEventView & { consequence?: string };
+      if (fe.consequence === 'lose-game') {
+        return e.seat === mySeat ? t('dp.loseGameYou') : t('dp.loseGameOpp');
+      }
+      return null;
+    }
+    if (e.ev === 'bank' || e.ev === 'bust' || e.ev === 'timeout_lost') return null;
   }
   return null;
 }
@@ -1404,6 +1434,13 @@ export function DiceProEnd({
       <p className="mt-1 text-sm text-white/50">
         {t('reveal.payout')}: {toSol(payout)} ◎
       </p>
+
+      {/* Match durch eine `lose-game`-Fail-Regel beendet? Dann den Grund unter der
+          Sieg-/Niederlage-Schlagzeile zeigen (sonst kein Zusatztext). */}
+      {(() => {
+        const reason = loseGameEndText(dp, mySeat, t);
+        return reason ? <p className="mt-2 text-xs text-white/40">{reason}</p> : null;
+      })()}
 
       {dp && (
         <div className="mx-auto mt-4 max-w-[16rem]">

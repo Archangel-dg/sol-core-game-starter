@@ -9,6 +9,8 @@ import { usePlayer, useDemo } from './DemoProvider';
 // Das Board wird 1:1 aus DiceProGame wiederverwendet — die Demo unterscheidet
 // sich nur in der Steuerung (Sim-Balance, Server-Bot statt echter Lobby).
 import { DiceProBoard, DiceProBust, DiceProEnd } from './DiceProGame';
+// Nur points-system: die geechote Creator-Paytable fürs Board (Wertung + Anzeige).
+import { parseDiceProPaytable } from '@/lib/dice-pro';
 
 /**
  * PvP-Dice-Pro-DEMO (Plan §6.4): rundenbasiertes Dice Pro gegen den Server-Bot
@@ -56,6 +58,12 @@ export function DemoDiceProGame({
     };
     return { minStake: big(src.minStakeLamports, 10_000_000n), maxStake: big(src.maxStakeLamports, 500_000_000n) };
   }, [engineConfig]);
+
+  // Nur points-system: geechote Creator-Paytable (sonst null → klassische Tabelle).
+  const paytable = useMemo(
+    () => parseDiceProPaytable((engineConfig as Record<string, unknown> | null | undefined)?.paytable ?? null),
+    [engineConfig],
+  );
 
   const minSol = Number(bounds.minStake) / 1e9;
   const maxSol = Number(bounds.maxStake) / 1e9;
@@ -235,6 +243,7 @@ export function DemoDiceProGame({
             busy={moveBusy}
             reduced={reduced.current}
             error={moveError}
+            paytable={paytable}
             onMove={(keep, action) => void doMove(keep, action)}
           />
         )

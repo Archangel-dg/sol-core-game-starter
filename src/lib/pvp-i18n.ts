@@ -201,6 +201,14 @@ const EN: Catalog = {
     'On your turn, roll your dice — the score is added to your total. No keeping, no busting: one throw per turn. Highest total after all turns (or first to the target) wins.',
   'dp.rulesPush':
     'Set aside at least one scoring die, then roll again to push your luck or bank the points. Score all six dice for a fresh roll (hot dice). A throw with no scoring dice busts — the turn scores 0.',
+  // dice pro — points-system (configurable creator paytable)
+  'dp.scoringPoints': 'Points system',
+  'dp.pt.single': 'Single {face}',
+  'dp.pt.ofAKind': '{n} of a kind',
+  'dp.pt.ofAKindFace': '{n}× face {face}',
+  'dp.pt.straight': 'Straight',
+  'dp.rulesPoints':
+    'Set aside at least one scoring die (per the scoring table below), then roll again to push your luck or bank the points. Score all your dice for a fresh roll (hot dice). A throw with no scoring dice busts — the turn scores 0.',
   // common
   'common.sol': 'SOL',
   'common.close': 'Close',
@@ -378,6 +386,13 @@ const DE: Catalog = {
     'An deinem Zug würfelst du — der Score wird auf dein Gesamtkonto addiert. Kein Behalten, kein Bust: ein Wurf pro Zug. Der höchste Gesamtstand nach allen Zügen (oder Erster am Ziel) gewinnt.',
   'dp.rulesPush':
     'Lege mindestens einen wertenden Würfel beiseite, dann würfle erneut (Push your luck) oder sichere die Punkte. Werten alle sechs Würfel, gibt es einen frischen Wurf (Hot Dice). Ein Wurf ohne wertende Würfel bustet — der Zug bringt 0.',
+  'dp.scoringPoints': 'Punktesystem',
+  'dp.pt.single': 'Einzel-{face}',
+  'dp.pt.ofAKind': '{n} Gleiche',
+  'dp.pt.ofAKindFace': '{n}× Augenzahl {face}',
+  'dp.pt.straight': 'Straße',
+  'dp.rulesPoints':
+    'Lege mindestens einen wertenden Würfel beiseite (gemäß der Tabelle unten), dann würfle erneut (Push your luck) oder sichere die Punkte. Werten alle deine Würfel, gibt es einen frischen Wurf (Hot Dice). Ein Wurf ohne wertende Würfel bustet — der Zug bringt 0.',
   'common.sol': 'SOL',
   'common.close': 'Schließen',
   'common.cancel': 'Abbrechen',
@@ -554,6 +569,13 @@ const FR: Catalog = {
     'À ton tour, lance tes dés — le score s’ajoute à ton total. Pas de conservation, pas de bust : un lancer par tour. Le meilleur total après tous les tours (ou le premier à la cible) gagne.',
   'dp.rulesPush':
     'Mets de côté au moins un dé marquant, puis relance pour tenter ta chance ou banque les points. Si les six dés marquent, nouveau lancer (hot dice). Un lancer sans dé marquant fait bust — le tour vaut 0.',
+  'dp.scoringPoints': 'Système de points',
+  'dp.pt.single': 'Simple {face}',
+  'dp.pt.ofAKind': '{n} identiques',
+  'dp.pt.ofAKindFace': '{n}× face {face}',
+  'dp.pt.straight': 'Suite',
+  'dp.rulesPoints':
+    'Mets de côté au moins un dé marquant (selon le barème ci-dessous), puis relance pour tenter ta chance ou banque les points. Si tous tes dés marquent, nouveau lancer (hot dice). Un lancer sans dé marquant fait bust — le tour vaut 0.',
   'common.sol': 'SOL',
   'common.close': 'Fermer',
   'common.cancel': 'Annuler',
@@ -730,6 +752,13 @@ const RU: Catalog = {
     'В свой ход вы бросаете кубики — счёт добавляется к вашему итогу. Без откладывания и без буста: один бросок за ход. Побеждает больший итог после всех ходов (или первый до цели).',
   'dp.rulesPush':
     'Отложите хотя бы один очковый кубик, затем бросайте снова, испытывая удачу, или записывайте очки. Если очковые все шесть кубиков — новый бросок (hot dice). Бросок без очковых кубиков — буст, ход приносит 0.',
+  'dp.scoringPoints': 'Очковая система',
+  'dp.pt.single': 'Одиночная {face}',
+  'dp.pt.ofAKind': '{n} одинаковых',
+  'dp.pt.ofAKindFace': '{n}× грань {face}',
+  'dp.pt.straight': 'Стрит',
+  'dp.rulesPoints':
+    'Отложите хотя бы один очковый кубик (по таблице ниже), затем бросайте снова, испытывая удачу, или записывайте очки. Если очковые все ваши кубики — новый бросок (hot dice). Бросок без очковых кубиков — буст, ход приносит 0.',
   'common.sol': 'SOL',
   'common.close': 'Закрыть',
   'common.cancel': 'Отмена',

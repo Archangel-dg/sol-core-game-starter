@@ -509,22 +509,24 @@ export const ENGINES: EngineDef[] = [
     category: 'PvP',
     mechanics: ['pvp'],
     blurb:
-      'Spieler gegen Spieler: konfigurierbares Würfel-Duell (Einzelwurf-Vergleich oder Push-your-luck) um den ganzen Pot.',
+      'Spieler gegen Spieler: konfigurierbares Würfel-Duell (Einzelwurf-Vergleich, Push-your-luck oder Punktesystem mit eigener Wertungstabelle) um den ganzen Pot.',
     // Die aufgelöste Config kommt beim PvP nicht über ein Control mit
     // `boundsFrom`, sondern als Server-Echo (publicEngineConfig → template,
     // scoreMode, winCondition, diceCount, faces, targetScore, turnsPerSeat,
-    // lastLicks, minBankPoints, engineVersion). Das Board (DiceProGame) liest
-    // diese Werte direkt aus dem `dicePro`-Block der Match-Sicht und rendert
-    // je Template die passende Steuerung/Wertung — daher hier wie bei allen
-    // PvP-Engines nur der Hinweistext.
+    // lastLicks, minBankPoints, engineVersion — und bei `points-system`
+    // zusätzlich die gefrorene Creator-`paytable`). Das Board (DiceProGame)
+    // liest diese Werte direkt aus dem `dicePro`-Block der Match-Sicht (die
+    // Paytable aus dem `engineConfig.paytable`-Echo) und rendert je Template die
+    // passende Steuerung/Wertung — daher hier wie bei allen PvP-Engines nur der
+    // Hinweistext.
     playerFacts: {
       inputs:
-        'Lobby mit Einsatz erstellen (optional per PIN sperren) oder einer offenen Lobby beitreten. Beide setzen „Bereit"; dann wird nach dem vom Creator gewählten Format abwechselnd gespielt: Einzelwurf-Vergleich (würfeln, höherer Score gewinnt) oder Push-your-luck-Farkle (wertende Würfel behalten, sichern oder riskieren).',
+        'Lobby mit Einsatz erstellen (optional per PIN sperren) oder einer offenen Lobby beitreten. Beide setzen „Bereit"; dann wird nach dem vom Creator gewählten Format abwechselnd gespielt: Einzelwurf-Vergleich (würfeln, höherer Score gewinnt), Push-your-luck-Farkle oder Punktesystem (wertende Würfel behalten, sichern oder riskieren — nach der vom Creator festgelegten Wertungstabelle).',
       outcomes:
-        'Wer nach dem Format vorn liegt, gewinnt den ganzen Pot (beide Einsätze) — Fees bleiben einbehalten. Siegbedingung: höchster Score über N Züge oder Erster am Ziel (der Gegner bekommt seine Last-Licks-Züge). Gleichstand ⇒ Sudden Death. Provably fair; verlierst du, ist dein Einsatz weg. Geld wird erst beim Spielstart (alle bereit) gebucht.',
+        'Wer nach dem Format vorn liegt, gewinnt den ganzen Pot (beide Einsätze) — Fees bleiben einbehalten. Siegbedingung: höchster Score über N Züge oder Erster am Ziel (der Gegner bekommt seine Last-Licks-Züge). Gleichstand ⇒ Sudden Death. Beim Punktesystem bestimmt die im Spiel angezeigte Creator-Paytable, welche Kombinationen wie viele Punkte bringen. Provably fair; verlierst du, ist dein Einsatz weg. Geld wird erst beim Spielstart (alle bereit) gebucht.',
     },
     pvp: {
-      hint: 'Lobby erstellen oder beitreten, „Bereit" setzen — dann nach Format spielen: Einzelwurf-Vergleich oder Push-your-luck-Farkle (wertende Würfel behalten, sichern oder riskieren).',
+      hint: 'Lobby erstellen oder beitreten, „Bereit" setzen — dann nach Format spielen: Einzelwurf-Vergleich, Push-your-luck-Farkle oder Punktesystem (wertende Würfel behalten, sichern oder riskieren — Wertung laut angezeigter Tabelle).',
     },
   },
 ];

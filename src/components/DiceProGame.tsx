@@ -21,6 +21,17 @@ import { usePvpLang, pvpErrorText, type TFn } from '@/lib/pvp-i18n';
 // reinen Helfer aus dice-duel.ts spiegeln die eingefrorene Backend-Paytable und
 // dienen NUR der Anzeige — der Server wertet jeden Zug neu.
 import { scoreSelection, keepValuesOf, DICE_DUEL_PAYTABLE, DIE_PIPS } from '@/lib/dice-duel';
+// `points-system` (Stage 2) teilt die push-your-luck-Zug-Maschine, wertet aber
+// gegen die KONFIGURIERBARE Creator-Paytable statt der eingefrorenen Farkle-
+// Tabelle: der parametrisierte Anzeige-Kern + die Paytable-Zeilen kommen aus
+// dice-pro.ts, gespeist vom `engineConfig.paytable`-Echo des Servers.
+import {
+  parseDiceProPaytable,
+  makeDiceProKernel,
+  paytableDisplayRows,
+  type DiceProPaytable,
+  type PaytableRow,
+} from '@/lib/dice-pro';
 // Die GESAMTE Lobby-Hülle (Hero, Tabelle, Raum, Wallet/Menü/Info/Create,
 // Overlay/Head, Helfer) wird 1:1 aus PvpGame wiederverwendet — nur die
 // In-Match-Sicht ist neu (konfigurierbares Dice-Pro-Board statt Coin-Reveal).
@@ -42,12 +53,15 @@ import {
  * PvP-Dice-Pro-Frontend (docs/pvp-plan.md, "Dice Pro"). Wiederverwendet die
  * komplette Lobby-Erfahrung von PvpGame (Header, Wallet-Modal, Lobby-Browser,
  * Lobby-Raum, Menü, Balance-Freeze, 1-s-Poll) und ersetzt NUR die In-Match-Sicht
- * durch ein konfigurierbares Dice-Pro-Board. Zwei Templates aus dem `dicePro`-
+ * durch ein konfigurierbares Dice-Pro-Board. Drei Templates aus dem `dicePro`-
  * Block der Match-Sicht: `single-roll-compare` (ein Wurf je Zug, sum/high-die,
- * kein Keep) und `push-your-luck` (klassisches 6d6-Farkle: Keep-Auswahl,
- * Roll/Bank, Bust-Reveal). Ergebnisse kommen ausschließlich vom Server; das
- * Board rechnet Auswahl-Punkte nur zur Anzeige. Züge laufen über moneyFetch
- * (Spieler-Token), die Match-Sicht wird token-frei gepollt (wie bei dice-duel).
+ * kein Keep), `push-your-luck` (klassisches 6d6-Farkle: Keep-Auswahl, Roll/Bank,
+ * Bust-Reveal) und `points-system` (dieselbe Push-your-luck-Zug-Maschine, aber
+ * die Wertung + angezeigte Tabelle kommen aus der KONFIGURIERBAREN Creator-
+ * Paytable des `engineConfig.paytable`-Echos statt der fixen Farkle-Tabelle).
+ * Ergebnisse kommen ausschließlich vom Server; das Board rechnet Auswahl-Punkte
+ * nur zur Anzeige. Züge laufen über moneyFetch (Spieler-Token), die Match-Sicht
+ * wird token-frei gepollt (wie bei dice-duel).
  */
 
 const LOBBY_STORE_KEY = 'sc_pvp_lobby';
@@ -88,6 +102,15 @@ export function DiceProGame({
       allowPin: src.allowPin === 1 || src.allowPin === true,
     };
   }, [engineConfig]);
+
+  // Nur `points-system`: die vom Server geechote Creator-Paytable (singles/
+  // ofAKind/straight) — Quelle für die Wertungs-Anzeige UND den parametrisierten
+  // Auswahl-Kern (dice-pro.ts). Fehlt sie (andere Templates / alter Stand), bleibt
+  // sie null und das Board fällt auf die klassische Farkle-Tabelle zurück.
+  const paytable = useMemo(
+    () => parseDiceProPaytable((engineConfig as Record<string, unknown> | null | undefined)?.paytable ?? null),
+    [engineConfig],
+  );
 
   const [lobbyId, setLobbyId] = useState<string | null>(null);
   const [lobby, setLobby] = useState<PvpLobbyView | null>(null);
@@ -593,6 +616,7 @@ export function DiceProGame({
               busy={moveBusy}
               reduced={reduced}
               error={moveError}
+              paytable={paytable}
               onMove={(keep, action) => void doMove(keep, action)}
             />
           )
@@ -753,8 +777,17 @@ function formatLabel(dp: DiceProView, t: TFn): string {
     : t('dp.formatHighest', { turns: dp.turnsPerSeat });
 }
 
+/** true ⇒ das Template ist `points-system` (konfigurierbare Creator-Paytable).
+ * `dp.template`/`dp.scoreMode` tragen dafür Werte ('points-system'/'farkle-config'),
+ * die noch NICHT in der eingefrorenen DiceProView-Union (Systemvertrag) stehen —
+ * daher hier lokal verbreitert gelesen. */
+export function isPointsSystem(dp: DiceProView): boolean {
+  return (dp.template as string) === 'points-system' || (dp.scoreMode as string) === 'farkle-config';
+}
+
 /** Scoring-Label je scoreMode/Template (Anzeige). */
 function scoringLabel(dp: DiceProView, t: TFn): string {
+  if (isPointsSystem(dp)) return t('dp.scoringPoints');
   if (dp.scoreMode === 'farkle') return t('dp.scoreFarkle');
   if (dp.scoreMode === 'high-die') return t('dp.scoreHighDie');
   return t('dp.scoreSum');
@@ -932,6 +965,7 @@ export function DiceProBoard({
   busy,
   reduced,
   error,
+  paytable = null,
   onMove,
 }: {
   t: TFn;
@@ -941,6 +975,8 @@ export function DiceProBoard({
   busy: boolean;
   reduced: boolean;
   error: string | null;
+  /** Nur points-system: die geechote Creator-Paytable (sonst null → klassisch). */
+  paytable?: DiceProPaytable | null;
   onMove: (keep: number[], action: 'roll' | 'bank') => void;
 }) {
   const myTurn = dp.activeSeat === (mySeat ?? 1);
@@ -967,7 +1003,10 @@ export function DiceProBoard({
         )}
       </div>
 
-      {dp.template === 'push-your-luck' ? (
+      {dp.template === 'push-your-luck' || isPointsSystem(dp) ? (
+        // Beide Push-your-luck-Templates teilen die GESAMTE Zug-UI (Keep-Tray,
+        // Roll/Bank, Hot Dice, Bust). Nur die Wertung + angezeigte Tabelle
+        // unterscheiden sich: points-system nutzt die Creator-Paytable.
         <PushYourLuckArea
           t={t}
           dp={dp}
@@ -976,6 +1015,7 @@ export function DiceProBoard({
           busy={busy}
           reduced={reduced}
           error={error}
+          paytable={paytable}
           onMove={onMove}
         />
       ) : (
@@ -1047,7 +1087,8 @@ function SingleRollArea({
   );
 }
 
-/** push-your-luck: klassisches 6d6-Farkle (Keep-Auswahl + Roll/Bank). */
+/** push-your-luck (klassisches 6d6-Farkle) UND points-system (dieselbe Zug-UI,
+ * aber Wertung + Tabelle aus der Creator-Paytable): Keep-Auswahl + Roll/Bank. */
 function PushYourLuckArea({
   t,
   dp,
@@ -1056,6 +1097,7 @@ function PushYourLuckArea({
   busy,
   reduced,
   error,
+  paytable = null,
   onMove,
 }: {
   t: TFn;
@@ -1065,10 +1107,23 @@ function PushYourLuckArea({
   busy: boolean;
   reduced: boolean;
   error: string | null;
+  /** Nur points-system: die geechote Creator-Paytable (sonst null → klassisch). */
+  paytable?: DiceProPaytable | null;
   onMove: (keep: number[], action: 'roll' | 'bank') => void;
 }) {
   const [selected, setSelected] = useState<number[]>([]);
   const [showPaytable, setShowPaytable] = useState(false);
+
+  // points-system wertet gegen die Creator-Paytable (parametrisierter Kern aus
+  // dice-pro.ts); die eingefrorene push-your-luck-Variante bleibt bei der fixen
+  // Farkle-Wertung (dice-duel.ts). Fehlt die Paytable (sollte bei points-system
+  // nie), fällt die Anzeige-Wertung graceful auf klassisch zurück.
+  const usePoints = isPointsSystem(dp) && !!paytable;
+  const kernel = useMemo(
+    () => (usePoints && paytable ? makeDiceProKernel(dp.faces, dp.diceCount, paytable) : null),
+    [usePoints, paytable, dp.faces, dp.diceCount],
+  );
+  const score = kernel ? kernel.scoreSelection : scoreSelection;
 
   // Auswahl bei jedem neuen Wurf (oder Zugwechsel) zurücksetzen.
   const trayKey = `${dp.tableDice.join('-')}|${dp.turnNo}|${dp.keptThisTurn.length}|${dp.activeSeat}`;
@@ -1077,7 +1132,7 @@ function PushYourLuckArea({
   }, [trayKey]);
 
   const keepValues = keepValuesOf(dp.tableDice, selected);
-  const sel = scoreSelection(keepValues);
+  const sel = score(keepValues);
   const selPoints = sel.valid ? sel.points : 0;
   const projected = dp.turnScore + selPoints;
   const hasSelection = keepValues.length > 0;
@@ -1182,16 +1237,20 @@ function PushYourLuckArea({
         {showPaytable && (
           <table className="mt-3 w-full text-xs">
             <tbody>
-              {DICE_DUEL_PAYTABLE.map((row) => (
-                <tr key={row.key} className="border-t border-white/5">
-                  <td className="py-1 text-white/60">{t(row.key)}</td>
-                  <td className="py-1 text-right font-semibold tabular-nums text-white/80">{row.value}</td>
-                </tr>
-              ))}
+              {(usePoints && paytable ? paytableDisplayRows(paytable, dp.faces) : (DICE_DUEL_PAYTABLE as PaytableRow[])).map(
+                (row, i) => (
+                  <tr key={`pt-${i}-${row.key}`} className="border-t border-white/5">
+                    <td className="py-1 text-white/60">{t(row.key, row.params)}</td>
+                    <td className="py-1 text-right font-semibold tabular-nums text-white/80">{row.value}</td>
+                  </tr>
+                ),
+              )}
             </tbody>
           </table>
         )}
-        <p className="mt-3 text-[11px] leading-relaxed text-white/40">{t('dp.rulesPush')}</p>
+        <p className="mt-3 text-[11px] leading-relaxed text-white/40">
+          {t(usePoints ? 'dp.rulesPoints' : 'dp.rulesPush')}
+        </p>
       </div>
     </>
   );

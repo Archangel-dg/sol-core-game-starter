@@ -104,13 +104,19 @@ export function DiceProGame({
   }, [engineConfig]);
 
   // Nur `points-system`: die vom Server geechote Creator-Paytable (singles/
-  // ofAKind/straight) — Quelle für die Wertungs-Anzeige UND den parametrisierten
-  // Auswahl-Kern (dice-pro.ts). Fehlt sie (andere Templates / alter Stand), bleibt
-  // sie null und das Board fällt auf die klassische Farkle-Tabelle zurück.
-  const paytable = useMemo(
+  // ofAKind/straight/patterns) — Quelle für die Wertungs-Anzeige UND den
+  // parametrisierten Auswahl-Kern (dice-pro.ts). Fehlt sie (andere Templates /
+  // alter Stand), bleibt sie null und das Board fällt auf die klassische
+  // Farkle-Tabelle zurück. Trägt das Echo dagegen eine UNBEKANNTE paytable-
+  // `version` (neuerer Server als dieses Template), wird `paytableOutdated`
+  // true und ein SICHTBARER „Frontend veraltet"-Banner gezeigt — nie still
+  // klassisch weiterrechnen (Plan Global Constraint 11).
+  const paytableParse = useMemo(
     () => parseDiceProPaytable((engineConfig as Record<string, unknown> | null | undefined)?.paytable ?? null),
     [engineConfig],
   );
+  const paytable = paytableParse.paytable;
+  const paytableOutdated = paytableParse.outdated;
 
   const [lobbyId, setLobbyId] = useState<string | null>(null);
   const [lobby, setLobby] = useState<PvpLobbyView | null>(null);
@@ -588,6 +594,19 @@ export function DiceProGame({
           </button>
         </div>
       </header>
+
+      {paytableOutdated && (
+        // Sichtbarer „Frontend veraltet"-Banner (Plan Global Constraint 11):
+        // das Server-Echo trägt eine paytable-Version, die dieses Template
+        // nicht kennt — Anzeige-Punkte wären falsch. KEIN stiller
+        // Klassik-Fallback; der Server wertet weiterhin autoritativ.
+        <div
+          role="alert"
+          className="mb-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-xs leading-relaxed text-amber-200"
+        >
+          {t('dp.outdatedFrontend')}
+        </div>
+      )}
 
       {inMatch ? (
         matchEnded ? (
@@ -1282,7 +1301,7 @@ function PushYourLuckArea({
         {showPaytable && (
           <table className="mt-3 w-full text-xs">
             <tbody>
-              {(usePoints && paytable ? paytableDisplayRows(paytable, dp.faces) : (DICE_DUEL_PAYTABLE as PaytableRow[])).map(
+              {(usePoints && paytable ? paytableDisplayRows(paytable, dp.faces, dp.diceCount) : (DICE_DUEL_PAYTABLE as PaytableRow[])).map(
                 (row, i) => (
                   <tr key={`pt-${i}-${row.key}`} className="border-t border-white/5">
                     <td className="py-1 text-white/60">{t(row.key, row.params)}</td>

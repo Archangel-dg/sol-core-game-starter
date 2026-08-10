@@ -211,6 +211,12 @@ const EN: Catalog = {
   'dp.pt.ofAKind': '{n} of a kind',
   'dp.pt.ofAKindFace': '{n}× face {face}',
   'dp.pt.straight': 'Straight',
+  'dp.pt.fullHouse': 'Full house (3 + 2)',
+  'dp.pt.nPairs': '{count} pairs',
+  'dp.pt.twoTriples': 'Two triples',
+  'dp.pt.wholeRoll': 'Combos score the entire throw — keeping one banks every die and rolls all dice again (hot dice).',
+  'dp.outdatedFrontend':
+    'This game template is outdated — the server sent a scoring table this frontend does not understand. Displayed points may be wrong; the server still scores every move correctly. Please update the template.',
   'dp.rulesPoints':
     'Set aside at least one scoring die (per the scoring table below), then roll again to push your luck or bank the points. Score all your dice for a fresh roll (hot dice). A throw with no scoring dice busts — the turn scores 0.',
   // common
@@ -399,6 +405,12 @@ const DE: Catalog = {
   'dp.pt.ofAKind': '{n} Gleiche',
   'dp.pt.ofAKindFace': '{n}× Augenzahl {face}',
   'dp.pt.straight': 'Straße',
+  'dp.pt.fullHouse': 'Full House (3 + 2)',
+  'dp.pt.nPairs': '{count} Paare',
+  'dp.pt.twoTriples': 'Zwei Drillinge',
+  'dp.pt.wholeRoll': 'Kombinationen werten den ganzen Wurf — wer eine behält, bankt alle Würfel und würfelt alle neu (Hot Dice).',
+  'dp.outdatedFrontend':
+    'Dieses Spiel-Template ist veraltet — der Server sendet eine Wertungstabelle, die dieses Frontend nicht kennt. Angezeigte Punkte können falsch sein; der Server wertet jeden Zug weiterhin korrekt. Bitte das Template aktualisieren.',
   'dp.rulesPoints':
     'Lege mindestens einen wertenden Würfel beiseite (gemäß der Tabelle unten), dann würfle erneut (Push your luck) oder sichere die Punkte. Werten alle deine Würfel, gibt es einen frischen Wurf (Hot Dice). Ein Wurf ohne wertende Würfel bustet — der Zug bringt 0.',
   'common.sol': 'SOL',
@@ -586,6 +598,12 @@ const FR: Catalog = {
   'dp.pt.ofAKind': '{n} identiques',
   'dp.pt.ofAKindFace': '{n}× face {face}',
   'dp.pt.straight': 'Suite',
+  'dp.pt.fullHouse': 'Full (3 + 2)',
+  'dp.pt.nPairs': '{count} paires',
+  'dp.pt.twoTriples': 'Deux brelans',
+  'dp.pt.wholeRoll': 'Les combos comptent le lancer entier — en garder un met tous les dés en banque et relance tous les dés (hot dice).',
+  'dp.outdatedFrontend':
+    'Ce template de jeu est obsolète — le serveur envoie un barème que ce frontend ne connaît pas. Les points affichés peuvent être faux ; le serveur continue de compter chaque coup correctement. Veuillez mettre à jour le template.',
   'dp.rulesPoints':
     'Mets de côté au moins un dé marquant (selon le barème ci-dessous), puis relance pour tenter ta chance ou banque les points. Si tous tes dés marquent, nouveau lancer (hot dice). Un lancer sans dé marquant fait bust — le tour vaut 0.',
   'common.sol': 'SOL',
@@ -773,6 +791,12 @@ const RU: Catalog = {
   'dp.pt.ofAKind': '{n} одинаковых',
   'dp.pt.ofAKindFace': '{n}× грань {face}',
   'dp.pt.straight': 'Стрит',
+  'dp.pt.fullHouse': 'Фулл-хаус (3 + 2)',
+  'dp.pt.nPairs': '{count} пары',
+  'dp.pt.twoTriples': 'Два триплета',
+  'dp.pt.wholeRoll': 'Комбинации оценивают весь бросок — оставив её, вы банкуете все кубики и бросаете все заново (hot dice).',
+  'dp.outdatedFrontend':
+    'Этот шаблон игры устарел — сервер прислал таблицу очков, которую этот фронтенд не знает. Показанные очки могут быть неверными; сервер по-прежнему считает каждый ход правильно. Пожалуйста, обновите шаблон.',
   'dp.rulesPoints':
     'Отложите хотя бы один очковый кубик (по таблице ниже), затем бросайте снова, испытывая удачу, или записывайте очки. Если очковые все ваши кубики — новый бросок (hot dice). Бросок без очковых кубиков — буст, ход приносит 0.',
   'common.sol': 'SOL',

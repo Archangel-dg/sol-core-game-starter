@@ -59,11 +59,15 @@ export function DemoDiceProGame({
     return { minStake: big(src.minStakeLamports, 10_000_000n), maxStake: big(src.maxStakeLamports, 500_000_000n) };
   }, [engineConfig]);
 
-  // Nur points-system: geechote Creator-Paytable (sonst null → klassische Tabelle).
-  const paytable = useMemo(
+  // Nur points-system: geechote Creator-Paytable (sonst null → klassische
+  // Tabelle). Unbekannte paytable-Version ⇒ sichtbarer „Frontend veraltet"-
+  // Banner (Plan Global Constraint 11), nie still klassisch weiterrechnen.
+  const paytableParse = useMemo(
     () => parseDiceProPaytable((engineConfig as Record<string, unknown> | null | undefined)?.paytable ?? null),
     [engineConfig],
   );
+  const paytable = paytableParse.paytable;
+  const paytableOutdated = paytableParse.outdated;
 
   const minSol = Number(bounds.minStake) / 1e9;
   const maxSol = Number(bounds.maxStake) / 1e9;
@@ -208,6 +212,19 @@ export function DemoDiceProGame({
           </button>
         </div>
       </header>
+
+      {paytableOutdated && (
+        // Sichtbarer „Frontend veraltet"-Banner (Plan Global Constraint 11):
+        // das Server-Echo trägt eine paytable-Version, die dieses Template
+        // nicht kennt — Anzeige-Punkte wären falsch. KEIN stiller
+        // Klassik-Fallback; der Server wertet weiterhin autoritativ.
+        <div
+          role="alert"
+          className="mb-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-xs leading-relaxed text-amber-200"
+        >
+          {t('dp.outdatedFrontend')}
+        </div>
+      )}
 
       {match && dp ? (
         settled ? (

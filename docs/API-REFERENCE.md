@@ -224,6 +224,8 @@ Wallet-bound actions need a player token (same as `/bet`); the lobby-room state 
 - `GET /api/game/pvp/me/:wallet` — `{ wallet, wins, losses, total, recent:[…] }`.
 - `GET /api/game/pvp/verify/:matchId` — **public** provably-fair check
   (`roll = HMAC-SHA256(serverSeed, seat1Seed:seat2Seed:matchId:nonce)`, `roll < 50 → seat 1`).
+  The human-readable verifier at `<verifier>/verify/<matchId>` accepts **match IDs as well as round
+  IDs** and recomputes the match in the player's browser — link players there, not at the raw JSON.
 - **Demo:** `POST /api/game/demo/pvp/lobby` — `{ playerWallet, stakeLamports, clientSeed? }` → an
   instant settled match vs. the server bot (token-free); `GET /api/game/demo/pvp/match/:id` re-reads it.
 

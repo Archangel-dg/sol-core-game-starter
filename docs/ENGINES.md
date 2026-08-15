@@ -145,8 +145,9 @@ create dialogs, exported from `PvpGame.tsx`) and only swaps the in-match view.
   Formats: `quick3` (3 turns each, most points wins) / `race10000` (first to `targetScore` = 10000, the
   opponent gets one last turn). A **move timer** counts down from `moveDeadline` (server auto-banks on
   expiry — the UI just keeps polling).
-- **End**: winner + payout + a Verify link to the raw `GET /pvp/verify/:matchId` (same as coin-flip). The
-  balance is frozen during the final settle.
+- **End**: winner + payout + a Verify link to `<verifier>/verify/<matchId>` (same as coin-flip) — the
+  public verifier accepts match IDs and replays the whole duel (opener picks, every die, every keep,
+  both scores) in the player's browser. The balance is frozen during the final settle.
 - **Demo:** `POST /api/demo/pvp/lobby` starts a turn-based match vs. the server bot on the simulated
   balance; each `POST /api/demo/pvp/match/:id/move` plays the player's turn and the bot's reply in one
   response — token-free, isolated from the real tables.

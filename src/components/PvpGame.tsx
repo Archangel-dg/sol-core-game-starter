@@ -1041,12 +1041,12 @@ function RevealView({
         <div className="mt-5 space-y-3">
           <p className="text-[11px] text-white/30">{t('reveal.settledAway')}</p>
           {matchId && (
-            // Roher, öffentlicher PvP-Verify-Endpunkt (same-origin-Proxy → JSON
-            // zum Nachrechnen). Die menschenlesbare Verifier-Seite kennt vorerst
-            // nur Single-Bet-Runden (creator_rounds), nicht pvp_matches — der
-            // Website-Verifier für PvP ist ein bewusster Follow-up.
+            // Menschenlesbarer Verifizierer: die Seite akzeptiert Runden- UND
+            // Match-IDs und rechnet ein Match (Seed-Commitment, zusammengesetzter
+            // Client-Seed, Würfe, Gewinner) IM BROWSER des Spielers nach. Der
+            // rohe JSON-Endpunkt bleibt unter /api/pvp/verify/<id> erreichbar.
             <a
-              href={`/api/pvp/verify/${matchId}`}
+              href={`${verifierUrl}/verify/${matchId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block text-sm text-accent underline underline-offset-2"

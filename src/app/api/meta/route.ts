@@ -35,8 +35,12 @@ export async function GET() {
       gameId: cfg.gameId,
       apiUrl: cfg.apiUrl, // öffentlich (nur Basis-URL, kein Key)
       verifierUrl: cfg.verifierUrl, // menschenlesbare Verifizierungsseite — für den Verify-Link
-      devMock: h.devMock,
-      network: h.network,
+      // Backend sendet devMock künftig nur noch, wenn true — fehlend ⇒ false.
+      devMock: h.devMock === true,
+      // /health liefert kein network mehr (keine Betriebsdetails öffentlich) —
+      // das Netzwerk kommt aus der eigenen Env, gleiche Quelle und gleicher
+      // Devnet-Fallback wie der RPC-Endpoint in `Providers.tsx`.
+      network: process.env.NEXT_PUBLIC_SOLANA_NETWORK ?? 'devnet',
       engineConfig: cachedEngine?.engineConfig ?? null,
       serverMode,
       // Das Spiel ist auf dem Server als andere Engine registriert als die

@@ -49,11 +49,13 @@ async function request<T>(path: string, init?: RequestInit, playerToken?: string
   return body;
 }
 
-/** Health (öffentlich): devMock-Flag steuert, ob Geld-UI angezeigt wird. */
-export async function health(): Promise<{ devMock: boolean; network: string }> {
+/** Health (öffentlich): devMock steuert, ob Geld-UI angezeigt wird. Das
+ * Backend sendet devMock NUR, wenn es true ist (fehlend ⇒ false); network
+ * ist kein Bestandteil von /health mehr (keine Betriebsdetails öffentlich). */
+export async function health(): Promise<{ status?: string; devMock?: boolean }> {
   const cfg = serverConfig();
   const res = await fetch(`${cfg.apiUrl}/health`, { cache: 'no-store' });
-  return (await res.json()) as { devMock: boolean; network: string };
+  return (await res.json()) as { status?: string; devMock?: boolean };
 }
 
 // ── Spieler-Autorisierung (Bearer-Token für alle Geld-Routen) ──────────────
@@ -178,6 +180,20 @@ export interface SessionView {
   /** Aufgelöste Engine-Dimensionen (fehlt bei alten API-Ständen). */
   engine?: { mode: string; config: Record<string, number> };
   progress: Record<string, unknown>;
+  // ── Nur bei Engines mit `session.costPerStep` (spin-tower-pro) ──
+  // Bei allen anderen Session-Engines kostet die Runde EINMAL beim Start; dort
+  // fehlen diese Felder komplett. Deshalb durchgehend OPTIONAL — sie werden
+  // defensiv gelesen (siehe SessionGame), nie vorausgesetzt.
+  /** Was JEDER weitere Schritt kostet: der für die Runde gesperrte Einsatz. */
+  spinCostLamports?: string;
+  /** FAIL-immun gesicherter Teil — geht nicht mehr verloren, wird aber erst mit
+   * der Schluss-Abrechnung am Rundenende ausgezahlt. */
+  securedLamports?: string;
+  /** Aktueller, noch verlierbarer Pot (Summe der erreichten Stufen). */
+  potLamports?: string;
+  /** Bezahlte Spins und der harte Spin-Deckel der Runde. */
+  spins?: number;
+  maxSpins?: number;
   // nur bei Ende:
   roundId?: string;
   payoutLamports?: string;

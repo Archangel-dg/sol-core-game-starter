@@ -16,8 +16,10 @@ payout-ready game — automatically.
 4. **Every `API-xxx` error is handled** (mapping in `lib/errors.ts`). Never pass raw errors to
    players. `API-305` opens the deposit flow.
 
-5. **Dev-mock detection is mandatory.** `GET /health` returns `devMock`. When it's `true`, the money
-   UI (balance/deposit/withdraw) hides itself automatically.
+5. **Dev-mock detection is mandatory.** `GET /health` returns `{ status: "ok" }` plus `devMock` only
+   when it is `true` (missing ⇒ `false`). When it's `true`, the money UI (balance/deposit/withdraw)
+   hides itself automatically. `/health` carries no `network` — that field is on the admin-only
+   `GET /health/full`; the game's network comes from `NEXT_PUBLIC_SOLANA_NETWORK`.
 
 6. **Make provably-fair visible.** Seed hash before the round, `roundId` + verify link after
    (`FairnessPanel`).

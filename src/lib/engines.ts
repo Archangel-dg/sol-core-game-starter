@@ -63,6 +63,21 @@ export interface EngineDef {
       | { kind: 'action'; label: string }; // pump
     /** Baut den Step-Body. */
     buildStep: (input: { value?: number; guess?: 'higher' | 'lower' }) => Record<string, unknown>;
+    /**
+     * Nur gesetzt, wenn JEDER Schritt erneut den Einsatz kostet (spin-tower-pro).
+     * Alle anderen Session-Engines buchen den Einsatz EINMAL beim Start; jeder
+     * Schritt danach ist gratis. Bewusst ein OPTIONALES Zusatzfeld und KEINE
+     * neue `Mechanic`: die Union oben ist Systemvertrag (DevKit-Spec, Public
+     * Mirror, jedes `switch (mechanic)`) — ein weiterer Wert hätte überall
+     * gerippelt, ein fehlendes optionales Feld bricht dagegen nichts.
+     *
+     * Der Riegel gegen „alter Client hält Schritte für gratis und verklickt
+     * Geld" liegt SERVERSEITIG (`SPIN_COST_GAME_MODES` lehnt den Einmal-Debit-
+     * Pfad für diese Modi ab), nicht an diesem Typ. Die Aufgabe der UI ist
+     * damit rein die Anzeigepflicht: Kosten je Schritt und Einsatz-Sperre
+     * müssen unübersehbar sein (siehe SessionGame).
+     */
+    costPerStep?: true;
     hint: string;
   };
   // ── Turnier (Pot-basierte Highscore-Läufe) ──
@@ -419,6 +434,33 @@ export const ENGINES: EngineDef[] = [
       step: { kind: 'action', label: 'Klettern' },
       buildStep: () => ({}),
       hint: 'Klettern oder cashen — Safe-Points und Leben fangen Fehlschläge ab, bis der Schutz verbraucht ist.',
+    },
+  },
+  {
+    key: 'spin-tower-pro',
+    label: 'Spin Tower Pro',
+    category: 'Chain',
+    // Mechanik bleibt `session` — der Unterschied zu allen anderen Sessions ist
+    // NUR der Preis pro Schritt (`session.costPerStep`), nicht der Ablauf:
+    // start → step* → cashout, identische Routen, identischer Reconnect.
+    mechanics: ['session'],
+    blurb: 'Türme hochspinnen — JEDER Spin kostet erneut den Einsatz.',
+    playerFacts: {
+      inputs:
+        'Ein Knopf: spinnen. Achtung, das ist der Unterschied zu jedem anderen Spiel hier — JEDER Spin kostet erneut deinen vollen Einsatz, nicht nur der Rundenstart. Ab dem ersten Spin ist der Einsatz für die ganze Runde gesperrt und nicht mehr änderbar.',
+      outcomes:
+        'Jeder Spin zieht genau ein Ergebnis: ein Turm steigt eine Stufe, ein Turm auf seiner höchsten Stufe zahlt seinen Top-Multiplikator als GESICHERT aus (und bleibt oben stehen), der Joker lässt alle Türme steigen bzw. sichern, „Nichts" passiert, oder FAIL. Dein Pot ist die Summe der Multiplikatoren der AKTUELL erreichten Stufen — FAIL nimmt ihn: je nach Spiel fallen alle Türme auf 0 und die Runde endet, oder jeder Turm rutscht eine Stufe runter und die Runde läuft weiter. Gesichertes ist FAIL-immun: es kann dir kein FAIL mehr nehmen, ausgezahlt wird es aber erst mit der Schluss-Abrechnung am Rundenende, nicht sofort. Cashout ab dem ersten Spin jederzeit — er zahlt Pot + Gesichertes. Spätestens nach der im Spiel gesetzten Spin-Zahl endet die Runde von selbst.',
+    },
+    session: {
+      // Leerer Step-Body wie pump/steps — „Spin" ist die einzige Aktion. Die
+      // Türme (`towers`), der FAIL-Modus (`failMode`), der Joker
+      // (`jokerEnabled`), der Spin-Deckel (`maxSpins`) und die gespielten
+      // Wahrscheinlichkeiten (`probsBps`) kommen als aufgelöstes Server-Echo in
+      // der Engine-Config; Stufen und Gesichertes stehen live im Fortschritt.
+      step: { kind: 'action', label: 'Spin' },
+      buildStep: () => ({}),
+      costPerStep: true,
+      hint: 'Jeder Spin kostet erneut den Einsatz. Pot (verlierbar) und Gesichertes (FAIL-immun) getrennt lesen — und rechtzeitig cashen.',
     },
   },
   {

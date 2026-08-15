@@ -7,8 +7,13 @@ Auth for game endpoints: header `X-API-Key: sk_live_…` (set by the server prox
 
 ## Health (public)
 
-`GET /health` → `{ status, devMock: boolean, network }`
+`GET /health` → `{ status: "ok", devMock? }` — `devMock` is only present when `true` (missing ⇒
+`false`); no other operational details are exposed publicly.
 `devMock: true` ⇒ no balances, bets don't check funds → hide the money UI.
+
+There is **no `network` in `/health`.** It lives on `GET /health/full`, which is admin-only (same
+auth as `/api/admin/*`) and therefore not reachable from a game. Take the network from your own env
+(`NEXT_PUBLIC_SOLANA_NETWORK`) — that is what `GET /api/meta` returns.
 
 ## Game config (API key)
 

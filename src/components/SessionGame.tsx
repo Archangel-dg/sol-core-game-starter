@@ -24,6 +24,26 @@ function formatTowersBombs(bombColumns: unknown): string {
   return rows.length ? `Bomben je Etage — ${rows.join(' · ')}` : '';
 }
 
+/** Aktueller Bezugswert eines Tipp-Schritts, gegen den „höher/tiefer" gilt:
+ * dice-ladder liefert `currentSum` (+ die Einzelwürfel des letzten Wurfs),
+ * hilo `currentCard`. Ohne diese Anzeige wäre ein Tipp blind — bei
+ * dice-ladder hängt die Gewinnchance sogar direkt am aktuellen Wert (eine 4
+ * ist etwas völlig anderes als eine 10). Rein defensiv aus dem
+ * `Record<string, unknown>`-Fortschritt gelesen; liefert null, wenn die
+ * Engine keinen solchen Wert führt. */
+function currentGuessValue(progress: unknown): { value: number; dice?: number[] } | null {
+  if (!progress || typeof progress !== 'object') return null;
+  const p = progress as Record<string, unknown>;
+  const raw = typeof p.currentSum === 'number' ? p.currentSum
+    : typeof p.currentCard === 'number' ? p.currentCard
+      : null;
+  if (raw === null || !Number.isFinite(raw)) return null;
+  const history = p.diceHistory;
+  const last = Array.isArray(history) ? history[history.length - 1] : undefined;
+  const dice = Array.isArray(last) ? last.filter((n): n is number => typeof n === 'number') : undefined;
+  return dice && dice.length > 0 ? { value: raw, dice } : { value: raw };
+}
+
 /** steps: Stufen-Fortschritt + Leiter defensiv aus Fortschritt und
  * Engine-Config lesen. Bei dieser Engine zählt `SessionView.steps` die
  * VERSUCHE — die aktuelle Stufe steht in `progress.currentStep`; Leiter,
@@ -62,14 +82,80 @@ function stepsInfo(
   return { rung, ladderBps, checkpoints: nums((c as Record<string, unknown>).checkpoints), lives, livesLeft, climbsUsed, lastFall };
 }
 
+/** spin-tower-pro (`session.costPerStep`): Turm-Brett, aktueller Pot und der
+ * FAIL-immune gesicherte Anteil — defensiv aus Fortschritt und Engine-Config
+ * gelesen. `towers` ist im Server-Echo ein ARRAY von `{ levels,
+ * multipliersBps }`, `EngineConfig` aber `Record<string, number>` (der Vertrag
+ * aller anderen Nutzer), deshalb geht der Zugriff über `unknown` mit
+ * `Array.isArray`-Absicherung — dieselbe Vorsicht wie bei `towersFloorColumns`
+ * und `bombColumns`. Liefert null, wenn weder Türme noch Stufen ankommen (alter
+ * API-Stand ⇒ es bleibt bei der generischen Aktions-UI, nichts crasht). */
+function spinTowerInfo(
+  progress: unknown,
+  cfg: Record<string, unknown> | null,
+): {
+  towers: { levels: number; multipliersBps: number[] }[];
+  /** Aktuelle Stufe je Turm (0 = Boden). */
+  levels: number[];
+  /** Summe der Multiplikatoren der AKTUELL erreichten Stufen — der verlierbare Teil. */
+  potBps: number;
+  /** FAIL-immun gesichert (BPS des Einsatzes), null wenn der Server es nicht führt. */
+  securedBps: number | null;
+  maxSpins: number | null;
+  failMode: 'reset' | 'stepdown' | null;
+} | null {
+  const p = progress && typeof progress === 'object' ? (progress as Record<string, unknown>) : {};
+  const c = (cfg ?? {}) as Record<string, unknown>;
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === 'number' && Number.isFinite(v) ? v : null;
+  const nums = (v: unknown): number[] =>
+    Array.isArray(v) ? v.filter((n): n is number => typeof n === 'number' && Number.isFinite(n)) : [];
+  const rawTowers = c.towers;
+  const towers = Array.isArray(rawTowers)
+    ? rawTowers.map((t: unknown) => {
+        const o = t && typeof t === 'object' ? (t as Record<string, unknown>) : {};
+        const multipliersBps = nums(o.multipliersBps);
+        return { levels: numOrNull(o.levels) ?? multipliersBps.length, multipliersBps };
+      })
+    : [];
+  const levels = nums(p.levels);
+  if (towers.length === 0 && levels.length === 0) return null;
+  // Pot lokal aus Brett + Stufen — die Lamport-Zahl kommt zwar vom Server
+  // (`potLamports`), aber die Multiplikator-Sicht funktioniert auch ohne sie.
+  const potBps = towers.reduce((sum, t, i) => {
+    const lvl = levels[i] ?? 0;
+    return lvl > 0 ? sum + (t.multipliersBps[lvl - 1] ?? 0) : sum;
+  }, 0);
+  const rawFail = c.failMode;
+  return {
+    towers,
+    levels,
+    potBps,
+    securedBps: numOrNull(p.securedBps),
+    maxSpins: numOrNull(c.maxSpins),
+    failMode: rawFail === 'reset' || rawFail === 'stepdown' ? rawFail : null,
+  };
+}
+
 /**
- * Generischer Session-Flow (mines/hilo/towers/pump/steps): start → step* →
- * cashout. Reconnect nach Reload über localStorage. Ergebnisse kommen vom
- * Server; die UI hier ist bewusst schlicht — Design-Zone.
+ * Generischer Session-Flow (mines/hilo/towers/pump/dice-ladder/steps/
+ * spin-tower-pro): start → step* → cashout. Reconnect nach Reload über
+ * localStorage. Ergebnisse kommen vom Server; die UI hier ist bewusst schlicht —
+ * Design-Zone.
  *
  * Index-Schritte (towers/mines) rendern ein Button-Feld, dessen Größe aus der
  * Server-Config kommt (engineConfig aus /api/meta, bzw. view.engine.config in
  * der laufenden Session) — ungültige Eingaben sind damit unmöglich.
+ * Tipp-Schritte (hilo/dice-ladder) zeigen zusätzlich den aktuellen
+ * Bezugswert, gegen den getippt wird (siehe `currentGuessValue`).
+ *
+ * `session.costPerStep` (spin-tower-pro) kehrt die teuerste Annahme dieser
+ * Oberfläche um: dort kostet JEDER Schritt erneut den Einsatz statt nur der
+ * Start. Der Riegel dagegen sitzt im Server (`SPIN_COST_GAME_MODES` lehnt den
+ * Einmal-Debit-Pfad ab) — die Pflicht HIER ist Sichtbarkeit: Kosten je Spin,
+ * die Einsatz-Sperre ab dem ersten Spin (Feld wird read-only), der
+ * Spin-Zähler gegen `maxSpins` und vor allem Pot (verlierbar) und Gesichertes
+ * (FAIL-immun, zahlt erst am Rundenende) als ZWEI getrennte Zahlen.
  */
 export function SessionGame({
   engine,
@@ -206,10 +292,117 @@ export function SessionGame({
   const ended = view && view.status !== 'active';
   const towersBombText =
     view && view.status === 'busted' && engine.key === 'towers' ? formatTowersBombs(view.reveal?.bombColumns) : '';
+  const guessValue = sess.step.kind === 'guess' ? currentGuessValue(view?.progress) : null;
   const steps = engine.key === 'steps' && view ? stepsInfo(view.progress, cfg) : null;
   // steps: Cashout erst ab Stufe 1 sinnvoll (der Server lehnt am Boden ohnehin
   // ab — nach einem Fall wäre `view.steps ≥ 1`, aber die Auszahlung 0).
   const cashoutBlocked = steps ? steps.rung < 1 : false;
+
+  // ── Engines mit Kosten je Schritt (spin-tower-pro) ────────────────────────
+  // Alles hier ist an `sess.costPerStep` gehängt, nicht an einem Engine-Key:
+  // fehlt das Feld (alle anderen Engines), bleibt jede Zeile unten wirkungslos
+  // und die Oberfläche rendert exakt wie bisher.
+  const costPerStep = sess.costPerStep === true;
+  const spinTower = costPerStep ? spinTowerInfo(view?.progress ?? null, cfg) : null;
+  // `spins` ist die Wahrheit des Servers für bezahlte Spins; `steps` ist der
+  // generische Zähler und dient nur als Rückfall für ältere API-Stände.
+  const spinsUsed = view?.spins ?? view?.steps ?? 0;
+  const maxSpins = view?.maxSpins ?? spinTower?.maxSpins ?? null;
+  const stepsTaken = costPerStep ? spinsUsed : (view?.steps ?? 0);
+  // Preis eines Spins: in der laufenden Runde sagt ihn der Server
+  // (`spinCostLamports`) — nach einem Reload weiß das lokale Einsatz-Feld
+  // nichts über die Runde, eine Anzeige daraus wäre schlicht falsch.
+  const spinCostText = view?.spinCostLamports ? toSol(view.spinCostLamports) : null;
+  // Vor dem Start ist die Eingabe selbst der Preis je Spin — daraus lässt sich
+  // ehrlich zeigen, was eine bis zum Deckel durchgespielte Runde MAXIMAL kostet.
+  const plannedStake = (() => {
+    try {
+      return solToLamports(bet);
+    } catch {
+      return null;
+    }
+  })();
+  const maxSpendText =
+    plannedStake !== null && maxSpins !== null && maxSpins > 0
+      ? toSol(plannedStake * BigInt(maxSpins))
+      : null;
+  // Einsatz-Sperre: spätestens ab dem ersten bezahlten Spin (`stepsTaken >= 1`)
+  // ist der Einsatz der Runde unveränderlich — jeder weitere Spin rechnet gegen
+  // genau diesen Betrag ab. Festgeschrieben hat ihn bereits der Start, deshalb
+  // gilt die Sperre für die GANZE aktive Runde. In der laufenden Runde zeigt der
+  // Kosten-Kopf unten ein hart read-only Feld; dieses Flag hängt zusätzlich am
+  // Start-Feld, damit die Sperre auch dann greift, wenn dieser Zweig eines Tages
+  // während einer aktiven Runde gerendert wird.
+  const stakeLocked = costPerStep && view?.status === 'active';
+  // Pot und Gesichertes sind ZWEI Zahlen und werden nie zu einer verrechnet:
+  // der Pot ist bei einem FAIL weg, das Gesicherte nicht. Lamports bevorzugt
+  // (Server), sonst die aus dem Brett abgeleitete Multiplikator-Sicht.
+  const potText = view?.potLamports
+    ? `${toSol(view.potLamports)} ◎`
+    : spinTower
+      ? `${(spinTower.potBps / 10000).toFixed(2)}×`
+      : '—';
+  const securedText = view?.securedLamports
+    ? `${toSol(view.securedLamports)} ◎`
+    : spinTower && spinTower.securedBps !== null
+      ? `${(spinTower.securedBps / 10000).toFixed(2)}×`
+      : '—';
+
+  // Turm-Brett (Design-Zone): je Turm eine Spalte, oberste Stufe zuerst, der
+  // Multiplikator jeder Stufe sichtbar, die aktuelle Stufe hervorgehoben. Die
+  // Leiter kommt 1:1 aus dem Server-Echo — hier wird nichts gewürfelt.
+  const towerBoard =
+    spinTower && spinTower.towers.length > 0 ? (
+      <div className="rounded-lg border border-white/10 bg-night p-2">
+        <div className="mb-1 flex items-baseline justify-between gap-2">
+          <span className="text-[11px] text-white/40">Türme — Multiplikator je Stufe</span>
+          {spinTower.failMode && (
+            <span className="text-[10px] text-red-300/70">
+              {spinTower.failMode === 'reset'
+                ? 'FAIL: alle Türme auf 0, Runde endet'
+                : 'FAIL: jeder Turm eine Stufe runter, Runde läuft weiter'}
+            </span>
+          )}
+        </div>
+        <div
+          className="grid gap-2"
+          style={{ gridTemplateColumns: `repeat(${spinTower.towers.length}, minmax(0, 1fr))` }}
+        >
+          {spinTower.towers.map((tower, ti) => {
+            const current = spinTower.levels[ti] ?? 0;
+            const rows = tower.multipliersBps.length;
+            return (
+              <div key={ti} className="space-y-1">
+                <div className="text-center text-[10px] text-white/40">Turm {ti + 1}</div>
+                {Array.from({ length: rows }, (_, i) => rows - i).map((lvl) => (
+                  <div
+                    key={lvl}
+                    className={`flex items-center justify-between rounded px-1.5 py-1 text-[11px] tabular-nums ${
+                      lvl === current
+                        ? 'bg-accent/15 text-accent ring-1 ring-accent/50'
+                        : lvl < current
+                          ? 'text-white/50'
+                          : 'text-white/25'
+                    }`}
+                  >
+                    <span>{lvl === rows ? '★' : lvl}</span>
+                    <span>{((tower.multipliersBps[lvl - 1] ?? 0) / 10000).toFixed(2)}×</span>
+                  </div>
+                ))}
+                <div className="text-center text-[10px] text-white/40">
+                  {current === 0 ? 'Boden' : `Stufe ${current}`}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-1 text-[10px] leading-relaxed text-white/30">
+          ★ = höchste Stufe: der nächste Treffer auf diesen Turm zahlt den Multiplikator als
+          GESICHERT (FAIL-immun, Auszahlung am Rundenende) — der Turm bleibt oben stehen und zählt
+          weiter im Pot.
+        </p>
+      </div>
+    ) : null;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
@@ -225,8 +418,18 @@ export function SessionGame({
             <div className="mt-1 text-sm text-white/70">
               {active && steps &&
                 `Stufe ${steps.rung}${steps.livesLeft !== null ? ` · Leben ${steps.livesLeft}${steps.lives !== null ? `/${steps.lives}` : ''}` : ''} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
-              {active && !steps && `Schritt ${view.steps} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
-              {view.status === 'busted' && 'Geplatzt — verloren'}
+              {active && !steps && costPerStep &&
+                `Spin ${spinsUsed}${maxSpins !== null ? `/${maxSpins}` : ''} · Cashout ${toSol(view.potentialPayoutLamports)} ◎`}
+              {active && !steps && !costPerStep && `Schritt ${view.steps} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
+              {/* Bei Kosten je Schritt wäre „alles verloren" gelogen: ein FAIL
+                  nimmt nur den Pot, das Gesicherte wird trotzdem ausgezahlt. */}
+              {view.status === 'busted' && costPerStep &&
+                `FAIL — Pot verloren${
+                  view.payoutLamports && view.payoutLamports !== '0'
+                    ? ` · gesichert ${toSol(view.payoutLamports)} ◎ ausgezahlt`
+                    : ''
+                }`}
+              {view.status === 'busted' && !costPerStep && 'Geplatzt — verloren'}
               {view.status === 'cashed_out' && `Cashout ${toSol(view.payoutLamports ?? '0')} ◎`}
             </div>
             {active && steps?.lastFall && (
@@ -252,15 +455,40 @@ export function SessionGame({
       {!view || ended ? (
         // Start-Ansicht
         <>
+          {towerBoard && <div className="mb-3">{towerBoard}</div>}
           <label className="block text-xs text-white/50">
-            Einsatz (SOL)
+            {costPerStep ? 'Einsatz JE SPIN (SOL)' : 'Einsatz (SOL)'}
             <input
               value={bet}
               onChange={(e) => setBet(e.target.value)}
+              readOnly={stakeLocked}
+              aria-readonly={stakeLocked}
               inputMode="decimal"
-              className="mt-1 w-full rounded-lg border border-white/10 bg-night px-3 py-2 tabular-nums text-white outline-none focus:border-accent/50"
+              className={`mt-1 w-full rounded-lg border border-white/10 bg-night px-3 py-2 tabular-nums text-white outline-none focus:border-accent/50 ${
+                stakeLocked ? 'cursor-not-allowed text-white/60' : ''
+              }`}
             />
           </label>
+          {costPerStep && (
+            // Anzeigepflicht vor dem ersten Klick: hier kostet nicht die Runde,
+            // sondern JEDER Spin. Ohne diesen Kasten hielte ein Spieler die
+            // Schritte für gratis — die Annahme, die jede andere Engine erfüllt.
+            <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-[11px] leading-relaxed text-amber-100/90">
+              <span className="font-semibold text-amber-200">
+                Achtung: JEDER Spin kostet erneut diesen Einsatz
+              </span>{' '}
+              — nicht nur der Rundenstart. Ab dem ersten Spin ist der Einsatz für die ganze Runde
+              gesperrt und nicht mehr änderbar.
+              {maxSpins !== null && (
+                <>
+                  {' '}
+                  Die Runde endet spätestens nach {maxSpins} Spins
+                  {maxSpendText ? ` — maximal ${maxSpendText} ◎ Gesamteinsatz` : ''}.
+                </>
+              )}{' '}
+              Cashout ist ab dem ersten Spin jederzeit möglich und zahlt Pot + Gesichertes.
+            </div>
+          )}
           <button
             type="button"
             onClick={() => void start()}
@@ -274,13 +502,83 @@ export function SessionGame({
         // Aktive Session: Schritt-Controls + Cashout
         <div className="space-y-3">
           <p className="text-xs text-white/40">{sess.hint}</p>
-          {sess.step.kind === 'guess' && (
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" disabled={busy} onClick={() => void step({ guess: 'higher' })}
-                className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">Höher</button>
-              <button type="button" disabled={busy} onClick={() => void step({ guess: 'lower' })}
-                className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">Tiefer</button>
+          {costPerStep && (
+            // Kosten-Kopf der laufenden Runde: Preis je Spin, der GESPERRTE
+            // Einsatz als read-only Feld und der Spin-Zähler gegen den Deckel.
+            <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 p-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-semibold text-amber-200">
+                  Jeder Spin kostet erneut den Einsatz
+                </span>
+                <span className="text-[11px] tabular-nums text-amber-100/70">
+                  Spin {spinsUsed}
+                  {maxSpins !== null ? `/${maxSpins}` : ''}
+                </span>
+              </div>
+              <label className="mt-2 block text-[11px] text-amber-100/70">
+                Einsatz je Spin (SOL) — für diese Runde gesperrt
+                <input
+                  value={spinCostText ?? bet}
+                  readOnly
+                  aria-readonly
+                  aria-label="Einsatz je Spin — für diese Runde gesperrt"
+                  className="mt-1 w-full cursor-not-allowed rounded-lg border border-amber-400/30 bg-night px-3 py-2 tabular-nums text-white/70 outline-none"
+                />
+              </label>
+              {spinCostText === null && (
+                <p className="mt-1 text-[10px] text-amber-100/60">
+                  Der Server meldet den Rundeneinsatz nicht — angezeigt ist der zuletzt eingegebene
+                  Wert.
+                </p>
+              )}
             </div>
+          )}
+          {costPerStep && (
+            // Pot und Gesichertes bewusst als ZWEI Zahlen: der Pot ist bei
+            // einem FAIL weg, das Gesicherte nicht. Eine Summe würde genau die
+            // Entscheidung verwischen, um die es in dieser Engine geht.
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg border border-white/10 bg-night px-2 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-white/40">Pot</div>
+                <div className="text-sm font-semibold tabular-nums text-white">{potText}</div>
+                <div className="mt-0.5 text-[10px] text-red-300/60">FAIL nimmt ihn</div>
+              </div>
+              <div className="rounded-lg border border-accent/30 bg-night px-2 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-white/40">Gesichert</div>
+                <div className="text-sm font-semibold tabular-nums text-accent">{securedText}</div>
+                <div className="mt-0.5 text-[10px] text-white/40">
+                  FAIL-immun · zahlt am Rundenende
+                </div>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-night px-2 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-white/40">Cashout jetzt</div>
+                <div className="text-sm font-semibold tabular-nums text-white">
+                  {toSol(view.potentialPayoutLamports)} ◎
+                </div>
+                <div className="mt-0.5 text-[10px] text-white/40">Pot + Gesichertes</div>
+              </div>
+            </div>
+          )}
+          {towerBoard}
+          {sess.step.kind === 'guess' && (
+            <>
+              {guessValue && (
+                <div className="rounded-lg border border-white/10 bg-night py-3 text-center">
+                  <div className="text-2xl font-bold tabular-nums text-white">{guessValue.value}</div>
+                  {guessValue.dice && (
+                    <div className="mt-0.5 text-[11px] text-white/40">
+                      {guessValue.dice.join(' + ')}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" disabled={busy} onClick={() => void step({ guess: 'higher' })}
+                  className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">Höher</button>
+                <button type="button" disabled={busy} onClick={() => void step({ guess: 'lower' })}
+                  className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">Tiefer</button>
+              </div>
+            </>
           )}
           {idxStep && bounds && (
             <div>
@@ -347,16 +645,19 @@ export function SessionGame({
             </div>
           )}
           {sess.step.kind === 'action' && (
+            // Bei `costPerStep` steht der Preis AUF dem Knopf — die eine Stelle,
+            // an der niemand vorbeiklickt.
             <button type="button" disabled={busy} onClick={() => void step({})}
-              className="w-full rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{sess.step.label}</button>
+              className="w-full rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{sess.step.label}
+              {costPerStep ? ` — kostet ${spinCostText ?? bet} ◎` : ''}</button>
           )}
           <button
             type="button"
             onClick={() => void cashout()}
-            disabled={busy || view.steps < 1 || cashoutBlocked}
+            disabled={busy || stepsTaken < 1 || cashoutBlocked}
             className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
           >
-            Cashout {view.steps >= 1 && !cashoutBlocked ? `(${toSol(view.potentialPayoutLamports)} ◎)` : ''}
+            Cashout {stepsTaken >= 1 && !cashoutBlocked ? `(${toSol(view.potentialPayoutLamports)} ◎)` : ''}
           </button>
         </div>
       )}

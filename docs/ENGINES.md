@@ -8,7 +8,12 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 
 - **single** — one bet, immediate result (`/api/game/bet`).
 - **session** — progressive: start a round → steps → cash out any time (`/api/game/session/*`). The
-  whole outcome is committed at start (provably-fair).
+  whole outcome is committed at start (provably-fair) and the stake is charged **once, at start** —
+  every step after that is free. **One exception: `spin-tower-pro`, where every step costs the
+  stake again** (and only the seed commitment is fixed at start — the roll for spin *i* is derived
+  at that spin) — see [Pay-per-spin](#pay-per-spin-spin-tower-pro) below. It is still the `session`
+  mechanic (same routes, same flow); the engine definition just carries
+  `session.costPerStep: true`.
 - **tournament** — pot-based highscore runs (`/api/game/tournament/*`): a fixed entry fee per run
   goes into the cycle pot; the run itself pays nothing. Players collect a score (all rolls are
   pre-committed at enter, provably-fair); at cycle end the pot is paid out 100% to the top ranks.
@@ -45,8 +50,10 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `slots-3x3` | slot | ✓ | | `{}` |
 | `slots-modular` | slot | ✓ | | `{}` |
 | `towers` | chain | | ✓ | — (session) |
+| `dice-ladder` | chain | | ✓ | — (session) |
 | `pump` | curve | | ✓ | — (session) |
 | `steps` | chain | | ✓ | — (session) |
+| `spin-tower-pro` | chain | | ✓ | — (session; **every spin costs the stake again**) |
 | `gauntlet` | tournament | | | — (tournament) |
 | `live-odds` | live | | | — (live; outcomes/odds from `/live/state`) |
 | `pvp-coinflip` | pvp | | | — (pvp; lobby → ready-check → server draw for the pot) |
@@ -59,8 +66,79 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `mines` | `{ tile: 0–(gridSize−1) }` |
 | `towers` | `{ column: 0–(columns−1) }` |
 | `hilo` | `{ guess: "higher"\|"lower" }` (a tie loses; ends after 20 steps) |
+| `dice-ladder` | `{ guess: "higher"\|"lower" }` on the next **dice sum** (a tie loses unless the game sets `tieRule: "win"`; ends after `config.maxSteps`, default 15) |
 | `pump` | `{}` (just pump again) |
 | `steps` | `{}` (one climb attempt). Note: `SessionView.steps` counts climb ATTEMPTS for this engine — the current rung is `progress.currentStep` and remaining lives are `progress.livesLeft`; the ladder (`ladderBps`), `checkpoints`, `lives` and `dropMode` arrive via the resolved engine config |
+| `spin-tower-pro` | `{}` (just spin again) — **but this step is charged**, see below |
+
+<a id="pay-per-spin-spin-tower-pro"></a>
+## Pay-per-spin (`spin-tower-pro`) — read this before you re-skin it
+
+**This is the only engine where a step costs money.** Every other engine in this template — including
+every other `session` engine — debits the stake exactly once, when the round starts; every step after
+that just uncovers an outcome that was already committed. `spin-tower-pro` breaks that assumption:
+
+> **Every spin costs the full stake again, and from the first spin the stake is locked for the whole
+> round.** A round is N *paid* spins, not one paid start plus N free reveals.
+
+If you re-skin this engine, the per-spin price and the stake lock must stay visible. That is a
+product requirement, not a style preference: a player who carries the "steps are free" habit over
+from `mines`/`pump` will spend far more than intended. The generic UI
+(`src/components/SessionGame.tsx`) already does it, keyed on `session.costPerStep` in
+`src/lib/engines.ts` — never on the engine key:
+
+- the stake field is labelled **"Einsatz JE SPIN"** and becomes **read-only** for the whole running
+  round (so from `steps >= 1` it can no longer be changed),
+- the spin button carries the price (`Spin — kostet X ◎`),
+- the start screen states the worst case: `maxSpins × stake` if you play the round to the cap,
+- the spin counter runs against `maxSpins`.
+
+### Pot vs. Secured — two figures, never one
+
+| Figure | What it is | Survives a FAIL? | Paid |
+|---|---|:---:|---|
+| **Pot** | sum of the multipliers of the **currently** reached tower levels | **no** | on cash-out / round end |
+| **Secured** | what a maxed-out tower already paid out | **yes — FAIL-immune** | at **round end**, not per spin |
+
+Cash-out is possible from spin 1 and pays **Pot + Secured**. Never render these as a single number:
+the whole decision in this engine is "is my pot worth another paid spin?", and merging them hides it.
+"Secured" being FAIL-immune does **not** mean it lands on the balance immediately — it is paid with
+the one final settlement (a per-spin credit would collide with the round's refund protection).
+
+### One spin, one outcome
+
+The creator configures T towers (2–5), each with 2–8 levels and a strictly increasing multiplier per
+level. One spin draws exactly one outcome from a weighted table:
+
+| Outcome | Effect |
+|---|---|
+| tower *t*, below max | tower *t* climbs one level |
+| tower *t*, **at max** | pays its top multiplier as **secured**; the tower stays at max |
+| joker | every tower below max climbs; every tower at max secures its top multiplier |
+| nothing | nothing |
+| FAIL, `failMode: 'reset'` | all levels to 0, **round ends** |
+| FAIL, `failMode: 'stepdown'` | every tower drops one level (floor 0), **round continues** |
+
+A maxed tower keeps counting in the pot even though it already paid — it stays on its level. The
+round also ends by itself at `maxSpins` or when the configured session return cap is reached (that
+one pays out in full).
+
+### Config echo + progress
+
+`engineConfig` (from `GET /api/meta`, and `engine.config` in every `SessionView`) carries the resolved
+engine: `towers: [{ levels, multipliersBps }]`, `jokerEnabled`, `failMode`, `maxSpins`,
+`maxSessionReturnBps`, `maxPotBps`, `outcomeKinds` and `probsBps` (the **played** probabilities in bps,
+summing to 10000 — never normalise the raw weights yourself). Read the `towers` array **defensively**
+(`Array.isArray`, `typeof x === 'number'`): the shared `EngineConfig` type is `Record<string, number>`,
+so this field is accessed through `unknown` — same care as towers' `floors` / `bombColumns`.
+
+The running round adds, optionally (older API builds omit them — always fall back, never assume):
+`spinCostLamports`, `potLamports`, `securedLamports`, `spins`, `maxSpins` on the `SessionView`, plus
+`levels: number[]` and `securedBps` in `progress`.
+
+Provably fair as usual: one server seed per round, committed at start, revealed at the end; spin *i*
+consumes roll index *i−1*. The outcome order is fixed — tower 0…T−1, joker, nothing, FAIL — and a
+disabled joker stays in the table as a zero-width edge so the indices never shift.
 
 ## Tournament steps (`gauntlet`)
 
@@ -170,6 +248,7 @@ in `lib/engines.ts`). Never hardcode the old fixed values (0–100, 1–13, unif
 | `dice` | target slider/input range | `boundsFrom`: `[config.rangeMin ?? 0, config.rangeMax ?? 100]` (both always echoed by the server, even at their defaults) |
 | `limbo` | target multiplier input | floor is always `config.minTargetBps` (default 1.00×, always echoed); ceiling only appears if the creator set `config.maxTargetBps` |
 | `hilo` | — | session only; the card is dealt by the game, not entered by the player |
+| `dice-ladder` | current-sum display + odds | `config.sumCounts` (combinations per sum, index 0 = sum `config.dice`) — the server echoes the exact distribution it prices with, so never recompute it client-side |
 | `keno` | number picker | `[1, config.pool ?? 40]` instead of the old fixed 1–40 |
 | `roulette` | straight-bet value picker | `[0, pocketCount − 1]`, where `pocketCount` is 37 (european) or 38 (american) from `config.wheelType` |
 | `plinko` | ball-count select (`params.balls`) | options are filtered to what's ≤ `config.maxBalls` (1/3/10/100); the whole control is hidden when `maxBalls` is 1 (the default) |
@@ -198,7 +277,9 @@ shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
 | `slots-3x3` | — (spin) | centre line: triple/pair pays | top triple of the reel |
 | `slots-modular` | — (spin) | up to 20 lines pay 3/4/5-of-a-kind left-to-right (wild substitutes); 3+ scatters pay anywhere; all hits of a spin sum | `lineCount·maxPay + scatterMax` (conservative bound) |
 | `towers` | one column per floor (2–4, from config) | each safe floor multiplies; bomb = loss; cash out any time | `(1−edge)·(c/(c−1))^levels` |
+| `dice-ladder` | higher/lower on the next dice sum | sums are **not** uniform (2d6: a 7 is six times likelier than a 2), so the same guess pays differently on every sum; right guess grows the multiplier, tie/wrong = loss | `config.maxWinBps` (chain ceiling, default 100×) — guesses that would overshoot it are rejected, the payout is never truncated |
 | `pump` | pump again or cash out | each pump grows the multiplier; burst = loss | `growth^maxPumps` |
+| `spin-tower-pro` | spin again or cash out — **each spin costs the stake again**, and the stake is locked from spin 1 | one outcome per spin: a tower climbs, a maxed tower pays its top multiplier as **secured** (FAIL-immune, paid at round end), joker climbs/secures everything, nothing, or FAIL (all levels to 0 and the round ends, or one level down and it continues). Cash-out from spin 1 pays **pot + secured**; the round ends at the latest at `maxSpins` | session return cap (`maxSessionReturnBps`) — the cap ends the round and pays out in full |
 | `gauntlet` | a risk tier per step, bank in time | entry feeds the pot; bust zeroes the run; best score per wallet ranks — top ranks split the pot at cycle end | pot share of rank 1 |
 
 ## Roulette `betType`
@@ -265,6 +346,8 @@ from the server's `details.grid`; the column stagger is a pure reveal animation,
 
 - **Multiplier** in basis points: `10000 = 1×`.
 - **Money** always as lamport-strings (1 SOL = 1e9).
+- **The stake is charged once per round — except `spin-tower-pro`, where every spin is charged.**
+  Detect it via `engine.session?.costPerStep`, never by hardcoding the engine key.
 - Session rules (bust, auto-cashout, 15-minute timeout) — see `API-REFERENCE.md`.
 - Which engine your game runs is fixed by the **creator when the game is registered** — the `.env`
   here must match it.

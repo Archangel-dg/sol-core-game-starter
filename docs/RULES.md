@@ -40,6 +40,7 @@ payout-ready game — automatically.
 ## Off-limits files (they work — don't rebuild them)
 
 `app/api/*` · `lib/solcore.ts` · `lib/config.ts` · `lib/lamports.ts` · `lib/errors.ts` ·
-`lib/engines.ts` · `lib/player-program.ts` · `lib/player-auth.ts` · `components/Providers.tsx`
+`lib/engines.ts` · `lib/player-program.ts` · `lib/player-auth.ts` · `lib/crash-math.ts` ·
+`components/Providers.tsx`
 
 They carry the `// ⚠ Nicht ändern — Systemvertrag` (do-not-edit / system-contract) marker.

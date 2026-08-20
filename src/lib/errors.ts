@@ -32,6 +32,44 @@ const MAP: Record<string, Omit<UiError, 'code'>> = {
   // 'lock' statt 'retry', analog zu API-303/API-201/202.
   'API-402': { message: 'Sitzung ungültig oder abgelaufen — bitte Wallet neu verbinden.', action: 'lock' },
   'API-500': { message: 'Serverfehler — bitte erneut versuchen.', action: 'retry' },
+
+  // ── Live-Crash-Schicht (API-820…827) ───────────────────────────────────
+  // Ohne diese Zeilen fällt `toUiError` auf den Rohtext des Servers zurück
+  // und der Spieler liest „API-823: …" mitten im Flug. Alle acht sind
+  // deterministische Zustandsaussagen, kein transientes Problem: ein
+  // Wiederholen desselben Klicks ändert nichts, deshalb 'info' statt
+  // 'retry' — mit einer Ausnahme (API-820, s. u.).
+  //
+  // Ausdrücklich KEIN 'lock': anders als API-201/202 sperrt keiner dieser
+  // Fälle das Spiel. Die nächste Runde öffnet in Sekunden, und der Spieler
+  // soll den Einsatzknopf dafür behalten.
+  'API-820': {
+    // Einziger Fall mit 'retry': die Runden-ID ist veraltet (der Poll hinkt
+    // bis zu einer Sekunde hinterher). Der nächste Zustand bringt eine
+    // gültige — ein erneuter Versuch ist hier tatsächlich sinnvoll.
+    message: 'Diese Runde gibt es nicht mehr — der nächste Flug wird gleich geladen.',
+    action: 'retry',
+  },
+  'API-821': {
+    message: 'Das Wettfenster ist zu — diese Runde fliegt bereits. Die nächste kommt gleich.',
+    action: 'info',
+  },
+  'API-822': { message: 'Du hast in dieser Runde keine offene Wette.', action: 'info' },
+  'API-823': { message: 'Zu spät — die Runde ist bereits gecrasht.', action: 'info' },
+  'API-824': {
+    message:
+      'Auto-Ausstieg außerhalb des erlaubten Bereichs — über 1.00× und höchstens bis zum Deckel dieses Spiels.',
+    action: 'info',
+  },
+  'API-825': { message: 'Diese Wette ist bereits abgerechnet.', action: 'info' },
+  'API-826': {
+    message: 'Du fliegst in dieser Runde schon mit — es gilt eine Wette pro Runde.',
+    action: 'info',
+  },
+  'API-827': {
+    message: 'Diese Runde fliegt gerade nicht — Aussteigen geht nur im Flug.',
+    action: 'info',
+  },
 };
 
 export function toUiError(

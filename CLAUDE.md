@@ -24,7 +24,7 @@ API. All engines are supported; the active engine comes from `NEXT_PUBLIC_ENGINE
 
 `src/app/api/*`, `src/lib/solcore.ts`, `src/lib/config.ts`, `src/lib/lamports.ts`,
 `src/lib/errors.ts`, `src/lib/engines.ts`, `src/lib/player-program.ts`, `src/lib/player-auth.ts`,
-`src/components/Providers.tsx`.
+`src/lib/crash-math.ts`, `src/components/Providers.tsx`.
 
 These carry a do-not-edit / system-contract marker (`// ⚠ Nicht ändern — Systemvertrag`). Change
 them only if the user explicitly asks and you are certain the contract with the server is preserved.
@@ -53,7 +53,9 @@ them only if the user explicitly asks and you are certain the contract with the 
 Live-specific contract additions: `src/lib/balance-freeze.tsx` and the freeze wiring in
 `BalanceBar` are system contract — they keep the balance display from leaking a live result
 mid-animation (the server credits winners at the draw). Never remove them, never show live win/loss
-before the reveal window ends.
+before the reveal window ends. Exception, already wired in `app/page.tsx`: `live-crash` runs on play
+money and therefore shows a play-money note instead of `BalanceBar` — a real-money deposit could
+never be spent in that game. The freeze wiring stays; only that one engine skips the bar.
 
 ## Before every commit
 

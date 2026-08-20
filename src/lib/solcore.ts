@@ -545,6 +545,112 @@ export function liveRound(roundId: string): Promise<LiveRoundInfo> {
   return request<LiveRoundInfo>(`/api/game/live/round/${roundId}`);
 }
 
+// ── Live-Crash-Schicht (geteilter Flug auf einem Stream: live-crash, Etappe 2 —
+// NUR Spielgeld) ────────────────────────────────────────────────────────────
+// state/round sind apiKeyAuth-only, Sekunden-Poll — Präzedenz `/live/state`.
+// demo-bet/demo-cashout sind es EBENFALLS: der Server verlangt hier (noch)
+// KEINE Spieler-Sitzung (Kommentar bei `/live-crash/*` in `routes/game.ts`:
+// "NIE requirePlayerSession, sonst hängt der Client unter enforce, Vorfall
+// c3a2f31"). Deshalb tragen die Funktionen unten bewusst KEIN `playerToken`-
+// Argument und die Proxy-Routen rufen NICHT `moneyFetch` — anders als bei
+// `/live/bet`. Etappe 3 (Echtgeld) macht demo-bet/-cashout zu Geld-Routen;
+// erst dann bekommen Server-Route, Client-Funktion, Proxy-Route und
+// Browser-Aufruf hier die Session-Bindung wie `liveBet`.
+
+export interface CrashRoundView {
+  roundId: string;
+  streamId: string;
+  roundNo: number;
+  status: 'betting' | 'flying' | 'crashed' | 'settled' | 'void';
+  opensAt: string;
+  locksAt: string;
+  takeoffAt: string | null;
+  crashedAt: string | null;
+  serverSeedHash: string;
+  clientSeed: string;
+  /** Erst ab `crashed`/`settled`. */
+  serverSeed: string | null;
+  crashMultiplierBps: number | null;
+}
+
+export interface CrashPlayerView {
+  /** Gekürzt — die volle Wallet geht nie an fremde Spieler. */
+  wallet: string;
+  betLamports: string;
+  /** Gesetzt, sobald der Spieler ausgestiegen ist. */
+  cashoutMultiplierBps: number | null;
+  status: 'placed' | 'cashed' | 'won' | 'lost';
+}
+
+export interface CrashStateView {
+  stream: { id: string; displayName: string };
+  round: CrashRoundView | null;
+  players: CrashPlayerView[];
+  curve: { doubleMs: number };
+  /**
+   * Der Deckel des Creators — die Obergrenze, bis zu der eine Wette DIESES
+   * Spiels ausgezahlt wird. Der Server rechnet beim Cashout
+   * `min(Kurvenstand, effectiveTargetBps(Deckel, Sicherheitsziel))`; ohne
+   * diesen Wert könnte die Oberfläche nur den Kurvenstand behaupten und würde
+   * bei niedrigem Deckel regelmäßig zu viel versprechen.
+   *
+   * Optional, weil ein Starter auch gegen einen älteren API-Stand laufen
+   * kann; `ceilingBps: null` bedeutet „Deckel unbekannt" und die Anzeige
+   * nennt dann keine Zahl (siehe `cashoutDisplayBps` in `lib/crash-math.ts`).
+   */
+  config?: { ceilingBps: number | null };
+  /** Server-Uhr — Basis für die Kurven-Animation (siehe `crashServerTimeIso`). */
+  serverTime: string;
+}
+
+export interface CrashDemoBetView {
+  betId: string;
+  reservedPayoutLamports: string;
+}
+
+export interface CrashDemoCashoutView {
+  multiplierBps: number;
+  payoutLamports: string;
+}
+
+/** Zustand des Plattform-Flugs. Ohne streamId — es gibt genau einen (Etappe 2). */
+export function liveCrashState(): Promise<CrashStateView> {
+  return request<CrashStateView>('/api/game/live-crash/state');
+}
+
+export function liveCrashRound(roundId: string): Promise<CrashRoundView> {
+  return request<CrashRoundView>(`/api/game/live-crash/round/${roundId}`);
+}
+
+/**
+ * Spielgeld-Einsatz (Etappe 2). `gameId` ist ABSICHTLICH kein Feld: der
+ * Server nimmt sie aus dem API-Key-Kontext (`req.game.id`), NIE aus dem Body
+ * — dieselbe Regel wie bei `crashDemoBetSchema` in `routes/game.ts`
+ * (Präzedenz `/authorize`, `/bet`). Kein `playerToken`-Parameter: die Route
+ * ist apiKeyAuth-only, siehe Abschnitts-Kommentar oben.
+ */
+export function liveCrashBet(body: {
+  roundId: string;
+  playerWallet: string;
+  betLamports: string;
+  safetyTargetBps?: number | null;
+}): Promise<CrashDemoBetView> {
+  return request<CrashDemoBetView>('/api/game/live-crash/demo-bet', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function liveCrashCashout(body: {
+  roundId: string;
+  playerWallet: string;
+}): Promise<CrashDemoCashoutView> {
+  return request<CrashDemoCashoutView>('/api/game/live-crash/demo-cashout', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 // ── PvP-Schicht (Lobby → Ready-Check → Lock-Debit → Server-Draw: pvp-coinflip) ─
 // Alle wallet-gebundenen Aktionen (create/join/leave/kick/ready/unready/stake/
 // chat) tragen ein Spieler-Token (wie /bet). WICHTIG: `pvpLobbyState` ist

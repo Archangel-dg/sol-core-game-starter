@@ -27,7 +27,10 @@ Binding rules:
 2. The winner must stand at `revealProgress = 1` at the latest; end your animation no later.
 3. Results come only from the props (the server) — never derive or guess them client-side.
 4. Don't remove the balance-freeze wiring (`lib/balance-freeze.tsx` + `BalanceBar`): it keeps the
-   balance display from spoiling the result mid-animation.
+   balance display from spoiling the result mid-animation. One deliberate exception, already wired
+   in `app/page.tsx`: `live-crash` plays on **play money** and shows a play-money note in place of
+   `BalanceBar`, because a real-money deposit could never be spent in that game. The freeze wiring
+   itself stays — only that one engine skips the bar.
 
 ## Build your own engine visuals
 

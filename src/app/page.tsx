@@ -10,6 +10,7 @@ import { SessionGame } from '@/components/SessionGame';
 import { TournamentGame } from '@/components/TournamentGame';
 import { DemoTournamentGame } from '@/components/DemoTournamentGame';
 import { LiveGame } from '@/components/LiveGame';
+import { LiveCrashGame } from '@/components/LiveCrashGame';
 import { PvpGame } from '@/components/PvpGame';
 import { DemoPvpGame } from '@/components/DemoPvpGame';
 import { DiceDuelGame } from '@/components/DiceDuelGame';
@@ -173,12 +174,42 @@ function HomeInner({ meta }: { meta: Meta | null }) {
             {/* Demo-Einstieg / -Saldo. Im Demo-Modus zählt die simulierte Wallet.
                 Live-Runden laufen immer echt — dort gibt es keinen Demo-Modus. */}
             {meta.mechanic !== 'live' && <DemoBar />}
-            {(!demo || meta.mechanic === 'live') && <BalanceBar devMock={meta.devMock} />}
+            {/* Crash spielt in dieser Etappe AUSSCHLIESSLICH gegen
+                `live_crash_demo_balances` — ein Spielgeld-Konto, das mit dem
+                Plattform-Guthaben der Wallet nichts zu tun hat. Die
+                BalanceBar mit ihrem On-Chain-„Einzahlen" gehört deshalb hier
+                nicht hin: eingezahltes SOL käme nie in diesem Spiel an, die
+                Gebühr wäre trotzdem bezahlt. Statt einer Bilanz, die sich nie
+                bewegt, steht hier der ehrliche Hinweis. Eine Anzeige des
+                Spielgeld-Kontos gibt es bewusst nicht — dafür fehlt eine
+                Leseroute (Etappe 3). Jede andere Engine behält ihre
+                BalanceBar unverändert. */}
+            {engine.key === 'live-crash' ? (
+              <div className="rounded-xl border border-amber-400/40 bg-amber-400/[0.08] p-4 text-sm text-amber-100">
+                <strong>Spielgeld — kein echtes Geld.</strong>
+                <br />
+                Dieses Spiel läuft ausschließlich mit Spielgeld: Einsätze und Gewinne bewegen ein
+                Übungs-Guthaben auf dem Server. Es wird nichts eingezahlt und nichts ausgezahlt.
+                <br />
+                <span className="text-xs text-amber-100/80">
+                  Deshalb steht hier weder ein Wallet-Guthaben noch ein Einzahlen-Knopf — eine
+                  Einzahlung wäre in diesem Spiel nicht verwendbar.
+                </span>
+              </div>
+            ) : (
+              (!demo || meta.mechanic === 'live') && <BalanceBar devMock={meta.devMock} />
+            )}
 
             {meta.mechanic === 'live' ? (
-              // Live bringt Countdown/Runden/Ergebnis-Ticker selbst mit —
-              // Verify läuft über /api/game/live/verify/:roundId.
-              <LiveGame engine={engine} />
+              engine.key === 'live-crash' ? (
+                // Crash bringt seinen eigenen geteilten Flug mit (Etappe 2:
+                // nur Spielgeld) — Verify läuft über /api/live-crash/round/:id.
+                <LiveCrashGame engine={engine} />
+              ) : (
+                // Live bringt Countdown/Runden/Ergebnis-Ticker selbst mit —
+                // Verify läuft über /api/game/live/verify/:roundId.
+                <LiveGame engine={engine} />
+              )
             ) : meta.mechanic === 'tournament' ? (
               // Turnier bringt Countdown/Pot/Leaderboard/Proof selbst mit —
               // Verify läuft über /api/game/tournament/verify/:runId.

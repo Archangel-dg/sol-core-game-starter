@@ -514,6 +514,22 @@ export const ENGINES: EngineDef[] = [
     },
   },
   {
+    key: 'live-crash',
+    label: 'Live Crash',
+    category: 'Live',
+    mechanics: ['live'],
+    blurb: 'Ein geteilter Flug: alle sehen dieselbe steigende Kurve — wer zu spät aussteigt, verliert.',
+    playerFacts: {
+      inputs:
+        'Vor dem Start Einsatz setzen, optional ein Sicherheitsziel. Während der Flug läuft, jederzeit per Klick aussteigen. Eine Wette pro Runde.',
+      outcomes:
+        'Die Kurve steigt, bis sie platzt — der Crash-Punkt ist für alle Spieler derselbe und steht vor dem Wettfenster fest (Hash committed, nach der Runde nachrechenbar). Wer rechtzeitig aussteigt, bekommt Einsatz × angezeigtem Multiplikator; wer zu spät klickt, verliert den Einsatz.',
+    },
+    live: {
+      hint: 'Einsatz setzen, Kurve steigen lassen, rechtzeitig aussteigen — der Crash-Punkt gilt für alle gleich.',
+    },
+  },
+  {
     key: 'pvp-coinflip',
     label: 'PvP Coin Flip',
     category: 'PvP',

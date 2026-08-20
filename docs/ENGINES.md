@@ -56,6 +56,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `spin-tower-pro` | chain | | ✓ | — (session; **every spin costs the stake again**) |
 | `gauntlet` | tournament | | | — (tournament) |
 | `live-odds` | live | | | — (live; outcomes/odds from `/live/state`) |
+| `live-crash` | live | | | — (live; shared flight, cash out mid-round — **demo money only**, see below) |
 | `pvp-coinflip` | pvp | | | — (pvp; lobby → ready-check → server draw for the pot) |
 | `pvp-dice-duel` | pvp | | | — (pvp; lobby → ready-check → turn-based Farkle for the pot) |
 
@@ -172,6 +173,44 @@ state payload — never trust the device clock). Multiple bets per player per ro
 **The result is credited server-side at the draw** — the reveal is pure theater. The template's
 balance-freeze hook (`lib/balance-freeze.tsx`) holds the displayed balance during the reveal so a
 background poll can't spoil the winner; never remove it.
+
+## Crash rounds (`live-crash`)
+
+**Demo money only at this stage.** `platform_engines.real_money_enabled` for `live-crash` is
+`false` (the table is a fail-closed allowlist — a missing or `false` row means no real money moves,
+see `migrations/024_platform_engines.sql`). The two money routes are `apiKeyAuth`-only with **no
+player-token binding** (`src/app/api/live-crash/bet/route.ts`, `.../cashout/route.ts`) — the client
+uses plain `fetch`, never `usePlayerAuth().moneyFetch`. On the Sol-Core Gaming API itself these are
+literally named `demo-bet` / `demo-cashout`. A later stage turns real money on for this engine and
+adds the session binding; until then, do not build anything here that implies a player can win or
+lose real SOL.
+
+Flow: poll `GET /live-crash/state` (1 s) for the shared round, the shared player list, the server
+clock offset (`serverTime`, same clock-offset pattern as `live-odds`), and `config.ceilingBps` —
+the creator's own ceiling, i.e. the highest multiplier a bet in this game is ever paid at. The
+ceiling is what lets the client state a cash-out figure the server will actually honor; the shared
+rules for that live in `src/lib/crash-math.ts` (system contract, mirrored from the server) → during
+`betting`,
+place **one bet per player per round** (`POST /live-crash/bet` with `{ roundId, playerWallet,
+betLamports, safetyTargetBps? }`) → once the round is `flying`, the curve is drawn **locally in the
+browser** from the shared `takeoffAt` and `curve.doubleMs` — every client computes the same
+`multiplier = 2^(elapsed / doubleMs)`, so two browsers on the same round draw the same picture
+without the server pushing intermediate values → cash out any time during the flight with `POST
+/live-crash/cashout`; the response carries the multiplier and payout the server actually credited,
+never the number the button happened to be showing. After the round reaches `crashed`, `GET
+/live-crash/round/:id` reveals the server seed and the crash multiplier for that round.
+
+Round states: `betting → flying → crashed → settled` (or `void` = refunded). The crash point is
+**shared** — every player in a round flies the same curve and crashes at the same point — and it is
+**pre-committed**: the server seed's hash is published before the betting window opens, and once a
+round is `crashed`/`settled` it is fully reproducible from the published seeds (`proofSchema:
+'crash_reproducible_v1'`, see `src/services/live-crash-public.ts` on the API side for exactly what
+is public at each stage — nothing about the crash point is derivable before it happens).
+
+★ **The design zone is `CrashCurveView.tsx`.** Read its own header comment before touching it — it
+states the three binding fairness rules (the curve is a pure function of elapsed flight time, no
+`Math.random()` anywhere, and the crash point must never be visible or hinted before the crash).
+Everything else in that file — colors, shapes, motion, layout — is yours to re-skin freely.
 
 ## PvP rounds (`pvp-coinflip`)
 

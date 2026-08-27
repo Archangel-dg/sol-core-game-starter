@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { gameConfig, health } from '@/lib/solcore';
 import { publicConfig, serverConfig } from '@/lib/config';
+import { SOLANA_NETWORK, PROGRAM_ID_STRING, rpcHost } from '@/lib/solana';
 
 /**
  * Boot-Info: Spielname, Engine/Mechanik, devMock-Flag, gameId — plus die
@@ -40,7 +41,15 @@ export async function GET() {
       // /health liefert kein network mehr (keine Betriebsdetails öffentlich) —
       // das Netzwerk kommt aus der eigenen Env, gleiche Quelle und gleicher
       // Devnet-Fallback wie der RPC-Endpoint in `Providers.tsx`.
-      network: process.env.NEXT_PUBLIC_SOLANA_NETWORK ?? 'devnet',
+      network: SOLANA_NETWORK,
+      // Womit das Frontend WIRKLICH auf die Kette geht. Das Netz allein genuegt
+      // nicht: NEXT_PUBLIC_SOLANA_NETWORK auf mainnet-beta zu stellen und die
+      // Programm-ID zu vergessen ergibt ein Spiel, das sich als Mainnet
+      // ausweist und trotzdem gegen ein totes Programm signiert. Beides ist
+      // oeffentlich (steht im Browser-Bundle); der RPC nur als Host, weil in
+      // der vollen URL meist der Schluessel steckt.
+      programId: PROGRAM_ID_STRING,
+      rpcHost,
       engineConfig: cachedEngine?.engineConfig ?? null,
       serverMode,
       // Das Spiel ist auf dem Server als andere Engine registriert als die

@@ -14,7 +14,7 @@ Built with **Next.js (App Router) + TypeScript + Tailwind**. Deployable on Verce
 
 ## Deploy without code
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FArchangel-dg%2Fsol-core-game-starter&env=SOLCORE_API_KEY,SOLCORE_GAME_ID,NEXT_PUBLIC_GAME_NAME,NEXT_PUBLIC_ENGINE,NEXT_PUBLIC_MECHANIC&envDescription=Values%20from%20your%20Sol-Core%20dashboard%20(create%20game%20%E2%86%92%20key%20card)&envLink=https%3A%2F%2Fsol-core.com%2Fhow-to-use%3Fstep%3D3%26path%3Deasy&project-name=my-sol-core-game)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FArchangel-dg%2Fsol-core-game-starter&env=SOLCORE_API_KEY,SOLCORE_GAME_ID,NEXT_PUBLIC_GAME_NAME,NEXT_PUBLIC_ENGINE,NEXT_PUBLIC_MECHANIC,NEXT_PUBLIC_SOLANA_RPC,NEXT_PUBLIC_SOLANA_NETWORK,NEXT_PUBLIC_PROGRAM_ID&envDescription=From%20your%20Sol-Core%20dashboard%20(create%20game%20%E2%86%92%20key%20card).%20The%20three%20SOLANA%20values%20decide%20WHICH%20NETWORK%20your%20game%20pays%20on%20%E2%80%94%20get%20them%20from%20the%20dashboard%20too.&envLink=https%3A%2F%2Fsol-core.com%2Fhow-to-use%3Fstep%3D3%26path%3Deasy&project-name=my-sol-core-game)
 
 No terminal needed: create your game in the [Sol-Core dashboard](https://sol-core.com/dashboard)
 (gives you the 5 values), click the button, paste, deploy. Guided walkthrough:

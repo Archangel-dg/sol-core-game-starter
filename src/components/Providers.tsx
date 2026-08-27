@@ -4,8 +4,8 @@ import { useMemo, type ReactNode } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import type { Adapter } from '@solana/wallet-adapter-base';
-import { clusterApiUrl } from '@solana/web3.js';
 import '@solana/wallet-adapter-react-ui/styles.css';
+import { SOLANA_RPC_URL } from '../lib/solana';
 
 /**
  * ⚠ Nicht ändern — Systemvertrag.
@@ -13,7 +13,11 @@ import '@solana/wallet-adapter-react-ui/styles.css';
  * Wallets (Phantom, Solflare, …) melden sich per Wallet-Standard automatisch an.
  */
 export function Providers({ children }: { children: ReactNode }) {
-  const endpoint = process.env.NEXT_PUBLIC_SOLANA_RPC ?? clusterApiUrl('devnet');
+  // Der RPC kommt aus solana.ts — mit derselben Pruefung wie Netz und
+  // Programm-ID. Ein Rueckfall auf Devnet an dieser Stelle waere still: Das
+  // Spiel baut eine Verbindung zum falschen Netz auf, sieht normal aus, und
+  // jede Einzahlung geht ins Leere.
+  const endpoint = SOLANA_RPC_URL;
   const wallets = useMemo<Adapter[]>(() => [], []);
   return (
     <ConnectionProvider endpoint={endpoint}>

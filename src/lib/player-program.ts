@@ -10,10 +10,15 @@ import {
   TransactionInstruction,
   type Connection,
 } from '@solana/web3.js';
+import { PROGRAM_ID_STRING } from './solana';
 
-export const PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_PROGRAM_ID ?? '8R7PfDa6FYVZdYgg7mGD8kfXNRN66M9VenLjP1t2qaoG',
-);
+// Die Programm-ID kommt aus solana.ts — dort zusammen mit RPC und Netz, und
+// dort mit der Pruefung, die einen Production-Build ohne gesetzte Env abbricht.
+// Vorher stand hier ein stiller Fallback auf die DEVNET-ID. Wer dieses Template
+// auf Mainnet betreibt und eine der drei NEXT_PUBLIC_SOLANA_*-Variablen
+// vergisst, baut sonst ein Spiel, das gegen ein nicht existierendes Programm
+// signiert — sichtbar erst, wenn ein Spieler einzahlen will.
+export const PROGRAM_ID = new PublicKey(PROGRAM_ID_STRING);
 
 // sha256("global:player_deposit")[0..8]
 const DISC_PLAYER_DEPOSIT = Uint8Array.from([64, 80, 109, 194, 32, 200, 22, 6]);

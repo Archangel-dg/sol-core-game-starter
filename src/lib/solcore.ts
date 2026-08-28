@@ -1189,6 +1189,14 @@ export interface BetLimitsView {
     dailyPayoutLamports: string | null;
   };
   /** Ab diesem Einsatz ginge ein Gewinn in die Pruefung (Halte-Modus). */
+  /**
+   * true = der genaue Deckel haengt an einer Entscheidung IN der Runde
+   * (welcher Ausgang, welches Sicherheitsziel). Die Zahl ist dann eine
+   * OBERGRENZE, kein Versprechen: erlaubt kann weniger sein, nie mehr.
+   *
+   * Fehlt das Feld (aelterer API-Stand), zaehlt das als `false`.
+   */
+  roundDependent?: boolean;
   payoutHoldAboveLamports: string | null;
   /** false = gerade gar nicht spielbar (Grenze auf 0). */
   playable: boolean;

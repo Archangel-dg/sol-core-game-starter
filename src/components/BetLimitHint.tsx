@@ -45,11 +45,15 @@ export function BetLimitHint({
 
   const maxAnzeige = maxBetText(maxSol);
   const gesperrt = !daten.playable || maxSol <= 0;
+  // Bei rundenabhaengigen Engines (Live, Crash) haengt der genaue Deckel an
+  // einer Entscheidung, die erst beim Setzen faellt. Dann ist die Zahl eine
+  // Obergrenze — und das muss dastehen, sonst ist sie wieder ein Versprechen.
+  const obergrenze = daten.roundDependent === true;
 
   return (
     <div className={`text-xs ${className}`}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-white/50">Max. Einsatz jetzt</span>
+        <span className="text-white/50">{obergrenze ? 'Max. Einsatz bis zu' : 'Max. Einsatz jetzt'}</span>
         {gesperrt ? (
           <span className="font-semibold text-rose-300">gerade nicht spielbar</span>
         ) : onPick ? (
@@ -115,6 +119,7 @@ export function MaxBetPick({
   }
 
   const maxAnzeige = maxBetText(maxSol);
+  const obergrenze = daten.roundDependent === true;
   return (
     <button
       type="button"
@@ -122,7 +127,7 @@ export function MaxBetPick({
       title={daten.text}
       className={`shrink-0 text-[11px] font-semibold tabular-nums text-accent underline decoration-dotted underline-offset-2 hover:text-accent/80 ${className}`}
     >
-      {label} ◎ {maxAnzeige}
+      {obergrenze ? `${label} bis` : label} ◎ {maxAnzeige}
     </button>
   );
 }

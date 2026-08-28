@@ -1,4 +1,5 @@
 'use client';
+import { verifyHref } from './VerifyLink';
 
 /**
  * Provably-Fair-Panel: zeigt den Seed-Hash VOR der Runde und den Verify-Link
@@ -22,9 +23,13 @@ export function FairnessPanel({
   roundId: string | null;
   demo?: boolean;
 }) {
-  const href = demo
-    ? `${apiUrl}/api/game/demo/verify/${roundId}`
-    : `${verifierUrl}/verify/${roundId}`;
+  // Ohne Runde gibt es nichts zu verifizieren — der Link wird unten ohnehin
+  // nur mit `roundId` gerendert; der leere String haelt nur den Typ sauber.
+  const href = !roundId
+    ? ''
+    : demo
+      ? `${apiUrl}/api/game/demo/verify/${roundId}`
+      : verifyHref(verifierUrl, roundId);
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
       <div className="mb-1 uppercase tracking-wide text-white/50">Provably Fair</div>

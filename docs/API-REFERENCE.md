@@ -267,13 +267,48 @@ result shows — the winner is paid even if a tab closed.
   program ID `8R7PfDa6FYVZdYgg7mGD8kfXNRN66M9VenLjP1t2qaoG`), target PDA `player_vault`. The wallet
   signs in the browser (see `lib/player-program.ts`); credited by the indexer in ~5–10s.
 
+## Bet limits (this app: `GET /api/limits`)
+
+Proxies `GET /api/public/games/:gameId/limits` (game id from the server config, never from the
+request) → `{ maxBetLamports, minBetLamports, limitedBy, text, limits{…}, playable }`.
+
+**UI requirement:** show `maxBetLamports` next to the balance (`BetLimitHint`) AND next to every
+bet field (`MaxBetPick`). The allowed bet is the MINIMUM of the game, level, solvency, single- and
+daily-payout caps, and the tightest of them moves during operation — measured 2026-08-28: game and
+level cap 50 SOL each, actually allowed 0.0365 SOL. Without the number a player types blind and
+gets a rejection with no visible reason. `text` is a ready-made sentence from the server; never
+translate the limits yourself, or backend and display drift apart.
+
 ## Provably fair (public, no key)
 
 `GET /api/game/verify/:roundId` → `{ serverSeedHash, serverSeed, clientSeed, nonce, recordedRoll,
-expectedRoll, verified, … }`
-UI requirement: show the hash BEFORE the round, `roundId` + verify link after.
+expectedRoll, verified, … }` — plus the same shape per mechanic:
+`/api/game/pvp/verify/:matchId`, `/api/game/live/verify/:roundId`,
+`/api/game/live-crash/verify/:roundId`, `/api/game/tournament/verify/:runId`.
 
-## Error codes (handle all of them — mapping in `lib/errors.ts`)
+**UI requirement:** show the hash BEFORE the round, and after it a DIRECT link into the Sol-Core
+Scanner for EVERY mechanic. Always build it with `components/VerifyLink.tsx`
+(`<VerifyLink verifierUrl={…} id={roundId} />` or `verifyHref(verifierUrl, id)`), which points at
+`<verifierUrl>/verify/<id>` — the page that recomputes the round in the player's own browser and
+resolves solo rounds, PvP matches, live rounds, crash rounds and tournament runs from the id alone.
+
+Never link at the JSON endpoints above: same data, but a wall of braces instead of a proof. On
+2026-08-28 seven of the nine listed games linked exactly there.
+
+## Error codes (handle all of them — texts come from the SERVER)
+
+`lib/errors.ts` fetches `GET /api/error-catalog` (proxy to `/api/public/error-catalog`) on start and
+overlays the built-in snapshot `lib/error-catalog.generated.ts`
+(regenerate: `npm run sync-error-catalog`). Use `toUiError(code, fallback, reason, details)` — or
+`errorTextIn(lang, …)` where the UI has its own language switch.
+
+`action` tells the UI what to DO without knowing the code: `deposit` · `lock` · `retry` ·
+`cooldown` · `info`. `reasons` splits cases that share one code (API-302: `bankroll_cap` = "bet
+less", `withdraw_daily_limit` = "come back tomorrow").
+
+**Never add a second code→text table of your own.** A list baked into a build cannot stay current —
+on 2026-08-28 no two of the nine listed games showed the same text for the same code, and none of
+them knew the crash block (API-820…827). The table below is the overview, not the source.
 
 | Code | HTTP | Meaning | UI |
 |---|---|---|---|
@@ -286,8 +321,9 @@ UI requirement: show the hash BEFORE the round, `roundId` + verify link after.
 | API-303 | 403 | self-bet (creator wallet) | notice |
 | API-304 | 429 | rate limit | disable button + countdown |
 | API-305 | 402 | **insufficient balance** | deposit dialog |
-| API-400 | 400 | creator fee out of level range (game paused) | lock |
 | API-402 | 401 | player token missing/invalid/expired | reconnect wallet |
+| API-310 | 423 | withdrawals paused (nothing was debited) | notice |
+| API-311 | 400 | below minimum withdrawal (full balance always allowed) | notice |
 | API-500 | 5xx | server error | retry |
 
 PvP-specific (API-7xx): `API-700` lobby not found / not a member · `API-701` full · `API-702`

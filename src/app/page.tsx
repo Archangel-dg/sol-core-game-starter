@@ -174,41 +174,28 @@ function HomeInner({ meta }: { meta: Meta | null }) {
             {/* Demo-Einstieg / -Saldo. Im Demo-Modus zählt die simulierte Wallet.
                 Live-Runden laufen immer echt — dort gibt es keinen Demo-Modus. */}
             {meta.mechanic !== 'live' && <DemoBar />}
-            {/* Crash spielt in dieser Etappe AUSSCHLIESSLICH gegen
-                `live_crash_demo_balances` — ein Spielgeld-Konto, das mit dem
-                Plattform-Guthaben der Wallet nichts zu tun hat. Die
-                BalanceBar mit ihrem On-Chain-„Einzahlen" gehört deshalb hier
-                nicht hin: eingezahltes SOL käme nie in diesem Spiel an, die
-                Gebühr wäre trotzdem bezahlt. Statt einer Bilanz, die sich nie
-                bewegt, steht hier der ehrliche Hinweis. Eine Anzeige des
-                Spielgeld-Kontos gibt es bewusst nicht — dafür fehlt eine
-                Leseroute (Etappe 3). Jede andere Engine behält ihre
-                BalanceBar unverändert. */}
-            {engine.key === 'live-crash' ? (
-              <div className="rounded-xl border border-amber-400/40 bg-amber-400/[0.08] p-4 text-sm text-amber-100">
-                <strong>Spielgeld — kein echtes Geld.</strong>
-                <br />
-                Dieses Spiel läuft ausschließlich mit Spielgeld: Einsätze und Gewinne bewegen ein
-                Übungs-Guthaben auf dem Server. Es wird nichts eingezahlt und nichts ausgezahlt.
-                <br />
-                <span className="text-xs text-amber-100/80">
-                  Deshalb steht hier weder ein Wallet-Guthaben noch ein Einzahlen-Knopf — eine
-                  Einzahlung wäre in diesem Spiel nicht verwendbar.
-                </span>
-              </div>
-            ) : (
-              (!demo || meta.mechanic === 'live') && <BalanceBar devMock={meta.devMock} />
-            )}
+            {/* Geld-Leiste in JEDER Mechanik (Systemvertrag — nie entfernen).
+                Ein- und Auszahlen gehören in das Spiel, nicht nur auf die
+                Plattform: Das Guthaben ist dasselbe Konto je Wallet und gilt
+                spielübergreifend — wer hier einzahlt, kann es überall
+                einsetzen und überall wieder abheben.
+
+                Crash war bis zum 28.08.2026 die Ausnahme (reines Spielgeld,
+                deshalb ohne Leiste). Seit der Echtgeld-Pfad steht, folgt das
+                Spiel dem Schalter der Engine; die Leiste gehört damit auch
+                dort hin. Steht der Schalter auf Spielgeld, sagt das Spiel das
+                ausdrücklich dazu (Hinweis in LiveCrashGame). */}
+            {(!demo || meta.mechanic === 'live') && <BalanceBar devMock={meta.devMock} />}
 
             {meta.mechanic === 'live' ? (
               engine.key === 'live-crash' ? (
                 // Crash bringt seinen eigenen geteilten Flug mit (Etappe 2:
                 // nur Spielgeld) — Verify läuft über /api/live-crash/round/:id.
-                <LiveCrashGame engine={engine} />
+                <LiveCrashGame engine={engine} verifierUrl={meta.verifierUrl} />
               ) : (
                 // Live bringt Countdown/Runden/Ergebnis-Ticker selbst mit —
                 // Verify läuft über /api/game/live/verify/:roundId.
-                <LiveGame engine={engine} />
+                <LiveGame engine={engine} verifierUrl={meta.verifierUrl} />
               )
             ) : meta.mechanic === 'tournament' ? (
               // Turnier bringt Countdown/Pot/Leaderboard/Proof selbst mit —
@@ -216,7 +203,7 @@ function HomeInner({ meta }: { meta: Meta | null }) {
               demo ? (
                 <DemoTournamentGame engine={engine} />
               ) : (
-                <TournamentGame engine={engine} />
+                <TournamentGame engine={engine} verifierUrl={meta.verifierUrl} />
               )
             ) : meta.mechanic === 'session' ? (
               <SessionGame

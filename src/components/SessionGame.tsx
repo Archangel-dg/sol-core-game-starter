@@ -8,6 +8,7 @@ import { solToLamports, toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
 import { usePlayerAuth } from '@/lib/player-auth';
 import type { RoundLog } from './SingleBetGame';
+import { MaxBetPick } from './BetLimitHint';
 
 /** towers-Reveal: `bombColumns` ist `number[][]` (eine Spalten-Menge je
  * Etage, `c.bombs` Bomben pro Etage). Rein defensiv — akzeptiert auch ältere
@@ -457,7 +458,11 @@ export function SessionGame({
         <>
           {towerBoard && <div className="mb-3">{towerBoard}</div>}
           <label className="block text-xs text-white/50">
-            {costPerStep ? 'Einsatz JE SPIN (SOL)' : 'Einsatz (SOL)'}
+            {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen). */}
+            <span className="flex items-baseline justify-between gap-2">
+              <span>{costPerStep ? 'Einsatz JE SPIN (SOL)' : 'Einsatz (SOL)'}</span>
+              {!stakeLocked && <MaxBetPick onPick={setBet} />}
+            </span>
             <input
               value={bet}
               onChange={(e) => setBet(e.target.value)}

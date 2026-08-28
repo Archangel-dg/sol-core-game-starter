@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { errorTextIn } from './errors';
 
 export type PvpLang = 'en' | 'de' | 'fr' | 'ru';
 
@@ -809,89 +810,19 @@ const RU: Catalog = {
 
 const CATALOG: Record<PvpLang, Catalog> = { en: EN, de: DE, fr: FR, ru: RU };
 
-/** PvP-Fehlercodes (API-7xx + geteilte) → sprachabhängige Klartexte. */
-const ERR: Record<PvpLang, Catalog> = {
-  en: {
-    'API-700': 'Lobby not found.',
-    'API-701': 'This lobby is full.',
-    'API-702': 'This lobby has expired.',
-    'API-703': 'Wrong PIN.',
-    'API-704': 'You are already in another lobby.',
-    'API-705': 'The creator wallet cannot play its own game.',
-    'API-706': 'Stake is outside the allowed range.',
-    'API-707': 'The seed session rotated — the match was refunded.',
-    'API-708': 'Not enough balance to start — the stake was refunded.',
-    'API-709': 'Too fast — please wait a moment.',
-    'API-710': 'Only the host can do that.',
-    'API-711': 'The match was already refunded.',
-    'API-712': 'The turn already moved on — refreshing.',
-    'API-402': 'Session invalid or expired — reconnect your wallet.',
-    'API-305': 'Not enough balance — please deposit.',
-    'API-201': 'Game temporarily unavailable.',
-    'API-202': 'Game is not active.',
-    generic: 'Something went wrong — please try again.',
-  },
-  de: {
-    'API-700': 'Lobby nicht gefunden.',
-    'API-701': 'Diese Lobby ist voll.',
-    'API-702': 'Diese Lobby ist abgelaufen.',
-    'API-703': 'Falscher PIN.',
-    'API-704': 'Du bist bereits in einer anderen Lobby.',
-    'API-705': 'Die Creator-Wallet darf nicht im eigenen Spiel mitspielen.',
-    'API-706': 'Einsatz außerhalb des erlaubten Bereichs.',
-    'API-707': 'Die Seed-Sitzung wurde rotiert — das Match wurde erstattet.',
-    'API-708': 'Guthaben reicht nicht zum Start — der Einsatz wurde erstattet.',
-    'API-709': 'Zu schnell — kurz warten.',
-    'API-710': 'Das darf nur der Host.',
-    'API-711': 'Das Match wurde bereits erstattet.',
-    'API-712': 'Der Zug ist bereits weiter — wird aktualisiert.',
-    'API-402': 'Sitzung ungültig oder abgelaufen — Wallet neu verbinden.',
-    'API-305': 'Guthaben reicht nicht — bitte einzahlen.',
-    'API-201': 'Spiel vorübergehend nicht verfügbar.',
-    'API-202': 'Spiel ist nicht aktiv.',
-    generic: 'Etwas ist schiefgelaufen — bitte erneut versuchen.',
-  },
-  fr: {
-    'API-700': 'Salon introuvable.',
-    'API-701': 'Ce salon est complet.',
-    'API-702': 'Ce salon a expiré.',
-    'API-703': 'PIN incorrect.',
-    'API-704': 'Vous êtes déjà dans un autre salon.',
-    'API-705': 'Le portefeuille du créateur ne peut pas jouer à son propre jeu.',
-    'API-706': 'Mise hors de la plage autorisée.',
-    'API-707': 'La session de seed a changé — le match a été remboursé.',
-    'API-708': 'Solde insuffisant pour démarrer — la mise a été remboursée.',
-    'API-709': 'Trop rapide — patientez un instant.',
-    'API-710': 'Seul l’hôte peut le faire.',
-    'API-711': 'Le match a déjà été remboursé.',
-    'API-712': 'Le tour a déjà avancé — actualisation.',
-    'API-402': 'Session invalide ou expirée — reconnectez votre portefeuille.',
-    'API-305': 'Solde insuffisant — veuillez déposer.',
-    'API-201': 'Jeu temporairement indisponible.',
-    'API-202': 'Le jeu n’est pas actif.',
-    generic: 'Une erreur est survenue — réessayez.',
-  },
-  ru: {
-    'API-700': 'Лобби не найдено.',
-    'API-701': 'Это лобби заполнено.',
-    'API-702': 'Срок действия лобби истёк.',
-    'API-703': 'Неверный PIN.',
-    'API-704': 'Вы уже в другом лобби.',
-    'API-705': 'Кошелёк создателя не может играть в свою игру.',
-    'API-706': 'Ставка вне допустимого диапазона.',
-    'API-707': 'Сессия seed сменилась — матч возвращён.',
-    'API-708': 'Недостаточно баланса для старта — ставка возвращена.',
-    'API-709': 'Слишком быстро — подождите немного.',
-    'API-710': 'Это может только хост.',
-    'API-711': 'Матч уже возвращён.',
-    'API-712': 'Ход уже продвинулся — обновление.',
-    'API-402': 'Сессия недействительна или истекла — переподключите кошелёк.',
-    'API-305': 'Недостаточно средств — пополните баланс.',
-    'API-201': 'Игра временно недоступна.',
-    'API-202': 'Игра неактивна.',
-    generic: 'Что-то пошло не так — попробуйте снова.',
-  },
+/**
+ * Rueckfalltext, wenn ein Code in KEINEM Katalog steht — der einzige Rest,
+ * der hier noch sprachabhaengig liegen muss. Die Fehlertexte selbst kommen
+ * seit dem 28.08.2026 aus dem Server-Katalog (lib/errors.ts); vorher lagen
+ * sie hier als zweite Kopie mit abweichenden Formulierungen.
+ */
+const GENERIC: Record<PvpLang, string> = {
+  en: 'Something went wrong — please try again.',
+  de: 'Etwas ist schiefgelaufen — bitte erneut versuchen.',
+  fr: 'Une erreur est survenue — réessayez.',
+  ru: 'Что-то пошло не так — попробуйте снова.',
 };
+
 
 /**
  * Übersetzer-Funktion. `params` ist optional (bestehende Aufrufe `t('key')`
@@ -911,9 +842,8 @@ function translate(lang: PvpLang, key: string, params?: Record<string, string | 
 }
 
 /** PvP-Fehlercode → Klartext (Fallback: generische Meldung). */
-export function pvpErrorText(lang: PvpLang, code?: string): string {
-  if (code && ERR[lang][code]) return ERR[lang][code]!;
-  return ERR[lang].generic!;
+export function pvpErrorText(lang: PvpLang, code?: string, reason?: string): string {
+  return errorTextIn(lang, code, GENERIC[lang], reason);
 }
 
 function normalizeLang(raw: string | null): PvpLang {

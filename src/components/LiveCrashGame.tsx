@@ -12,6 +12,10 @@ import {
 } from '@/lib/crash-math';
 import { solToLamports, toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
+import { usePlayerAuth } from '@/lib/player-auth';
+import { useBetLimits } from '@/lib/bet-limits';
+import { MaxBetPick } from './BetLimitHint';
+import { VerifyLink } from './VerifyLink';
 import { CRASH_THEME, CrashCurveView, formatMultiplier } from './CrashCurveView';
 
 /**
@@ -25,11 +29,15 @@ import { CRASH_THEME, CrashCurveView, formatMultiplier } from './CrashCurveView'
  *     Abflugzeitpunkt, der Browser rechnet daraus dieselbe Formel wie der
  *     Server (`multiplierBpsAt`). Zwei Browser auf derselben Runde zeigen
  *     zwangsläufig dasselbe Bild.
- *  2. Die Geld-Routen tragen hier bewusst KEIN Spieler-Token: `demo-bet` und
- *     `demo-cashout` sind serverseitig apiKeyAuth-only (Spielgeld, Etappe 2).
- *     Deshalb normales `fetch`, NICHT `moneyFetch` — siehe die Kommentare in
- *     `src/lib/solcore.ts` und in den Proxy-Routen. Etappe 3 (Echtgeld) dreht
- *     das um; dann kommt hier `usePlayerAuth().moneyFetch` hin.
+ *  2. DAS SPIEL FOLGT DEM SCHALTER. Der Zustands-Poll liefert `realMoney`
+ *     (aus `platform_engines`); danach — und nur danach — waehlt das Spiel
+ *     seine Routen: Echtgeld ueber `moneyFetch` (Spieler-Token Pflicht),
+ *     Spielgeld ueber normales `fetch` auf die `demo-*`-Zwillinge.
+ *
+ *     WARUM NICHT EINE FESTE ANNAHME: Am 28.08.2026 meldete das Dashboard
+ *     zweimal „Echtgeld an", waehrend das ausgerollte Spiel weiter die
+ *     Spielgeld-Routen rief. Eine Annahme im Bundle kann einem Schalter im
+ *     Betrieb nicht folgen — ein Poll kann es.
  *
  * Der Server bleibt in jeder Frage die Autorität: Der Knopf zeigt den Stand,
  * den der Browser gerade zeichnet — WELCHER Multiplikator gutgeschrieben wird,
@@ -73,6 +81,16 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
+/** Abruf-Takt: im Flug schnell, sonst sparsam. */
+const POLL_FLUG_MS = 300;
+const POLL_RUHE_MS = 1_000;
+/**
+ * Wie weit die Anzeige dem letzten bestaetigten Serverstand vorauslaufen darf.
+ * Grosszuegig genug, dass sie im Normalfall fluessig laeuft, und eng genug,
+ * dass ein Verbindungsabriss die Zahl anhaelt statt sie davonlaufen zu lassen.
+ */
+const VORLAUF_MS = 900;
+
 type UiPhase = 'betting' | 'flying' | 'crashed' | 'settled';
 
 const PHASE_BADGE: Record<UiPhase, string> = {
@@ -89,13 +107,27 @@ const PLAYER_STATUS: Record<CrashPlayerView['status'], string> = {
   lost: 'verloren',
 };
 
-export function LiveCrashGame({ engine }: { engine: EngineDef }) {
+export function LiveCrashGame({
+  engine,
+  verifierUrl,
+}: {
+  engine: EngineDef;
+  verifierUrl: string;
+}) {
   const { publicKey, connected } = useWallet();
   const wallet = publicKey?.toBase58() ?? null;
   const reduced = usePrefersReducedMotion();
+  // Geld-Routen laufen im Echtgeld-Modus ausschliesslich hierueber (haengt das
+  // Spieler-Token an). Im Spielgeld-Modus wird es nicht benutzt.
+  const { moneyFetch } = usePlayerAuth();
+  // Hoechsteinsatz — dieselbe Quelle wie die Geld-Leiste, damit Feld und
+  // Leiste nie zwei verschiedene Zahlen zeigen.
+  const betLimits = useBetLimits();
 
   const [state, setState] = useState<CrashStateView | null>(null);
   const [offsetMs, setOffsetMs] = useState(0);
+  /** Serverzeit der letzten erfolgreichen Antwort — Obergrenze der Anzeige. */
+  const [syncedServerMs, setSyncedServerMs] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [amount, setAmount] = useState('0.10');
   const [safety, setSafety] = useState('');
@@ -126,19 +158,29 @@ export function LiveCrashGame({ engine }: { engine: EngineDef }) {
       if (!alive.current || s.error) return;
       setState(s);
       // Der Server ist die Uhr — jede Kurvenzeit rechnet gegen diesen Versatz.
-      setOffsetMs(new Date(s.serverTime).getTime() - Date.now());
+      const serverMs = new Date(s.serverTime).getTime();
+      setOffsetMs(serverMs - Date.now());
+      setSyncedServerMs(serverMs);
     } catch {
       /* nächster Tick versucht es erneut */
     }
   }, []);
-  useEffect(() => {
-    void refresh();
-    const id = setInterval(() => void refresh(), 1_000);
-    return () => clearInterval(id);
-  }, [refresh]);
-
+  // Im Flug SCHNELLER fragen als sonst. Der Client kennt den Crash-Punkt
+  // nicht (das ist Absicht) und erfaehrt das Ende erst beim naechsten Abruf —
+  // bis dahin zeichnet er die Kurve weiter. Bei 4 s Verdopplungszeit sind
+  // 1 s Nachlauf rund 19 % zu viel: gemeldet als Rakete, die auf 22x steigt,
+  // waehrend das Ergebnis 16x lautet.
   const round = state?.round ?? null;
   const flying = round?.status === 'flying';
+  // Fehlendes Feld (aelterer API-Stand) zaehlt als Spielgeld — die sichere
+  // Richtung: lieber Uebungsmodus anbieten, wo Echtgeld ginge, als umgekehrt.
+  const realMoney = state?.realMoney === true;
+
+  useEffect(() => {
+    void refresh();
+    const id = setInterval(() => void refresh(), flying ? POLL_FLUG_MS : POLL_RUHE_MS);
+    return () => clearInterval(id);
+  }, [refresh, flying]);
 
   // ── Anzeige-Takt: 60 Hz im Flug, sonst (und unter reduced-motion) 1 Hz ──
   useEffect(() => {
@@ -165,7 +207,16 @@ export function LiveCrashGame({ engine }: { engine: EngineDef }) {
 
   // Der laufende Stand — reine Funktion aus (Serverzeit − Abflugzeit).
   const takeoffMs = round?.takeoffAt ? new Date(round.takeoffAt).getTime() : null;
-  const liveBps = flying && takeoffMs !== null ? multiplierBpsAt(serverNow - takeoffMs, doubleMs) : 10_000;
+  // Die Anzeige darf dem letzten BESTAETIGTEN Serverstand nur begrenzt
+  // vorauslaufen. Ohne diese Schranke rechnet der Browser bei einem
+  // Verbindungsabriss munter weiter und zeigt Fantasiewerte — die Kurve ist
+  // exponentiell, nach 20 s stiller Leitung waere sie bei ueber 30x.
+  // Mit Schranke friert die Zahl stattdessen sichtbar ein, bis wieder eine
+  // Antwort da ist. Eine stehende Zahl ist ehrlich; eine steigende luegt.
+  const kurvenZeit =
+    syncedServerMs === null ? serverNow : Math.min(serverNow, syncedServerMs + VORLAUF_MS);
+  const liveBps =
+    flying && takeoffMs !== null ? multiplierBpsAt(kurvenZeit - takeoffMs, doubleMs) : 10_000;
   // Ab `crashed` liefert der Server den Crash-Punkt; vorher ist er null und
   // taucht nirgends auf.
   const revealedBps = phase === 'crashed' || phase === 'settled' ? round?.crashMultiplierBps ?? null : null;
@@ -271,22 +322,32 @@ export function LiveCrashGame({ engine }: { engine: EngineDef }) {
     setBusy(true);
     setMsg(null);
     try {
-      const r = (await fetch('/api/live-crash/bet', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          roundId: round.roundId,
-          playerWallet: wallet,
-          betLamports: betLamports.toString(),
-          safetyTargetBps,
-        }),
-      }).then((res) => res.json())) as { betId?: string; error?: { code?: string; message?: string; reason?: string } };
+      // Die Route entscheidet der Schalter, nicht der Knopf.
+      const body = {
+        roundId: round.roundId,
+        playerWallet: wallet,
+        betLamports: betLamports.toString(),
+        safetyTargetBps,
+      };
+      const r = (realMoney
+        ? await moneyFetch('/api/live-crash/bet', body)
+        : await fetch('/api/live-crash/demo-bet', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          }).then((res) => res.json())) as {
+        betId?: string;
+        error?: { code?: string; message?: string; reason?: string };
+      };
       if (r.error) {
         showError(r.error);
         return;
       }
       setMyBet({ roundId: round.roundId, betLamports: betLamports.toString(), safetyTargetBps });
       await refresh();
+      // Der eigene Einsatz veraendert die Solvenzlage sofort — Grenze sofort
+      // nachziehen statt bis zum naechsten 20-s-Takt zu warten.
+      betLimits.refresh();
     } catch (e) {
       setMsg((e as Error).message);
     } finally {
@@ -300,11 +361,14 @@ export function LiveCrashGame({ engine }: { engine: EngineDef }) {
     setBusy(true);
     setMsg(null);
     try {
-      const r = (await fetch('/api/live-crash/cashout', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ roundId: round.roundId, playerWallet: wallet }),
-      }).then((res) => res.json())) as {
+      const body = { roundId: round.roundId, playerWallet: wallet };
+      const r = (realMoney
+        ? await moneyFetch('/api/live-crash/cashout', body)
+        : await fetch('/api/live-crash/demo-cashout', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          }).then((res) => res.json())) as {
         multiplierBps?: number;
         payoutLamports?: string;
         error?: { code?: string; message?: string; reason?: string };
@@ -369,7 +433,7 @@ export function LiveCrashGame({ engine }: { engine: EngineDef }) {
             {state.stream.displayName}
           </p>
           <p className="truncate text-xs" style={{ color: 'var(--crash-muted)' }}>
-            Runde #{round?.roundNo ?? '—'} · Spielgeld
+            Runde #{round?.roundNo ?? '—'} · {realMoney ? 'Echtgeld' : 'Spielgeld'}
           </p>
         </div>
         <span
@@ -383,6 +447,29 @@ export function LiveCrashGame({ engine }: { engine: EngineDef }) {
               : PHASE_BADGE[phase]}
         </span>
       </div>
+
+      {/* Übungsmodus ausdrücklich benennen (Systemvertrag — nie entfernen).
+          Die Geld-Leiste steht auch hier, und ihr Guthaben ist echt und
+          spielübergreifend. Solange der Echtgeld-Schalter dieser Engine aus
+          ist, wird es in DIESEM Spiel aber nicht bewegt — das muss dastehen,
+          sonst zahlt jemand für eine Runde ein, die sein Geld gar nicht
+          anfasst. */}
+      {!realMoney && (
+        <p
+          className="border px-3 py-2 text-xs"
+          style={{
+            borderRadius: 'var(--crash-radius)',
+            borderColor: 'var(--crash-line)',
+            background: 'var(--crash-panel)',
+            color: 'var(--crash-muted)',
+          }}
+        >
+          <strong style={{ color: 'var(--crash-text)' }}>Übungsmodus.</strong> Dieses Spiel
+          bewegt gerade ein Übungs-Guthaben auf dem Server — dein Wallet-Guthaben bleibt
+          unangetastet. Ein- und Auszahlen oben funktioniert trotzdem: das Guthaben gilt für
+          alle Spiele der Plattform.
+        </p>
+      )}
 
       {/* ★ Gestaltungszone: die Kurve */}
       <CrashCurveView
@@ -411,8 +498,17 @@ export function LiveCrashGame({ engine }: { engine: EngineDef }) {
           <div className="space-y-3">
             <div className="flex flex-wrap items-end gap-2">
               <label className="flex-1 basis-28">
-                <span className="mb-1 block text-[11px] uppercase tracking-wide" style={{ color: 'var(--crash-muted)' }}>
-                  Einsatz (◎)
+                {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen):
+                    Der erlaubte Einsatz ist das Minimum aus Spiel-, Level-,
+                    Solvenz- und Rundendeckel und bewegt sich im Betrieb. Im
+                    Flug ist eine Ablehnung besonders teuer — die Runde ist
+                    dann weg. Klick uebernimmt die Zahl. */}
+                <span
+                  className="mb-1 flex items-baseline justify-between gap-2 text-[11px] uppercase tracking-wide"
+                  style={{ color: 'var(--crash-muted)' }}
+                >
+                  <span>Einsatz (◎)</span>
+                  <MaxBetPick onPick={setAmount} className="normal-case tracking-normal" />
                 </span>
                 <input
                   value={amount}
@@ -665,6 +761,12 @@ export function LiveCrashGame({ engine }: { engine: EngineDef }) {
           Der Crash-Punkt steht vor dem Wettfenster fest und gilt für alle gleich. Ergebnisse kommen
           ausschließlich vom Sol-Core-Server.
         </p>
+        {/* Nachprüfbarkeit (Systemvertrag — nie entfernen): Erst mit dem Crash
+            gibt der Server den Seed heraus; vorher wäre ein Link eine leere
+            Behauptung. Ab dann rechnet der Scanner die Runde im Browser nach. */}
+        {round && (phase === 'crashed' || phase === 'settled') && (
+          <VerifyLink verifierUrl={verifierUrl} id={round.roundId} className="mt-2" />
+        )}
       </div>
     </div>
   );

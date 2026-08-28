@@ -10,6 +10,7 @@ import { EngineControls } from './EngineControls';
 import { ResultView } from './ResultView';
 import { SlotGrid } from './SlotGrid';
 import { RouletteBoard, spotKey, type RouletteSpot } from './RouletteBoard';
+import { MaxBetPick } from './BetLimitHint';
 
 export interface RoundLog {
   win: boolean;
@@ -240,7 +241,13 @@ export function SingleBetGame({
       </div>
 
       <label className="block text-xs text-white/50">
-        Einsatz (SOL)
+        {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen): Der erlaubte
+            Einsatz ist das Minimum aus Spiel-, Level-, Solvenz- und Tagesdeckel
+            und bewegt sich im Betrieb. Ohne diese Zahl tippt der Spieler blind. */}
+        <span className="flex items-baseline justify-between gap-2">
+          <span>Einsatz (SOL)</span>
+          <MaxBetPick onPick={setBet} />
+        </span>
         <input
           value={bet}
           onChange={(e) => setBet(e.target.value)}

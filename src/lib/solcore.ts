@@ -599,6 +599,20 @@ export interface CrashStateView {
    * nennt dann keine Zahl (siehe `cashoutDisplayBps` in `lib/crash-math.ts`).
    */
   config?: { ceilingBps: number | null };
+  /**
+   * Echtgeld-Schalter der Engine (`platform_engines`), wie ihn der Server
+   * gerade sieht.
+   *
+   * WARUM ER IM ZUSTAND STEHT UND NICHT IN DER ENV: Am 28.08.2026 meldete das
+   * Dashboard zweimal „live-crash: Echtgeld an", während das ausgerollte Spiel
+   * weiter die Spielgeld-Routen rief — eine Annahme im Bundle kann einem
+   * Schalter im Betrieb nicht folgen. Das Spiel POLLT ihn deshalb und wählt
+   * danach seine Routen; auseinanderlaufen ist damit ausgeschlossen.
+   *
+   * Optional: Gegen einen älteren API-Stand fehlt das Feld — fehlend zählt
+   * als `false` (Spielgeld). Das ist die sichere Richtung.
+   */
+  realMoney?: boolean;
   /** Server-Uhr — Basis für die Kurven-Animation (siehe `crashServerTimeIso`). */
   serverTime: string;
 }
@@ -613,6 +627,13 @@ export interface CrashDemoCashoutView {
   payoutLamports: string;
 }
 
+/** Echtgeld-Einsatz: zusätzlich Gebühren und die Reservierung der Runde. */
+export interface CrashBetView {
+  betId: string;
+  reservedPayoutLamports: string;
+  totalChargeLamports?: string;
+}
+
 /** Zustand des Plattform-Flugs. Ohne streamId — es gibt genau einen (Etappe 2). */
 export function liveCrashState(): Promise<CrashStateView> {
   return request<CrashStateView>('/api/game/live-crash/state');
@@ -623,13 +644,11 @@ export function liveCrashRound(roundId: string): Promise<CrashRoundView> {
 }
 
 /**
- * Spielgeld-Einsatz (Etappe 2). `gameId` ist ABSICHTLICH kein Feld: der
- * Server nimmt sie aus dem API-Key-Kontext (`req.game.id`), NIE aus dem Body
- * — dieselbe Regel wie bei `crashDemoBetSchema` in `routes/game.ts`
- * (Präzedenz `/authorize`, `/bet`). Kein `playerToken`-Parameter: die Route
- * ist apiKeyAuth-only, siehe Abschnitts-Kommentar oben.
+ * SPIELGELD-Einsatz (Übungsmodus). `gameId` ist ABSICHTLICH kein Feld: der
+ * Server nimmt sie aus dem API-Key-Kontext (`req.game.id`), NIE aus dem Body.
+ * Kein `playerToken`-Parameter: die Route ist apiKeyAuth-only.
  */
-export function liveCrashBet(body: {
+export function liveCrashDemoBet(body: {
   roundId: string;
   playerWallet: string;
   betLamports: string;
@@ -641,7 +660,7 @@ export function liveCrashBet(body: {
   });
 }
 
-export function liveCrashCashout(body: {
+export function liveCrashDemoCashout(body: {
   roundId: string;
   playerWallet: string;
 }): Promise<CrashDemoCashoutView> {
@@ -649,6 +668,40 @@ export function liveCrashCashout(body: {
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+/**
+ * ECHTGELD-Einsatz. `playerToken` ist PFLICHT — der Server nimmt die Wallet
+ * aus der signierten Sitzung, NIE aus dem Body. Der Server lehnt mit API-206
+ * ab, wenn der Echtgeld-Schalter der Engine aus ist; das Spiel fragt ihn
+ * deshalb im Zustands-Poll (`realMoney`) und ruft die Route gar nicht erst
+ * auf, solange er aus steht.
+ */
+export function liveCrashBet(
+  body: {
+    roundId: string;
+    playerWallet: string;
+    betLamports: string;
+    safetyTargetBps?: number | null;
+  },
+  playerToken?: string,
+): Promise<CrashBetView> {
+  return request<CrashBetView>(
+    '/api/game/live-crash/bet',
+    { method: 'POST', body: JSON.stringify(body) },
+    playerToken,
+  );
+}
+
+export function liveCrashCashout(
+  body: { roundId: string; playerWallet: string },
+  playerToken?: string,
+): Promise<CrashDemoCashoutView> {
+  return request<CrashDemoCashoutView>(
+    '/api/game/live-crash/cashout',
+    { method: 'POST', body: JSON.stringify(body) },
+    playerToken,
+  );
 }
 
 // ── PvP-Schicht (Lobby → Ready-Check → Lock-Debit → Server-Draw: pvp-coinflip) ─
@@ -1099,4 +1152,51 @@ export interface DemoDiceProView {
   balanceLamports: string;
   engine: { mode: string; config: Record<string, unknown> };
   createdAt: string;
+}
+
+// ── Aktuelle Einsatz-Grenzen ────────────────────────────────────────────────
+
+/**
+ * Was JETZT hoechstens gesetzt werden darf — und woran es liegt.
+ *
+ * Der Hoechsteinsatz ist keine feste Zahl aus der Spiel-Config: Er ist das
+ * MINIMUM aus mehreren Grenzen, und die engste davon wechselt im Betrieb.
+ * Vor allem die Solvenz-Grenze bewegt sich staendig — sie haengt an der
+ * Pool-Groesse, und ein Spiel mit hohem Multiplikator stoesst schon bei
+ * kleinen Einsaetzen daran (gemessen am 28.08.2026: Spiel- und Level-Grenze
+ * je 50 SOL, tatsaechlich erlaubt waren 0,0365 SOL).
+ *
+ * Ohne diese Anzeige tippt ein Spieler eine Zahl ein, bekommt API-302 und
+ * weiss nicht, welche Zahl denn ginge. `text` beantwortet genau das in einem
+ * Satz; `limits` zeigt die einzelnen Grenzen fuer alle, die es genau wissen
+ * wollen.
+ */
+export interface BetLimitsView {
+  gameId: string;
+  mode: string;
+  /** Hoechster JETZT erlaubter Einsatz (Lamports, String). Kann '0' sein. */
+  maxBetLamports: string;
+  minBetLamports: string;
+  /** Welche Grenze gerade bindet. */
+  limitedBy: 'game' | 'level' | 'solvency' | 'single_payout' | 'daily_payout' | 'round';
+  /** Der Grund als fertiger Satz — die Oberflaeche muss nichts uebersetzen. */
+  text: string;
+  limits: {
+    gameLamports: string;
+    levelLamports: string;
+    solvencyLamports: string | null;
+    singlePayoutLamports: string | null;
+    dailyPayoutLamports: string | null;
+  };
+  /** Ab diesem Einsatz ginge ein Gewinn in die Pruefung (Halte-Modus). */
+  payoutHoldAboveLamports: string | null;
+  /** false = gerade gar nicht spielbar (Grenze auf 0). */
+  playable: boolean;
+}
+
+/** `gameId` kommt aus der Server-Config, NIE vom Client — sonst koennte sich
+ *  jemand die Grenzen eines fremden Spiels anzeigen lassen. */
+export function getBetLimits(): Promise<BetLimitsView> {
+  const cfg = serverConfig();
+  return request<BetLimitsView>(`/api/public/games/${cfg.gameId}/limits`);
 }

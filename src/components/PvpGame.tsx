@@ -1,4 +1,6 @@
 'use client';
+import { verifyHref } from './VerifyLink';
+import { MaxBetPick } from './BetLimitHint';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
@@ -923,6 +925,12 @@ export function LobbyRoom({
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="mb-1 text-[10px] uppercase tracking-wider text-white/40">{t('room.stakeChange')}</div>
           <p className="mb-2 text-[11px] text-amber-300/80">{t('room.stakeChangeHint')}</p>
+          {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen): Der
+              Platzhalter nennt die ENGINE-Spanne; die hier ist die Grenze des
+              MOMENTS (Solvenz, Level, Tagesdeckel). */}
+          <div className="mb-2 flex justify-end">
+            <MaxBetPick onPick={setStakeSol} />
+          </div>
           <div className="flex items-center gap-2">
             <input
               value={stakeSol}
@@ -1046,7 +1054,7 @@ function RevealView({
             // Client-Seed, Würfe, Gewinner) IM BROWSER des Spielers nach. Der
             // rohe JSON-Endpunkt bleibt unter /api/pvp/verify/<id> erreichbar.
             <a
-              href={`${verifierUrl}/verify/${matchId}`}
+              href={verifyHref(verifierUrl, matchId)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block text-sm text-accent underline underline-offset-2"
@@ -1383,9 +1391,14 @@ export function CreateLobbyDialog({
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-night p-5">
         <ModalHead title={t('create.title')} onClose={onCancel} closeLabel={t('common.close')} />
         <div className="mb-4">
-          <div className="mb-1 flex items-baseline justify-between">
+          <div className="mb-1 flex items-baseline justify-between gap-2">
             <span className="text-xs text-white/50">{t('create.stake')}</span>
-            <span className="text-sm font-bold tabular-nums text-accent">{stakeSol.toFixed(3)} ◎</span>
+            <span className="flex items-baseline gap-2">
+              {/* Hoechsteinsatz des MOMENTS — der Regler kennt nur die
+                  Engine-Spanne. Klick zieht ihn auf die erlaubte Obergrenze. */}
+              <MaxBetPick onPick={(sol) => setStakeSol(Math.min(Number(sol), maxSol))} />
+              <span className="text-sm font-bold tabular-nums text-accent">{stakeSol.toFixed(3)} ◎</span>
+            </span>
           </div>
           <input
             type="range"

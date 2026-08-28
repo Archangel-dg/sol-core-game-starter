@@ -1,6 +1,8 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { loadErrorCatalog } from '@/lib/errors';
+
+import { useMemo, type ReactNode, useEffect } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import type { Adapter } from '@solana/wallet-adapter-base';
@@ -13,6 +15,14 @@ import { SOLANA_RPC_URL } from '../lib/solana';
  * Wallets (Phantom, Solflare, …) melden sich per Wallet-Standard automatisch an.
  */
 export function Providers({ children }: { children: ReactNode }) {
+  // Fehlertexte vom Server holen und die mitgebaute Momentaufnahme
+  // ueberlagern (Systemvertrag). Ohne diesen Abruf bliebe das Spiel fuer
+  // immer auf dem Stand seines Baus — genau die Drift, die am 28.08.2026
+  // dazu fuehrte, dass kein Spiel dieselben Fehlertexte zeigte.
+  useEffect(() => {
+    void loadErrorCatalog();
+  }, []);
+
   // Der RPC kommt aus solana.ts — mit derselben Pruefung wie Netz und
   // Programm-ID. Ein Rueckfall auf Devnet an dieser Stelle waere still: Das
   // Spiel baut eine Verbindung zum falschen Netz auf, sieht normal aus, und

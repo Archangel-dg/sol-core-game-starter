@@ -1,6 +1,7 @@
 'use client';
 
 import type { RoundLog } from './SingleBetGame';
+import { verifyHref } from './VerifyLink';
 import { toSol } from '@/lib/lamports';
 
 /** Letzte Runden (lokal im State). Design-Zone. Echt-Runden verlinken auf den
@@ -28,7 +29,7 @@ export function History({
               {(r.multiplierBps / 10000).toFixed(2)}× {r.win ? `+${toSol(r.payoutLamports)} ◎` : 'verloren'}
             </span>
             <a
-              href={demo ? `${apiUrl}/api/game/demo/verify/${r.roundId}` : `${verifierUrl}/verify/${r.roundId}`}
+              href={demo ? `${apiUrl}/api/game/demo/verify/${r.roundId}` : verifyHref(verifierUrl, r.roundId)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-white/30 underline underline-offset-2 hover:text-white/60"

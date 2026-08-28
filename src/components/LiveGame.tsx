@@ -9,6 +9,8 @@ import { toUiError } from '@/lib/errors';
 import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { usePlayerAuth } from '@/lib/player-auth';
 import { LiveResultView } from './LiveResultView';
+import { MaxBetPick } from './BetLimitHint';
+import { VerifyLink } from './VerifyLink';
 
 /**
  * Generischer Live-Driver (funktioniert für jede live-Engine): pollt den
@@ -25,7 +27,7 @@ type UiPhase = 'loading' | 'paused' | 'intermission' | 'betting' | 'drawing' | '
 /** Client-Sperre kurz VOR dem Server-Lock — der Server-Gate bleibt Autorität. */
 const CLIENT_LOCK_MS = 500;
 
-export function LiveGame({ engine }: { engine: EngineDef }) {
+export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierUrl: string }) {
   const { publicKey, connected } = useWallet();
   const wallet = publicKey?.toBase58() ?? null;
   const { freezeUntil, release } = useBalanceFreeze();
@@ -266,6 +268,9 @@ export function LiveGame({ engine }: { engine: EngineDef }) {
               className="w-24 rounded-lg border border-white/10 bg-night px-3 py-2 text-sm tabular-nums outline-none focus:border-accent/50"
             />
             <span className="text-xs text-white/50">SOL Einsatz</span>
+            {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen): Bei Live
+                laeuft die Uhr; eine Ablehnung kostet die ganze Runde. */}
+            <MaxBetPick onPick={setAmount} className="ml-auto" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             {round.outcomes.map((o) => (
@@ -325,6 +330,17 @@ export function LiveGame({ engine }: { engine: EngineDef }) {
         </div>
       )}
 
+      {/* Nachpruefbarkeit (Systemvertrag — nie entfernen): JEDE
+          abgeschlossene Runde bekommt ihren Direktlink in den Sol-Core
+          Scanner. Live-Runden hatten bis zum 28.08.2026 gar keinen. */}
+      {displayRound && (phase === 'settled' || phase === 'revealing') && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
+          <div className="mb-1 uppercase tracking-wide text-white/50">Provably Fair</div>
+          <div className="break-all text-white/60">Runde #{displayRound.roundNo}</div>
+          <VerifyLink verifierUrl={verifierUrl} id={displayRound.roundId} className="mt-1" />
+        </div>
+      )}
+      
       {/* Ergebnis-Ticker */}
       {recent.length > 0 && (
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">

@@ -1,104 +1,160 @@
 // ⚠ Nicht ändern — Systemvertrag.
-// Mapping der API-Fehlercodes auf spielerfreundliche Meldungen + UI-Aktion.
+//
+// Fehlercodes → Klartext + UI-Aktion.
+//
+// WARUM DAS NICHT MEHR EINE LISTE IM SPIEL IST (28.08.2026)
+// Bis hierher trug jedes Spiel seine eigene Kopie dieser Zuordnung. Beim
+// Nachmessen der neun gelisteten Spiele: keine zwei Kopien waren gleich, keine
+// war vollständig — allen fehlte der komplette Crash-Block (API-820…827), den
+// meisten API-310. Wo ein Code fehlte, las der Spieler den Rohtext des Servers.
+//
+// Das ist Bauart, nicht Schlamperei: Next.js backt eine Datei wie diese beim
+// BAUEN ins Bundle. Ein ausgeliefertes Spiel kann seine Fehlertexte gar nicht
+// nachziehen, ohne neu gebaut zu werden — und ein Neubau kostet ein
+// Vercel-Kontingent und einen Menschen, der daran denkt.
+//
+// Ab jetzt gilt: Der Server hält den Katalog (`GET /api/public/error-catalog`),
+// das Spiel holt ihn beim Start über die eigene Route `/api/error-catalog` und
+// überlagert damit die mitgebaute Momentaufnahme. Ein neuer Code ist in jedem
+// Spiel sofort da. Die Momentaufnahme bleibt als Notnagel für den ersten Klick
+// und für Netzausfälle — nie als zweite Wahrheit.
+
+import { CATALOG_SNAPSHOT } from './error-catalog.generated';
+
+export type CatalogLang = 'en' | 'de' | 'fr' | 'ru';
+
+/** Was die Oberfläche tun soll — nicht was schiefging. */
+export type UiAction = 'deposit' | 'lock' | 'retry' | 'cooldown' | 'info';
 
 export interface UiError {
   code: string;
   message: string;
-  /** Hinweis für die UI, wie zu reagieren ist. */
-  action: 'deposit' | 'lock' | 'retry' | 'cooldown' | 'info';
+  action: UiAction;
 }
 
-const MAP: Record<string, Omit<UiError, 'code'>> = {
-  'API-201': { message: 'Spiel vorübergehend nicht verfügbar.', action: 'lock' },
-  'API-202': { message: 'Spiel ist nicht aktiv.', action: 'lock' },
-  'API-204': { message: 'Ungültige Eingabe.', action: 'info' },
-  'API-300': { message: 'Einsatz unter dem Minimum.', action: 'info' },
-  'API-301': { message: 'Einsatz über dem Maximum.', action: 'info' },
-  'API-302': { message: 'Auszahlungslimit erreicht — bitte später erneut.', action: 'cooldown' },
-  'API-303': { message: 'Die Creator-Wallet darf nicht selbst spielen.', action: 'lock' },
-  'API-304': { message: 'Zu schnell — kurz warten.', action: 'cooldown' },
-  'API-305': { message: 'Guthaben reicht nicht — bitte einzahlen.', action: 'deposit' },
-  // Auszahlungssperre der Plattform (HTTP 423): greift VOR jeder Abbuchung,
-  // gilt für alle Spieler gleichzeitig und bleibt bis zur Operator-Freigabe
-  // bestehen. Deshalb ausdrücklich NICHT 'retry' (der Fallback) — ein
-  // Wiederholen ändert nichts, solange die Sperre steht. 'info': das Spiel
-  // selbst läuft normal weiter, nur Auszahlungen ruhen.
-  'API-310': { message: 'Auszahlungen sind gerade pausiert — es wurde nichts abgebucht.', action: 'info' },
-  'API-400': { message: 'Spiel vorübergehend nicht verfügbar.', action: 'lock' },
-  // Spieler-Token fehlt/ungültig/abgelaufen oder für ein anderes Spiel/eine
-  // andere Wallet ausgestellt. Kein transienter Fehler: ein Retry mit
-  // demselben (kaputten) Token bringt nichts — die App braucht ein frisches
-  // Token über /api/game/authorize, bevor irgendeine Geld-Aktion weitergeht.
-  // 'lock' statt 'retry', analog zu API-303/API-201/202.
-  'API-402': { message: 'Sitzung ungültig oder abgelaufen — bitte Wallet neu verbinden.', action: 'lock' },
-  'API-500': { message: 'Serverfehler — bitte erneut versuchen.', action: 'retry' },
+export interface CatalogEntry {
+  action: UiAction;
+  text: Record<string, string>;
+  /** Feinere Texte, wenn `error.details.reason` den Fall unterscheidet. */
+  reasons?: Record<string, { action?: UiAction; text: Record<string, string> }>;
+}
 
-  // ── Live-Crash-Schicht (API-820…827) ───────────────────────────────────
-  // Ohne diese Zeilen fällt `toUiError` auf den Rohtext des Servers zurück
-  // und der Spieler liest „API-823: …" mitten im Flug. Alle acht sind
-  // deterministische Zustandsaussagen, kein transientes Problem: ein
-  // Wiederholen desselben Klicks ändert nichts, deshalb 'info' statt
-  // 'retry' — mit einer Ausnahme (API-820, s. u.).
-  //
-  // Ausdrücklich KEIN 'lock': anders als API-201/202 sperrt keiner dieser
-  // Fälle das Spiel. Die nächste Runde öffnet in Sekunden, und der Spieler
-  // soll den Einsatzknopf dafür behalten.
-  'API-820': {
-    // Einziger Fall mit 'retry': die Runden-ID ist veraltet (der Poll hinkt
-    // bis zu einer Sekunde hinterher). Der nächste Zustand bringt eine
-    // gültige — ein erneuter Versuch ist hier tatsächlich sinnvoll.
-    message: 'Diese Runde gibt es nicht mehr — der nächste Flug wird gleich geladen.',
-    action: 'retry',
-  },
-  'API-821': {
-    message: 'Das Wettfenster ist zu — diese Runde fliegt bereits. Die nächste kommt gleich.',
-    action: 'info',
-  },
-  'API-822': { message: 'Du hast in dieser Runde keine offene Wette.', action: 'info' },
-  'API-823': { message: 'Zu spät — die Runde ist bereits gecrasht.', action: 'info' },
-  'API-824': {
-    message:
-      'Auto-Ausstieg außerhalb des erlaubten Bereichs — über 1.00× und höchstens bis zum Deckel dieses Spiels.',
-    action: 'info',
-  },
-  'API-825': { message: 'Diese Wette ist bereits abgerechnet.', action: 'info' },
-  'API-826': {
-    message: 'Du fliegst in dieser Runde schon mit — es gilt eine Wette pro Runde.',
-    action: 'info',
-  },
-  'API-827': {
-    message: 'Diese Runde fliegt gerade nicht — Aussteigen geht nur im Flug.',
-    action: 'info',
-  },
-};
+export interface ErrorCatalog {
+  version: string;
+  langs: readonly string[];
+  fallbackLang: string;
+  codes: Record<string, CatalogEntry>;
+}
 
+// ── Aktiver Katalog + aktive Sprache ───────────────────────────────────────
+// Modul-Zustand statt React-Kontext mit Absicht: `toUiError` wird aus
+// Ereignis-Handlern heraus aufgerufen (nicht beim Rendern) und muss synchron
+// bleiben. Ein Kontext würde jeden dieser Aufrufer zu einer Komponente machen.
+
+let aktiv: ErrorCatalog = CATALOG_SNAPSHOT;
+let sprache: CatalogLang = 'de';
+
+/** Sprache für alle künftigen Fehlertexte. */
+export function setErrorLang(lang: CatalogLang): void {
+  sprache = lang;
+}
+
+export function errorCatalogVersion(): string {
+  return aktiv.version;
+}
+
+/** true, sobald der Laufzeit-Abruf einen NEUEREN Stand gebracht hat. */
+export function errorCatalogIsLive(): boolean {
+  return aktiv !== CATALOG_SNAPSHOT;
+}
+
+/**
+ * Holt den Katalog vom eigenen Server und überlagert die Momentaufnahme.
+ * Wird einmal beim Start aufgerufen (Providers). Scheitert er, bleibt die
+ * Momentaufnahme stehen — ein Spiel darf daran nicht hängen.
+ *
+ * Bewusst ohne Wiederholungsschleife: Der nächste Seitenaufruf versucht es
+ * ohnehin erneut, und ein Spiel, das im Hintergrund minutenlang an einer
+ * Textliste zieht, ist die Sorte Nebenwirkung, die niemand debuggen will.
+ */
+let laufend: Promise<void> | null = null;
+export function loadErrorCatalog(): Promise<void> {
+  if (laufend) return laufend;
+  laufend = (async () => {
+    try {
+      const res = await fetch('/api/error-catalog', { cache: 'no-store' });
+      if (!res.ok) return;
+      const k = (await res.json()) as Partial<ErrorCatalog>;
+      // Ein kaputter oder leerer Katalog darf die funktionierende
+      // Momentaufnahme NICHT ersetzen — sonst tauscht ein Ausfall der API
+      // gute Texte gegen keine.
+      if (
+        typeof k.version !== 'string' ||
+        !k.codes ||
+        Object.keys(k.codes).length < 20 ||
+        !Array.isArray(k.langs)
+      ) {
+        return;
+      }
+      aktiv = k as ErrorCatalog;
+    } catch {
+      /* Momentaufnahme bleibt — still, das ist der Sinn des Notnagels. */
+    }
+  })();
+  return laufend;
+}
+
+/** Text in der aktiven Sprache, sonst in der Rückfallsprache, sonst leer. */
+function text(t: Record<string, string>): string {
+  return t[sprache] ?? t[aktiv.fallbackLang] ?? t.en ?? '';
+}
+
+/**
+ * Übersetzt eine API-Antwort in das, was der Spieler liest.
+ *
+ * @param code    `error.code` der API (z. B. 'API-305').
+ * @param fallback Text, wenn der Code in keinem Katalog steht.
+ * @param reason  `error.details.reason` — unterscheidet Fälle hinter EINEM Code.
+ * @param details `error.details` — füllt Platzhalter (z. B. validRange).
+ */
 export function toUiError(
   code: string | undefined,
   fallback = 'Unbekannter Fehler',
   reason?: string,
   details?: Record<string, unknown>,
 ): UiError {
-  // API-302 hat zwei Ursachen: Solvenz-Cap beim Wetten (Einsatz zu groß für
-  // den Pool) vs. Tages-Auszahlungslimit. Der `reason` aus den API-Details
-  // unterscheidet sie — ohne reason bleibt die generische Meldung.
-  if (code === 'API-302' && reason === 'bankroll_cap') {
-    return {
-      code,
-      message: 'Einsatz übersteigt gerade das Gewinn-Limit des Pools — versuch einen kleineren Einsatz.',
-      action: 'info',
-    };
+  const eintrag = code ? aktiv.codes[code] : undefined;
+  if (!eintrag) {
+    return { code: code ?? 'ERR', message: fallback, action: 'retry' };
   }
-  // Ungültiger Spalten-/Feld-Index: der Server nennt den gültigen Bereich.
-  if (code === 'API-204' && (reason === 'invalid_column' || reason === 'invalid_tile')) {
-    const range = typeof details?.validRange === 'string' ? details.validRange : undefined;
-    return {
-      code,
-      message: range
-        ? `Ungültige Auswahl — gültig ist ${range}. (UI und Spiel-Config passen nicht zusammen?)`
-        : 'Ungültige Auswahl — außerhalb des Spielfelds.',
-      action: 'info',
-    };
+
+  const fall = reason ? eintrag.reasons?.[reason] : undefined;
+  let message = fall ? text(fall.text) : text(eintrag.text);
+  const action = fall?.action ?? eintrag.action;
+
+  // Der Server nennt bei Feld-/Spalten-Fehlern den gültigen Bereich. Ihn
+  // anzuhängen ist der Unterschied zwischen „ungültig" und einer Auskunft,
+  // mit der ein Spieler etwas anfangen kann.
+  if (typeof details?.validRange === 'string') {
+    message = `${message} (gültig: ${details.validRange})`;
   }
-  if (code && MAP[code]) return { code, ...MAP[code] };
-  return { code: code ?? 'ERR', message: fallback, action: 'retry' };
+
+  return { code: code ?? 'ERR', message, action };
+}
+
+/**
+ * Nur für Oberflächen mit eigener Sprachwahl (PvP): Text zu einem Code in
+ * EINER bestimmten Sprache, ohne die globale Sprache umzustellen.
+ */
+export function errorTextIn(
+  lang: CatalogLang,
+  code: string | undefined,
+  fallback: string,
+  reason?: string,
+): string {
+  const eintrag = code ? aktiv.codes[code] : undefined;
+  if (!eintrag) return fallback;
+  const fall = reason ? eintrag.reasons?.[reason] : undefined;
+  const t = fall ? fall.text : eintrag.text;
+  return t[lang] ?? t[aktiv.fallbackLang] ?? t.en ?? fallback;
 }

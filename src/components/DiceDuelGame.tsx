@@ -1,4 +1,5 @@
 'use client';
+import { verifyHref } from './VerifyLink';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
@@ -1205,7 +1206,7 @@ export function DiceDuelEnd({
         <p className="text-[11px] text-white/30">{t('reveal.settledAway')}</p>
         {matchId && (
           <a
-            href={`/api/pvp/verify/${matchId}`}
+            href={verifyHref(verifierUrl, matchId)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block text-sm text-accent underline underline-offset-2"

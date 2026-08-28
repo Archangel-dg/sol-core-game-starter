@@ -1,4 +1,5 @@
 'use client';
+import { BetLimitHint } from './BetLimitHint';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
@@ -112,6 +113,12 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
           {balance === null ? '—' : `${toSol(balance)} ◎`}
         </span>
       </div>
+      {/* Was JETZT hoechstens gesetzt werden darf. Steht bewusst direkt
+          unter dem Guthaben: Beide Zahlen zusammen beantworten die einzige
+          Frage vor dem Tippen — „wie viel habe ich, und wie viel davon
+          darf ich setzen?" Die engste Grenze ist meist die Pool-Groesse,
+          und die bewegt sich im Betrieb. */}
+      <BetLimitHint className="mt-2" />
       <div className="mt-3 flex items-center gap-2">
         <input
           value={amount}

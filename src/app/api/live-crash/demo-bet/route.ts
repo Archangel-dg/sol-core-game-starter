@@ -1,14 +1,11 @@
 // ⚠ Nicht ändern — Systemvertrag.
-// ECHTGELD-Einsatz. Geld-Route: Spieler-Token ist Pflicht — der Server nimmt
-// die Wallet aus der signierten Sitzung, nie aus dem Body. Im Browser deshalb
-// ausschließlich über `usePlayerAuth().moneyFetch`.
-//
-// Der Spielgeld-Zwilling liegt unter `/api/live-crash/demo-bet`. Welche der
+// SPIELGELD-Einsatz (Übungsmodus). Serverseitig apiKeyAuth-only, OHNE
+// Spieler-Sitzung — der Browser darf hier bewusst NICHT über `moneyFetch`
+// gehen. Der Echtgeld-Zwilling liegt unter `/api/live-crash/bet`; welche der
 // beiden ein Spiel ruft, entscheidet der Schalter aus dem Zustands-Poll
-// (`realMoney`) — nicht der Knopf und keine Annahme im Bundle. Steht der
-// Schalter aus, lehnt der Server hier mit API-206 ab.
+// (`realMoney`), nie eine Annahme im Bundle.
 import { NextResponse } from 'next/server';
-import { liveCrashBet, playerTokenFrom, SolcoreError } from '@/lib/solcore';
+import { liveCrashDemoBet, SolcoreError } from '@/lib/solcore';
 
 export async function POST(req: Request) {
   try {
@@ -21,15 +18,12 @@ export async function POST(req: Request) {
     if (!body.roundId || !body.playerWallet || !body.betLamports) {
       return NextResponse.json({ error: { code: 'API-204' } }, { status: 400 });
     }
-    const view = await liveCrashBet(
-      {
-        roundId: body.roundId,
-        playerWallet: body.playerWallet,
-        betLamports: body.betLamports,
-        safetyTargetBps: body.safetyTargetBps ?? null,
-      },
-      playerTokenFrom(req),
-    );
+    const view = await liveCrashDemoBet({
+      roundId: body.roundId,
+      playerWallet: body.playerWallet,
+      betLamports: body.betLamports,
+      safetyTargetBps: body.safetyTargetBps ?? null,
+    });
     return NextResponse.json(view);
   } catch (err) {
     if (err instanceof SolcoreError) {

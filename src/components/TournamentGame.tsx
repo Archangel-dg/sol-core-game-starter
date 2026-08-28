@@ -1,4 +1,5 @@
 'use client';
+import { VerifyLink } from './VerifyLink';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -39,7 +40,7 @@ function useCountdown(endsAt: string | undefined): string {
   return `${m}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export function TournamentGame({ engine }: { engine: EngineDef }) {
+export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; verifierUrl: string }) {
   const { publicKey, connected } = useWallet();
   // Geld-Routen laufen ausschließlich über moneyFetch (hängt das Spieler-Token an).
   const { moneyFetch } = usePlayerAuth();
@@ -288,6 +289,18 @@ export function TournamentGame({ engine }: { engine: EngineDef }) {
           </p>
         )}
       </div>
+
+      {/* Nachpruefbarkeit (Systemvertrag — nie entfernen): Der eigene Lauf ist
+          eine Kette aus Wuerfen, die sich aus Seed und Nonce nachrechnen
+          laesst. Ohne diesen Link war das Turnier die Mechanik, in der ein
+          Spieler seinem Ergebnis nur glauben konnte. */}
+      {view?.runId && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-xs">
+          <div className="mb-1 uppercase tracking-wide text-white/50">Provably Fair</div>
+          <div className="break-all text-white/60">Lauf {view.runId}</div>
+          <VerifyLink verifierUrl={verifierUrl} id={view.runId} label="Lauf verifizieren →" className="mt-1" />
+        </div>
+      )}
     </div>
   );
 }

@@ -1,8 +1,8 @@
 // ⚠ Nicht ändern — Systemvertrag.
-// ECHTGELD-Ausstieg. Geld-Route: Spieler-Token ist Pflicht (siehe
-// `/api/live-crash/bet`). Spielgeld-Zwilling: `/api/live-crash/demo-cashout`.
+// SPIELGELD-Ausstieg (Übungsmodus) — apiKeyAuth-only, kein Spieler-Token.
+// Echtgeld-Zwilling: `/api/live-crash/cashout`.
 import { NextResponse } from 'next/server';
-import { liveCrashCashout, playerTokenFrom, SolcoreError } from '@/lib/solcore';
+import { liveCrashDemoCashout, SolcoreError } from '@/lib/solcore';
 
 export async function POST(req: Request) {
   try {
@@ -10,10 +10,10 @@ export async function POST(req: Request) {
     if (!body.roundId || !body.playerWallet) {
       return NextResponse.json({ error: { code: 'API-204' } }, { status: 400 });
     }
-    const view = await liveCrashCashout(
-      { roundId: body.roundId, playerWallet: body.playerWallet },
-      playerTokenFrom(req),
-    );
+    const view = await liveCrashDemoCashout({
+      roundId: body.roundId,
+      playerWallet: body.playerWallet,
+    });
     return NextResponse.json(view);
   } catch (err) {
     if (err instanceof SolcoreError) {

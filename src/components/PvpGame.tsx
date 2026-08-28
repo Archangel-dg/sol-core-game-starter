@@ -9,7 +9,7 @@ import type {
   PvpStatsView,
   PvpChatMessage,
 } from '@/lib/solcore';
-import { buildDepositTx } from '@/lib/player-program';
+import { buildDepositTx, warteAufBestaetigung } from '@/lib/player-program';
 import { toSol, solToLamports } from '@/lib/lamports';
 import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { usePlayerAuth } from '@/lib/player-auth';
@@ -581,7 +581,7 @@ export function PvpGame({
               const lamports = solToLamports(sol);
               const tx = await buildDepositTx(connection, publicKey, lamports);
               const sig = await sendTransaction(tx, connection);
-              await connection.confirmTransaction(sig, 'confirmed');
+              await warteAufBestaetigung(connection, sig);
               setTimeout(() => void refreshBalance(), 6000);
               return t('wallet.depositSent');
             } catch (e) {

@@ -60,3 +60,25 @@ export async function buildDepositTx(
   tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
   return tx;
 }
+
+/**
+ * Wartet per HTTP-Polling auf die Bestaetigung einer Transaktion.
+ *
+ * Ersetzt `connection.confirmTransaction(...)`: Das lauscht per WebSocket, und
+ * die /api/rpc-Durchreiche kann kein WebSocket — confirmTransaction wuerde 60 s
+ * haengen und dann als Fehler enden, obwohl die Einzahlung laengst durch ist.
+ */
+export async function warteAufBestaetigung(
+  connection: Connection,
+  signature: string,
+): Promise<void> {
+  const bis = Date.now() + 60_000;
+  while (Date.now() < bis) {
+    const st = (await connection.getSignatureStatuses([signature])).value[0];
+    if (st?.err) throw new Error(`Transaktion fehlgeschlagen: ${JSON.stringify(st.err)}`);
+    if (st?.confirmationStatus === 'confirmed' || st?.confirmationStatus === 'finalized') return;
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  // Kein Reject als "fehlgeschlagen": Nach 60 s ist unklar, nicht kaputt.
+  throw new Error('Bestätigung dauert länger als üblich — prüfe dein Guthaben in ein paar Sekunden.');
+}

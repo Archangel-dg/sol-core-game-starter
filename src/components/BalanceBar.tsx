@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { buildDepositTx } from '@/lib/player-program';
+import { buildDepositTx, warteAufBestaetigung } from '@/lib/player-program';
 import { toSol, solToLamports } from '@/lib/lamports';
 import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { usePlayerAuth } from '@/lib/player-auth';
@@ -63,7 +63,7 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
       const lamports = solToLamports(amount);
       const tx = await buildDepositTx(connection, publicKey, lamports);
       const sig = await sendTransaction(tx, connection);
-      await connection.confirmTransaction(sig, 'confirmed');
+      await warteAufBestaetigung(connection, sig);
       setMsg('Einzahlung gesendet — Guthaben erscheint in ~5–10 s.');
       setTimeout(() => void refresh(), 6000);
     } catch (e) {

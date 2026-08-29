@@ -30,12 +30,15 @@ Standalone, the rules you must keep are:
 - **Every finished round links into the Sol-Core Scanner** via `VerifyLink`/`verifyHref`
   (`<verifierUrl>/verify/<id>`) — for every mechanic, and never at a raw `/api/.../verify/...`
   JSON endpoint.
+- **Every page carries its origin.** `PoweredBy` renders `Powered by Sol-Core Engine` at the foot
+  of the page, the name linking to <https://sol-core.com>. It lives in `app/layout.tsx`, above all
+  render paths — never move it into a game component, where the next re-skin loses it.
 - **Responsible by construction:** no near-miss, no loss-as-win, withdrawal as easy as deposit.
 - **Every money call needs a player token** (wallet signature → `POST /api/game/authorize`, 15 min,
   bound to wallet + game). In the browser always `usePlayerAuth().moneyFetch(…)`; the route handlers
   forward it as `Authorization: Bearer`. Mainnet runs `PLAYER_AUTH_MODE=enforce` → `API-402` without it.
 - **Do not edit system-contract files:** `src/app/api/*`, `src/lib/{solcore,config,lamports,errors,engines,player-program,player-auth,bet-limits,i18n}.*`,
-  `src/lib/error-catalog.generated.ts`, `src/components/{Providers,VerifyLink,BetLimitHint}.tsx`.
+  `src/lib/error-catalog.generated.ts`, `src/components/{Providers,VerifyLink,BetLimitHint,PoweredBy}.tsx`.
 
 Binding docs: `docs/RULES.md`, `docs/API-REFERENCE.md`, `docs/ENGINES.md`, `docs/CUSTOMIZE.md`.
 Before declaring work done: `npm run typecheck`, `npm run build` and `npm run check:contract` must

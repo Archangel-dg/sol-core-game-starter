@@ -330,6 +330,44 @@ pruef(gibt(/verifyHref\(|<VerifyLink\b/), 'Verify-Link wird benutzt');
   }
 }
 
+// ── 7. Herkunft ─────────────────────────────────────────────────────────────
+console.log('\n7) Herkunft — „Powered by Sol-Core Engine" am Fuß jeder Seite');
+pruef(dateiDa('src/components/PoweredBy.tsx'), 'Herkunftszeile vorhanden (PoweredBy)');
+{
+  // Im LAYOUT, nicht in einer Spielkomponente: Die Vorlage hat sieben
+  // Render-Pfade, und eine Fußzeile je Pfad überlebt kein Re-Skin.
+  const layout = existsSync(join(WURZEL, 'src/app/layout.tsx'))
+    ? readFileSync(join(WURZEL, 'src/app/layout.tsx'), 'utf8')
+    : '';
+  pruef(
+    /<PoweredBy[\s/>]/.test(layout),
+    'Steht im Layout — damit auf JEDER Seite',
+    'src/app/layout.tsx rendert <PoweredBy /> nicht. In einer einzelnen ' +
+      'Spielkomponente fällt die Zeile beim nächsten Umbau weg.',
+  );
+}
+{
+  const quelle = existsSync(join(WURZEL, 'src/components/PoweredBy.tsx'))
+    ? readFileSync(join(WURZEL, 'src/components/PoweredBy.tsx'), 'utf8')
+    : '';
+  pruef(
+    /https:\/\/sol-core\.com/.test(quelle),
+    'Der Name verlinkt auf sol-core.com',
+    'Kein Link auf sol-core.com — die Zeile nennt die Engine, führt aber nirgendwo hin.',
+  );
+  pruef(/Sol-Core Engine/.test(quelle), 'Der verlinkte Text lautet „Sol-Core Engine"');
+  pruef(
+    /rel=\{?["'`][^"'`]*noopener/.test(quelle),
+    'Externer Link mit rel="noopener"',
+    'Ohne noopener bekommt die Zielseite Zugriff auf das Spielfenster.',
+  );
+  pruef(
+    /t\(['"]app\.poweredBy['"]\)/.test(quelle),
+    'Das „Powered by" läuft durch den Sprachkatalog',
+    'Fest verdrahtet statt übersetzt — Regel 11 gilt auch hier.',
+  );
+}
+
 console.log(
   `\n${fehler === 0 ? '✅ Vertrag eingehalten.' : `❌ ${fehler} Zusage(n) gebrochen.`}`,
 );

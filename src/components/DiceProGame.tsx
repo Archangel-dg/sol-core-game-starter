@@ -685,12 +685,6 @@ export function DiceProGame({
         </p>
       )}
 
-      <footer className="mt-8 flex items-center justify-center gap-2 text-[11px] text-white/30">
-        <a href={platformUrl ?? verifierUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white/60">
-          {t('info.poweredBy')}
-        </a>
-      </footer>
-
       {walletOpen && (
         <WalletModal
           t={t}

@@ -562,12 +562,6 @@ export function PvpGame({
         </p>
       )}
 
-      <footer className="mt-8 flex items-center justify-center gap-2 text-[11px] text-white/30">
-        <a href={platformUrl ?? verifierUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white/60">
-          {t('info.poweredBy')}
-        </a>
-      </footer>
-
       {/* ── Overlays ── */}
       {walletOpen && (
         <WalletModal
@@ -1343,7 +1337,7 @@ export function InfoModal({ t, verifierUrl, onClose }: { t: TFn; verifierUrl: st
           rel="noopener noreferrer"
           className="inline-block rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent"
         >
-          {t('info.poweredBy')} ↗
+          {t('menu.verify')} ↗
         </a>
       </div>
     </Overlay>

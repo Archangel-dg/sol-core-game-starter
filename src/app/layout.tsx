@@ -3,6 +3,7 @@ import { networkLabel } from '@/lib/solana';
 import type { CSSProperties, ReactNode } from 'react';
 import './globals.css';
 import { Providers } from '@/components/Providers';
+import { PoweredBy } from '@/components/PoweredBy';
 
 export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_GAME_NAME ?? 'Sol-Core Game',
@@ -27,8 +28,14 @@ function accentStyle(): CSSProperties | undefined {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="de">
-      <body className="min-h-screen font-mono antialiased" style={accentStyle()}>
-        <Providers>{children}</Providers>
+      {/* Spalte + flex-1: Ist eine Seite kürzer als der Bildschirm, steht die
+          Herkunftszeile trotzdem unten und nicht mitten im Bild. */}
+      <body className="flex min-h-screen flex-col font-mono antialiased" style={accentStyle()}>
+        <Providers>
+          <div className="flex-1">{children}</div>
+          {/* Systemvertrag: auf JEDER Seite, unter allen Render-Pfaden. */}
+          <PoweredBy />
+        </Providers>
       </body>
     </html>
   );

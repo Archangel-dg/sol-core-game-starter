@@ -32,6 +32,15 @@ export const STRINGS = {
     fr: 'Chargement…',
     ru: 'Загрузка…',
   },
+  // Die Herkunftszeile am Seitenfuß (components/PoweredBy.tsx). Übersetzt wird
+  // nur das „Powered by" — „Sol-Core Engine" ist ein Eigenname und bleibt in
+  // jeder Sprache stehen.
+  'app.poweredBy': {
+    en: 'Powered by',
+    de: 'Betrieben mit',
+    fr: 'Propulsé par',
+    ru: 'Работает на',
+  },
   'app.backendUnreachable': {
     en: 'Backend unreachable',
     de: 'Backend nicht erreichbar',

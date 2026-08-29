@@ -120,7 +120,6 @@ const EN: Catalog = {
     'Player vs. player: create or join a lobby, set a stake, both mark ready. The server flips one provably-fair coin — the winner takes the whole pot. Money is only charged when the game starts (both ready), never when the lobby is created. Leaving before the start is free.',
   'info.fees':
     'Fees (platform + creator) are taken on top of the stake and are always kept, win or lose. The winner receives the whole pot (both clean stakes).',
-  'info.poweredBy': 'Powered by Sol-Core — provably fair gaming',
   // demo (used by the demo layer in the DevKit template)
   'demo.badge': 'Demo',
   'demo.intro': 'Practice against the server bot with simulated SOL — no wallet, no real money.',
@@ -318,7 +317,6 @@ const DE: Catalog = {
     'Spieler gegen Spieler: Lobby erstellen oder beitreten, Einsatz setzen, beide auf „bereit". Der Server wirft eine provably-faire Münze — der Gewinner bekommt den ganzen Pot. Geld wird erst beim Spielstart (beide bereit) gebucht, nie beim Erstellen. Verlassen vor dem Start ist kostenlos.',
   'info.fees':
     'Fees (Plattform + Creator) kommen on top auf den Einsatz und bleiben immer einbehalten — egal ob Sieg oder Niederlage. Der Gewinner erhält den ganzen Pot (beide sauberen Einsätze).',
-  'info.poweredBy': 'Powered by Sol-Core — Provably Fair Gaming',
   'demo.badge': 'Demo',
   'demo.intro': 'Übung gegen den Server-Bot mit simulierten SOL — ohne Wallet, ohne echtes Geld.',
   'demo.play': 'Demo-Wurf spielen',
@@ -511,7 +509,6 @@ const FR: Catalog = {
     'Joueur contre joueur : créez ou rejoignez un salon, définissez une mise, les deux se déclarent prêts. Le serveur lance une pièce provably-fair — le gagnant remporte tout le pot. L’argent n’est débité qu’au démarrage (les deux prêts), jamais à la création. Quitter avant le départ est gratuit.',
   'info.fees':
     'Les frais (plateforme + créateur) s’ajoutent à la mise et sont toujours conservés, gagné ou perdu. Le gagnant reçoit tout le pot (les deux mises nettes).',
-  'info.poweredBy': 'Propulsé par Sol-Core — jeu provably fair',
   'demo.badge': 'Démo',
   'demo.intro': 'Entraînez-vous contre le bot du serveur avec des SOL simulés — sans portefeuille, sans argent réel.',
   'demo.play': 'Lancer en démo',
@@ -704,7 +701,6 @@ const RU: Catalog = {
     'Игрок против игрока: создайте лобби или присоединитесь, задайте ставку, оба отмечают готовность. Сервер бросает provably-fair монету — победитель забирает весь пот. Деньги списываются только при старте (оба готовы), никогда при создании. Выход до старта бесплатен.',
   'info.fees':
     'Комиссии (платформа + создатель) добавляются сверх ставки и всегда удерживаются — при выигрыше и проигрыше. Победитель получает весь пот (обе чистые ставки).',
-  'info.poweredBy': 'На платформе Sol-Core — provably fair',
   'demo.badge': 'Демо',
   'demo.intro': 'Тренируйтесь против бота сервера с симулированными SOL — без кошелька и реальных денег.',
   'demo.play': 'Демо-бросок',

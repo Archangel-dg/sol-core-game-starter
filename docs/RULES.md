@@ -78,11 +78,31 @@ payout-ready game — automatically.
    calls with `API-402`. See API-REFERENCE.md → "Player authorization".
    The demo layer (`/api/demo/*`) is the one exception — it moves no money and needs no token.
 
+14. **Every page carries its origin.** At the foot of the page stands
+    `Powered by Sol-Core Engine`, where the name links to <https://sol-core.com>.
+    `components/PoweredBy.tsx` renders it, and it sits in `app/layout.tsx` — above all seven
+    render paths (loading, engine mismatch, the normal game, four full-bleed PvP surfaces), each
+    of which ends in its own `<main>`. A footer that lives inside a game component does not
+    survive the first re-skin: that is exactly how the six older "Powered by Sol-Core" lines
+    ended up pointing at the platform or the verifier instead of the engine. Restyle it — colour,
+    size, spacing, position within the footer — but keep the sentence, keep the link target, and
+    keep it on every page. Only "Powered by" is translated; "Sol-Core Engine" is a proper name.
+
+14. **Every page carries its origin.** At the foot of the page stands
+    `Powered by Sol-Core Engine`, where the name links to <https://sol-core.com>.
+    `components/PoweredBy.tsx` renders it, and it sits in `app/layout.tsx` — above all seven
+    render paths (loading, engine mismatch, the normal game, four full-bleed PvP surfaces), each
+    of which ends in its own `<main>`. A footer that lives inside a game component does not
+    survive the first re-skin: that is exactly how the six older "Powered by Sol-Core" lines
+    ended up pointing at the platform or the verifier instead of the engine. Restyle it — colour,
+    size, spacing, position within the footer — but keep the sentence, keep the link target, and
+    keep it on every page. Only "Powered by" is translated; "Sol-Core Engine" is a proper name.
+
 ## Off-limits files (they work — don't rebuild them)
 
 `app/api/*` · `lib/solcore.ts` · `lib/config.ts` · `lib/lamports.ts` · `lib/errors.ts` ·
 `lib/error-catalog.generated.ts` · `lib/bet-limits.tsx` · `lib/i18n.tsx` ·
-`components/VerifyLink.tsx` · `components/BetLimitHint.tsx` ·
+`components/VerifyLink.tsx` · `components/BetLimitHint.tsx` · `components/PoweredBy.tsx` ·
 `lib/engines.ts` · `lib/player-program.ts` · `lib/player-auth.ts` · `lib/crash-math.ts` ·
 `components/Providers.tsx`
 

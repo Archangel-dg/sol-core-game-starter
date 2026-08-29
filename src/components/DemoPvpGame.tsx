@@ -227,7 +227,7 @@ export function DemoPvpGame({
 
       <footer className="mt-6 text-center text-[11px] text-white/30">
         <a href={verifierUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white/60">
-          {engine.pvp?.hint ?? t('info.poweredBy')}
+          {engine.pvp?.hint ?? t('menu.verify')}
         </a>
       </footer>
     </main>

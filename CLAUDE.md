@@ -26,7 +26,8 @@ API. All engines are supported; the active engine comes from `NEXT_PUBLIC_ENGINE
 `src/lib/errors.ts`, `src/lib/error-catalog.generated.ts`, `src/lib/bet-limits.tsx`,
 `src/lib/engines.ts`, `src/lib/player-program.ts`, `src/lib/player-auth.ts`,
 `src/lib/crash-math.ts`, `src/lib/i18n.tsx`, `src/components/Providers.tsx`,
-`src/components/VerifyLink.tsx`, `src/components/BetLimitHint.tsx`.
+`src/components/VerifyLink.tsx`, `src/components/BetLimitHint.tsx`,
+`src/components/PoweredBy.tsx`.
 (`src/lib/strings.ts` is the exception: the wording is design zone — only the
 requirement that every key carries all four languages is contract.)
 
@@ -58,6 +59,10 @@ them only if the user explicitly asks and you are certain the contract with the 
 11. English is the main language; de/fr/ru ship with it. Every visible string goes through `t(...)`
     (`lib/i18n.tsx`), the catalog is `lib/strings.ts` with all four languages per key. Keep
     `LangSwitch` reachable. Never hard-code a sentence into a component.
+12. Every page carries its origin: `Powered by Sol-Core Engine` at the foot, the name linking
+    to `https://sol-core.com`. `PoweredBy` is rendered in `app/layout.tsx` — above all seven render
+    paths, so no re-skin of a single screen can drop it. Only "Powered by" goes through the
+    catalog; the name is not translated.
 
 ## Tasks that are safe
 
@@ -86,7 +91,7 @@ into a bundle cannot follow a switch.
 `npm run typecheck` and `npm run build` must pass, and `npm run check:contract` must be green — it
 reads your own source and verifies the promises are still wired (deposit/withdraw incl.
 `/api/rpc`, error texts from the server catalog, max bet at every bet field, all four languages
-plus a switcher, Scanner link in every mechanic). For behavior changes, also `npm run check` against the configured backend.
+plus a switcher, Scanner link in every mechanic, the origin line in the layout). For behavior changes, also `npm run check` against the configured backend.
 
 That check exists because none of this fails loudly: a re-skin that drops the max-bet line or
 repoints a verify link leaves a game that still runs, still pays out, and is quietly worse. All

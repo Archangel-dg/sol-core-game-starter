@@ -21,6 +21,9 @@ Standalone, the rules you must keep are:
   fails with 403.
 - **Show the maximum bet, quietly but always:** `BetLimitHint` at the balance, `MaxBetPick` at every
   bet field. It is the minimum of several caps and moves during operation.
+- **The demo mode stays.** `/api/demo/*` plus `DemoProvider`/`DemoBar` let a visitor try the game
+  on a simulated balance before depositing. Every demo spin is server-decided and verifiable like a
+  real one. Restyle it freely, but never remove it and keep the entry point reachable.
 - **English is the main language; de/fr/ru ship with it.** Every visible string goes through
   `t(...)` (`src/lib/i18n.tsx`); the catalog `src/lib/strings.ts` carries all four languages per
   key. Keep `LangSwitch` reachable. Never hard-code a sentence into a component.

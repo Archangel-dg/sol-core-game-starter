@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Vertrags-Selbsttest: prüft im eigenen Quelltext, ob dieses Spiel die vier
+ * Vertrags-Selbsttest: prüft im eigenen Quelltext, ob dieses Spiel die sechs
  * Zusagen noch einhält, die für JEDES Sol-Core-Spiel gelten.
  *
  * WARUM ES DAS GIBT (28.08.2026)
@@ -17,9 +17,10 @@
  *      jede Einzahlung auf einer Creator-Domain an 403 scheitert.
  *   2. FEHLERTEXTE über den Server-Katalog — keine eigene, driftende Liste.
  *   3. HÖCHSTEINSATZ sichtbar — an der Geld-Leiste und an den Einsatzfeldern.
- *   4. SPRACHEN — Englisch als Hauptsprache, dazu Deutsch, Französisch,
+ *   4. DEMO-MODUS — die Eingangstür: ausprobieren, bevor Geld fließt.
+ *   5. SPRACHEN — Englisch als Hauptsprache, dazu Deutsch, Französisch,
  *      Russisch; jeder Schlüssel in allen vieren, und ein Umschalter dafür.
- *   5. VERIFY-LINK auf den Sol-Core Scanner — nicht auf rohes JSON.
+ *   6. VERIFY-LINK auf den Sol-Core Scanner — nicht auf rohes JSON.
  *
  * Lauf:  node scripts/check-contract.mjs   (auch Teil von `npm run check`)
  * Exit-Code 1, sobald eine Zusage gebrochen ist.
@@ -177,7 +178,52 @@ pruef(
   );
 }
 
-// ── 4. Sprachen ─────────────────────────────────────────────────────────────
+// ── 4. Demo-Modus ───────────────────────────────────────────────────────────
+console.log('\n4) Demo-Modus — risikofrei ausprobieren, bevor Geld fliesst');
+{
+  // Der Demo-Modus ist die einzige Stelle, an der ein Besucher das Spiel
+  // kennenlernt, ohne vorher einzuzahlen. Er ist beim Abgleich der beiden
+  // Vorlagen am 29.08.2026 fast verlorengegangen — der Arbeitsbaum hatte ihn
+  // schlicht nicht, und niemandem waere es aufgefallen, weil das Spiel ohne
+  // ihn genauso laeuft. Nur eben ohne Eingangstuer.
+  pruef(
+    dateiDa('src/app/api/demo/start/route.ts'),
+    'Demo-Einstieg vorhanden (/api/demo/start)',
+    'Ohne ihn gibt es keine simulierte Wallet — der Uebungsmodus faellt aus.',
+  );
+  pruef(
+    dateiDa('src/app/api/demo/play/route.ts') && dateiDa('src/app/api/demo/balance'),
+    'Demo-Runden und -Guthaben erreichbar',
+  );
+  pruef(
+    dateiDa('src/components/DemoProvider.tsx') && gibt(/<DemoProvider\b/),
+    'Demo-Zustand umschliesst die App (DemoProvider)',
+  );
+  pruef(
+    gibt(/<DemoBar\b/),
+    'Der Besucher kommt in den Demo-Modus hinein (DemoBar)',
+    'Die Routen allein nuetzen nichts, wenn kein Knopf sie erreicht.',
+  );
+  {
+    // Jede Spiel-Komponente, die echtes Geld bewegt, muss den Demo-Zweig
+    // kennen — sonst spielt der Uebungsmodus stillschweigend mit echtem Geld
+    // oder gar nicht.
+    const geldSpiele = ['SingleBetGame', 'SessionGame'];
+    const ohneZweig = geldSpiele.filter((n) => {
+      const p = join(WURZEL, `src/components/${n}.tsx`);
+      if (!existsSync(p)) return false;
+      const t = readFileSync(p, 'utf8');
+      return !/\bdemo\b/.test(t);
+    });
+    pruef(
+      ohneZweig.length === 0,
+      'Die Geld-Spiele kennen den Demo-Zweig',
+      ohneZweig.length ? `Ohne Demo-Zweig: ${ohneZweig.join(', ')}` : undefined,
+    );
+  }
+}
+
+// ── 5. Sprachen ─────────────────────────────────────────────────────────────
 console.log('\n4) Sprachen — Englisch als Hauptsprache, dazu de/fr/ru');
 pruef(dateiDa('src/lib/i18n.tsx'), 'Sprachschicht vorhanden (lib/i18n.tsx)');
 pruef(dateiDa('src/lib/strings.ts'), 'Textkatalog vorhanden (lib/strings.ts)');

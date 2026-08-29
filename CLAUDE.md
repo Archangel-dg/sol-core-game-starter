@@ -51,7 +51,11 @@ them only if the user explicitly asks and you are certain the contract with the 
    every bet field. It is the minimum of several caps and moves during operation.
 9. Every finished round links into the Sol-Core Scanner via `VerifyLink`/`verifyHref` — never to a
    raw `/api/.../verify/...` JSON endpoint.
-10. English is the main language; de/fr/ru ship with it. Every visible string goes through `t(...)`
+10. The demo mode stays. `/api/demo/*` + `DemoProvider`/`DemoBar` let a visitor try the game with a
+    simulated 3 SOL balance before depositing anything — every demo spin is server-decided and
+    verifiable exactly like a real one. It is the only door into the game that does not start with
+    a deposit; never remove it, and keep the entry point reachable.
+11. English is the main language; de/fr/ru ship with it. Every visible string goes through `t(...)`
     (`lib/i18n.tsx`), the catalog is `lib/strings.ts` with all four languages per key. Keep
     `LangSwitch` reachable. Never hard-code a sentence into a component.
 

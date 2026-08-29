@@ -224,7 +224,7 @@ console.log('\n4) Demo-Modus — risikofrei ausprobieren, bevor Geld fliesst');
 }
 
 // ── 5. Sprachen ─────────────────────────────────────────────────────────────
-console.log('\n4) Sprachen — Englisch als Hauptsprache, dazu de/fr/ru');
+console.log('\n5) Sprachen — Englisch als Hauptsprache, dazu de/fr/ru');
 pruef(dateiDa('src/lib/i18n.tsx'), 'Sprachschicht vorhanden (lib/i18n.tsx)');
 pruef(dateiDa('src/lib/strings.ts'), 'Textkatalog vorhanden (lib/strings.ts)');
 pruef(
@@ -290,8 +290,8 @@ pruef(
   );
 }
 
-// ── 5. Nachprüfbarkeit ──────────────────────────────────────────────────────
-console.log('\n5) Verify — Direktlink in den Sol-Core Scanner');
+// ── 6. Nachprüfbarkeit ──────────────────────────────────────────────────────
+console.log('\n6) Verify — Direktlink in den Sol-Core Scanner');
 pruef(dateiDa('src/components/VerifyLink.tsx'), 'Verify-Link-Komponente vorhanden');
 pruef(gibt(/verifyHref\(|<VerifyLink\b/), 'Verify-Link wird benutzt');
 {

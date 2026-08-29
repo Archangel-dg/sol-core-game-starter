@@ -30,7 +30,8 @@ Optional re-skin: add `NEXT_PUBLIC_ACCENT_COLOR=#RRGGBB` in Vercel → Environme
 ```bash
 npm install
 
-# Get a throwaway GAME_ID + API key on devnet (dev only):
+# Get a throwaway GAME_ID + API key on devnet — the staging default (dev only;
+# mainnet setup: see docs/mainnet-migration.md):
 node scripts/create-test-game.mjs        # prints SOLCORE_GAME_ID + SOLCORE_API_KEY
 
 cp .env.example .env                      # paste those values, pick your engine

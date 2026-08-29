@@ -8,10 +8,9 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 
 - **single** — one bet, immediate result (`/api/game/bet`).
 - **session** — progressive: start a round → steps → cash out any time (`/api/game/session/*`). The
-  whole outcome is committed at start (provably-fair) and the stake is charged **once, at start** —
+  whole outcome is committed at start (provably-fair). The stake is charged **once, at start** —
   every step after that is free. **One exception: `spin-tower-pro`, where every step costs the
-  stake again** (and only the seed commitment is fixed at start — the roll for spin *i* is derived
-  at that spin) — see [Pay-per-spin](#pay-per-spin-spin-tower-pro) below. It is still the `session`
+  stake again** — see [Pay-per-spin](#pay-per-spin-spin-tower-pro) below. It is still the `session`
   mechanic (same routes, same flow); the engine definition just carries
   `session.costPerStep: true`.
 - **tournament** — pot-based highscore runs (`/api/game/tournament/*`): a fixed entry fee per run
@@ -51,9 +50,9 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `slots-modular` | slot | ✓ | | `{}` |
 | `towers` | chain | | ✓ | — (session) |
 | `dice-ladder` | chain | | ✓ | — (session) |
-| `pump` | curve | | ✓ | — (session) |
 | `steps` | chain | | ✓ | — (session) |
 | `spin-tower-pro` | chain | | ✓ | — (session; **every spin costs the stake again**) |
+| `pump` | curve | | ✓ | — (session) |
 | `gauntlet` | tournament | | | — (tournament) |
 | `live-odds` | live | | | — (live; outcomes/odds from `/live/state`) |
 | `live-crash` | live | | | — (live; shared flight, cash out mid-round — **demo money only**, see below) |
@@ -69,7 +68,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `hilo` | `{ guess: "higher"\|"lower" }` (a tie loses; ends after 20 steps) |
 | `dice-ladder` | `{ guess: "higher"\|"lower" }` on the next **dice sum** (a tie loses unless the game sets `tieRule: "win"`; ends after `config.maxSteps`, default 15) |
 | `pump` | `{}` (just pump again) |
-| `steps` | `{}` (one climb attempt). Note: `SessionView.steps` counts climb ATTEMPTS for this engine — the current rung is `progress.currentStep` and remaining lives are `progress.livesLeft`; the ladder (`ladderBps`), `checkpoints`, `lives` and `dropMode` arrive via the resolved engine config |
+| `steps` | `{}` (just climb again) |
 | `spin-tower-pro` | `{}` (just spin again) — **but this step is charged**, see below |
 
 <a id="pay-per-spin-spin-tower-pro"></a>
@@ -176,14 +175,23 @@ background poll can't spoil the winner; never remove it.
 
 ## Crash rounds (`live-crash`)
 
-**Demo money only at this stage.** `platform_engines.real_money_enabled` for `live-crash` is
-`false` (the table is a fail-closed allowlist — a missing or `false` row means no real money moves,
-see `migrations/024_platform_engines.sql`). The two money routes are `apiKeyAuth`-only with **no
-player-token binding** (`src/app/api/live-crash/bet/route.ts`, `.../cashout/route.ts`) — the client
-uses plain `fetch`, never `usePlayerAuth().moneyFetch`. On the Sol-Core Gaming API itself these are
-literally named `demo-bet` / `demo-cashout`. A later stage turns real money on for this engine and
-adds the session binding; until then, do not build anything here that implies a player can win or
-lose real SOL.
+**Two money modes since stage 3 (2026-08-28).** The Gaming API now carries BOTH pairs of routes:
+the demo pair (`POST /live-crash/demo-bet` / `demo-cashout`, `apiKeyAuth`-only, play money against
+`live_crash_demo_balances`) **and** the real-money pair (`POST /live-crash/bet` / `cashout`,
+`apiKeyAuth` **plus** `requirePlayerSession` — the wallet always comes from the signed player
+token, never from the body, exactly like `/live/bet`). The real path adds fees (fee-on-top like
+`/bet`), the per-round liability cap against the bankroll share (`API-302`,
+`reason: 'crash_exposure_cap'`, including how much still fits), and settlement through sol-core
+with the payout-hold mechanism. Whether real bets are ACCEPTED is still gated by
+`platform_engines.real_money_enabled` (fail-closed allowlist, `migrations/024_platform_engines.sql`)
+— cashout and settlement are never gated.
+
+**This starter template still plays the demo pair.** Its crash routes
+(`src/app/api/live-crash/bet/route.ts`, `.../cashout/route.ts`) call `demo-bet`/`demo-cashout`
+with plain `fetch` and no player token. Upgrading the template to real money means: call the new
+route pair, add the session binding via `usePlayerAuth().moneyFetch` (same pattern as `/live/bet`),
+and surface fees and the `crash_exposure_cap` error to the player. Until that template stage ships,
+do not build anything HERE that implies a player can win or lose real SOL.
 
 Flow: poll `GET /live-crash/state` (1 s) for the shared round, the shared player list, the server
 clock offset (`serverTime`, same clock-offset pattern as `live-odds`), and `config.ceilingBps` —
@@ -219,29 +227,28 @@ or **join** an open one (`POST /pvp/lobby/:id/join`) → in the lobby room chat
 (`POST /pvp/lobby/:id/chat`), the host may change the stake (`POST /pvp/lobby/:id/stake`, which
 un-readies everyone) or kick (`POST /pvp/lobby/:id/kick`) → each player marks **ready**
 (`POST /pvp/lobby/:id/ready`, sending their hex `clientSeed`) → when **both** are ready the server
-locks, debits both seats and draws; at `settled` the winner is paid the whole pot.
+locks, debits both seats and draws → at `settled` the winner is paid the whole pot.
 
 - **Poll the lobby room** with `GET /pvp/lobby/:id?since=<chatCursor>` — this is **membership-checked
   and token-bound**: the poll must carry the player's Bearer token (the starter uses
-  `usePlayerAuth().authFetch`), a non-member gets `API-700`. The open-lobby list
-  (`GET /pvp/lobbies`), match view (`GET /pvp/match/:id`), W/L stats (`GET /pvp/me/:wallet`) and
-  verify (`GET /pvp/verify/:matchId`) are plain reads.
-- **Money is only charged at the lock** (both ready), not at lobby creation; leaving before the
-  start is free. Fees are taken on top of the stake and always kept — the winner receives the whole
-  pot (both clean stakes).
+  `usePlayerAuth().authFetch`), a non-member gets `API-700`. The per-game open-lobby list
+  (`GET /pvp/lobbies`), the match view (`GET /pvp/match/:id`), the W/L stats
+  (`GET /pvp/me/:wallet`) and the verify (`GET /pvp/verify/:matchId`) are plain reads.
+- **Money is only charged at the lock** (both ready), not when the lobby is created; leaving before
+  the start is free. Fees (platform + creator) are taken on top of the stake and always kept — the
+  winner receives the whole pot (both clean stakes).
 - The reveal animation is deterministic from the lobby state's `match.drawAt` + `serverTime` offset
   (same clock-offset pattern as live), with the balance frozen until the result shows. The winner is
   paid server-side even if a tab closed. Provably fair:
   `roll = HMAC-SHA256(serverSeed, seat1Seed:seat2Seed:matchId:nonce)`, `roll < 50 → seat 1` (host).
-- **Demo:** `POST /api/demo/pvp/lobby` plays an instant match vs. the server bot on the simulated
-  balance (`GET /api/demo/pvp/match/:id` re-reads it) — token-free, isolated from the real tables.
-- Stake bounds / PIN policy come from the resolved engine config — never hardcode them.
+- Stake bounds (`minStakeLamports`/`maxStakeLamports`) and the PIN policy (`allowPin`) come from the
+  resolved engine config — never hardcode them.
 
 ## PvP Dice Duel (`pvp-dice-duel`, "Dice Risk")
 
 Same lobby → ready-check → lock flow as `pvp-coinflip` (create/join/chat/ready/stake/kick, money only
 charged at the lock, winner paid the whole pot). The difference is the **in-match phase**: instead of a
-single coin flip it is a **turn-based Farkle** duel. The template renders this in `DiceDuelGame.tsx`,
+single coin flip it is a **turn-based Farkle** duel. The starter renders this in `DiceDuelGame.tsx`,
 which reuses the entire coin-flip lobby shell (`Hero`, `OpenLobbiesTable`, `LobbyRoom`, wallet/menu/info/
 create dialogs, exported from `PvpGame.tsx`) and only swaps the in-match view.
 
@@ -262,12 +269,8 @@ create dialogs, exported from `PvpGame.tsx`) and only swaps the in-match view.
   Formats: `quick3` (3 turns each, most points wins) / `race10000` (first to `targetScore` = 10000, the
   opponent gets one last turn). A **move timer** counts down from `moveDeadline` (server auto-banks on
   expiry — the UI just keeps polling).
-- **End**: winner + payout + a Verify link to `<verifier>/verify/<matchId>` (same as coin-flip) — the
-  public verifier accepts match IDs and replays the whole duel (opener picks, every die, every keep,
-  both scores) in the player's browser. The balance is frozen during the final settle.
-- **Demo:** `POST /api/demo/pvp/lobby` starts a turn-based match vs. the server bot on the simulated
-  balance; each `POST /api/demo/pvp/match/:id/move` plays the player's turn and the bot's reply in one
-  response — token-free, isolated from the real tables.
+- **End**: winner + payout + a Verify link to the raw `GET /pvp/verify/:matchId` (same as coin-flip). The
+  balance is frozen during the final settle.
 - Engine config echoes `matchFormat`, `minBankPoints`, `targetScore` (10000) and `waitTimeSeconds`
   (the move timer) in addition to the coin-flip fields.
 

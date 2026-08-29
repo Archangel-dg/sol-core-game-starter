@@ -17,9 +17,12 @@ Vercel is the easiest target (free, mobile-friendly). Any other Next.js platform
    | `NEXT_PUBLIC_GAME_NAME` | display name |
    | `NEXT_PUBLIC_ENGINE` | e.g. `dice` |
    | `NEXT_PUBLIC_MECHANIC` | `single` or `session` |
-   | `NEXT_PUBLIC_SOLANA_RPC` | `https://api.devnet.solana.com` |
-   | `NEXT_PUBLIC_SOLANA_NETWORK` | `devnet` |
-   | `NEXT_PUBLIC_PROGRAM_ID` | `8R7PfDa6FYVZdYgg7mGD8kfXNRN66M9VenLjP1t2qaoG` |
+   | `NEXT_PUBLIC_SOLANA_RPC` | devnet (staging): `https://api.devnet.solana.com` — mainnet: your RPC URL |
+   | `NEXT_PUBLIC_SOLANA_NETWORK` | `devnet` (staging) or `mainnet-beta` |
+   | `NEXT_PUBLIC_PROGRAM_ID` | devnet (staging): `8R7PfDa6FYVZdYgg7mGD8kfXNRN66M9VenLjP1t2qaoG` — mainnet: `<mainnet program id>` |
+
+   All three `NEXT_PUBLIC_SOLANA_*` variables are **required for production builds** — a missing
+   one fails the build (no silent devnet fallback). Mainnet values: see `docs/mainnet-migration.md`.
 4. **Deploy** → you get a `https://…vercel.app` URL.
 5. Register that URL as the game's URL in the **creator dashboard** — done.
 
@@ -35,5 +38,6 @@ npm run dev        # locally on http://localhost:3000
 
 - The hosted Gaming service may have a **~30–50s cold start** after idle. The first action then
   takes longer — that's normal.
-- To play for real, a player needs devnet SOL: **deposit** first (deposit button), then play. The
-  creator wallet must not play its own game.
+- To play for real, a player needs SOL on the configured network (devnet staging: free test SOL
+  from the faucet; mainnet: real SOL — see `docs/mainnet-migration.md`): **deposit** first
+  (deposit button), then play. The creator wallet must not play its own game.

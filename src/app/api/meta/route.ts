@@ -46,8 +46,10 @@ export async function GET() {
       // nicht: NEXT_PUBLIC_SOLANA_NETWORK auf mainnet-beta zu stellen und die
       // Programm-ID zu vergessen ergibt ein Spiel, das sich als Mainnet
       // ausweist und trotzdem gegen ein totes Programm signiert. Beides ist
-      // oeffentlich (steht im Browser-Bundle); der RPC nur als Host, weil in
-      // der vollen URL meist der Schluessel steckt.
+      // öffentlich (steht im Browser-Bundle); der RPC nur als Host, weil in
+      // der vollen URL meist der Schlüssel steckt.
+      // Fehlen diese Felder in einer Antwort, ist das Spiel ein Build von vor
+      // der Mainnet-Migration — siehe scripts/spiele-netz-pruefen.mjs.
       programId: PROGRAM_ID_STRING,
       rpcHost,
       engineConfig: cachedEngine?.engineConfig ?? null,

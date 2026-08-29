@@ -51,7 +51,8 @@ if (!API || !KEY || !GAME) { console.log('\n✗ Abbruch: .env unvollständig.');
 let devMock = false;
 {
   const h = await j(await fetch(`${API}/health`, { signal: AbortSignal.timeout(90000) }));
-  ok(h.status === 'ok', `Health erreichbar (devMock=${h.devMock})`);
+  // devMock wird vom Backend nur noch mitgesendet, wenn true — fehlend ⇒ false.
+  ok(h.status === 'ok', `Health erreichbar (devMock=${h.devMock === true})`);
   devMock = h.devMock === true;
 }
 

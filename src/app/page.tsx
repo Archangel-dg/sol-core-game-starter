@@ -23,6 +23,7 @@ import { FairnessPanel } from '@/components/FairnessPanel';
 import { History } from '@/components/History';
 import { BalanceFreezeProvider } from '@/lib/balance-freeze';
 import { getEngine } from '@/lib/engines';
+import { isMainnet, networkLabel } from '@/lib/solana';
 
 interface Meta {
   gameName: string;
@@ -241,7 +242,7 @@ function HomeInner({ meta }: { meta: Meta | null }) {
             <p className="pt-2 text-center text-[11px] text-white/30">
               {demo && meta.mechanic !== 'live'
                 ? t('demo.note')
-                : `${t('app.serverDecides')} ${t('app.devnetOnly')}`}
+                : `${t('app.serverDecides')}${isMainnet ? '' : ` ${t('app.devnetOnly')}`}`}
             </p>
           </div>
         </BalanceFreezeProvider>

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { networkLabel } from '@/lib/solana';
 import type { CSSProperties, ReactNode } from 'react';
 import './globals.css';
 import { Providers } from '@/components/Providers';
@@ -7,7 +8,10 @@ export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_GAME_NAME ?? 'Sol-Core Game',
   // Metadaten rendert der Server, bevor die Sprache des Besuchers feststeht —
   // deshalb bewusst die Hauptsprache Englisch (siehe lib/i18n.tsx).
-  description: 'A Sol-Core game (Devnet).',
+  // Netzwerkabhängig (Build-Zeit): NEXT_PUBLIC_SOLANA_NETWORK via lib/solana.
+  // Metadaten rendert der Server, bevor die Sprache des Besuchers feststeht —
+  // deshalb bewusst die Hauptsprache Englisch (siehe lib/i18n.tsx).
+  description: `A Sol-Core game (${networkLabel}).`,
 };
 
 /** Optionales Re-Skin ohne Code: NEXT_PUBLIC_ACCENT_COLOR=#RRGGBB

@@ -9,11 +9,11 @@ Auth for game endpoints: header `X-API-Key: sk_live_…` (set by the server prox
 
 `GET /health` → `{ status: "ok", devMock? }` — `devMock` is only present when `true` (missing ⇒
 `false`); no other operational details are exposed publicly.
-`devMock: true` ⇒ no balances, bets don't check funds → hide the money UI.
 
 There is **no `network` in `/health`.** It lives on `GET /health/full`, which is admin-only (same
 auth as `/api/admin/*`) and therefore not reachable from a game. Take the network from your own env
 (`NEXT_PUBLIC_SOLANA_NETWORK`) — that is what `GET /api/meta` returns.
+`devMock: true` ⇒ no balances, bets don't check funds → hide the money UI.
 
 ## Game config (API key)
 
@@ -28,7 +28,6 @@ render exactly this geometry, never guessed values:
 | `mines` | `{ gridSize, mineCount }` |
 | `pump` | `{ growthBps, maxPumps }` |
 | `hilo` | `{ maxSteps: 20 }` |
-| `steps` | `{ steps, winChanceBps, minSteps, failMode, ladderBps[], maxWinBps? }` (+ `lives`, `dropMode`, `checkpoints[]` in checkpoint mode) |
 | others | `{}` |
 
 Game config is immutable after creation → cache the response indefinitely. The starter exposes it
@@ -210,29 +209,36 @@ Wallet-bound actions need a player token (same as `/bet`); the lobby-room state 
 `API-700`. The open-lobby list, match view, W/L stats and verify are plain reads.
 
 - `POST /api/game/pvp/lobby` — `{ playerWallet, stakeLamports, pin?, clientSeed? }` → `PvpLobbyView`
-  (creates a lobby; **no money moves yet**). `API-704` = already in another lobby (details `lobbyId`).
-- `POST /api/game/pvp/lobby/:id/join` — `{ playerWallet, pin?, clientSeed? }` → `PvpLobbyView`
-  (wrong PIN → `API-703`, full → `API-701`, expired → `API-702`).
-- `POST /api/game/pvp/lobby/:id/leave` — `{ playerWallet }` → `{ left, dissolved }`.
+  (creates a lobby; **no money moves yet**). `API-704` = already in another lobby (details carry
+  `lobbyId`).
+- `POST /api/game/pvp/lobby/:id/join` — `{ playerWallet, pin?, clientSeed? }` → `PvpLobbyView`.
+  Wrong PIN → `API-703`; full → `API-701`; expired → `API-702`.
+- `POST /api/game/pvp/lobby/:id/leave` — `{ playerWallet }` → `{ left, dissolved }` (host leaving
+  dissolves the lobby).
 - `POST /api/game/pvp/lobby/:id/kick` — `{ playerWallet (host), wallet (target) }` → `PvpLobbyView`
-  (host only, `API-710` otherwise).
-- `POST /api/game/pvp/lobby/:id/ready` — `{ playerWallet, clientSeed? }` (hex `[0-9a-f]{1,64}`) →
-  `PvpLobbyView`. Both ready → server locks + draws; caller debit failure → `API-708`.
+  (host only, before the lock; `API-710` otherwise).
+- `POST /api/game/pvp/lobby/:id/ready` — `{ playerWallet, clientSeed? }` → `PvpLobbyView`. Send a hex
+  `clientSeed` (`[0-9a-f]{1,64}`). When **both** are ready the server locks, debits both seats and
+  draws; a debit failure on the caller → `API-708` (refunded, lobby reopened, ready reset).
 - `POST /api/game/pvp/lobby/:id/unready` — `{ playerWallet }` → `PvpLobbyView`.
 - `POST /api/game/pvp/lobby/:id/stake` — `{ playerWallet (host), stakeLamports }` → `PvpLobbyView`
   (host only; **un-readies everyone**; `API-706` if out of range).
-- `POST /api/game/pvp/lobby/:id/chat` — `{ playerWallet, message }` (≤200 chars, 1 msg / 2 s).
-- `GET /api/game/pvp/lobby/:id?since=<chatCursor>` — **token-bound** lobby-room state
-  (`members[]`, `match{…}|null`, `engineConfig`, `serverTime`); poll 1 s; non-member → `API-700`.
-- `GET /api/game/pvp/lobbies` — open lobbies of this game (host wallet truncated).
-- `GET /api/game/pvp/match/:id` — full match view (wallets truncated for non-participants).
+- `POST /api/game/pvp/lobby/:id/chat` — `{ playerWallet, message }` (≤200 chars, 1 msg / 2 s) →
+  `{ id, createdAt }`.
+- `GET /api/game/pvp/lobby/:id?since=<chatCursor>` — **token-bound** lobby-room state:
+  `{ lobbyId, status, hostWallet, stakeLamports, maxPlayers, hasPin, lastError, expiresAt,
+  members:[{ wallet, seatNo, ready, isHost, joinedAt }], match:{ matchId, status, drawAt, winnerSeat,
+  settledAt }|null, engineConfig, serverTime }`. Poll 1 s; non-member → `API-700`.
+- `GET /api/game/pvp/lobbies` — open lobbies of **this** game (host wallet truncated):
+  `{ lobbies:[{ lobbyId, hostWallet, stakeLamports, playersCurrent, playersMax, locked, ageSeconds,
+  createdAt }], serverTime }`.
+- `GET /api/game/pvp/match/:id` — full match view (seat wallets truncated for non-participants;
+  `result` appears at `settled`).
 - `GET /api/game/pvp/me/:wallet` — `{ wallet, wins, losses, total, recent:[…] }`.
-- `GET /api/game/pvp/verify/:matchId` — **public** provably-fair check
-  (`roll = HMAC-SHA256(serverSeed, seat1Seed:seat2Seed:matchId:nonce)`, `roll < 50 → seat 1`).
-  The human-readable verifier at `<verifier>/verify/<matchId>` accepts **match IDs as well as round
-  IDs** and recomputes the match in the player's browser — link players there, not at the raw JSON.
 - **Demo:** `POST /api/game/demo/pvp/lobby` — `{ playerWallet, stakeLamports, clientSeed? }` → an
   instant settled match vs. the server bot (token-free); `GET /api/game/demo/pvp/match/:id` re-reads it.
+- `GET /api/game/pvp/verify/:matchId` — **public** provably-fair check:
+  `roll = HMAC-SHA256(serverSeed, seat1Seed:seat2Seed:matchId:nonce)`, `roll < 50 → seat 1` (host).
 
 ### Dice Duel move (`pvp-dice-duel` only)
 
@@ -248,24 +254,28 @@ winnerSeat, matchOver, decisionLog }` (plus top-level `serverTime`). `tableDice`
   (min 1, must be a fully-scoring selection); `action` is `'roll'` (reroll the remaining dice; all
   six scored = hot dice → reroll all six with the turn score held) or `'bank'` (secure the turn score
   and end the turn). Wallet-bound (player token, same as `/bet`); **only the active seat** may move.
-  Errors: `API-710` not your turn · `API-204` `invalid_selection` / `dice_not_on_table` /
-  `cannot_bank` · `API-712` stale move (re-fetch the match view) · `API-707` seed rotated (voided +
-  refunded). On move-timer expiry the server auto-banks — the UI just keeps polling.
-- **Demo:** `POST /api/game/demo/pvp/match/:id/move` — same `{ playerWallet, keep, action }` body,
-  token-free; plays the player's turn and the bot's reply in one response.
+  Errors: `API-710` not your turn / not the active seat · `API-204` `invalid_selection` /
+  `dice_not_on_table` / `cannot_bank` (below `minBankPoints`) · `API-712` stale move (someone or the
+  timer already advanced — just re-fetch the match view) · `API-707` seed rotated (match voided +
+  refunded). On move-timer expiry (`moveDeadline`) the server auto-banks — the UI just keeps polling.
 
-Money is only charged at the lock (both ready), never at lobby creation; leaving before the start is
-free. Drive the reveal from `match.drawAt` + `serverTime` offset and freeze the balance until the
-result shows — the winner is paid even if a tab closed.
+Rules the UI MUST reflect:
+- **Money is only charged at the lock** (both ready), never at lobby creation; leaving before the
+  start is free. The winner takes the whole pot (both clean stakes); fees are kept regardless.
+- Drive the reveal from the lobby state's `match.drawAt` + `serverTime` offset (same clock-offset
+  pattern as live); freeze the balance until the result shows. The winner is paid even if a tab
+  closed.
+- Stake bounds / PIN policy come from the resolved engine config — never hardcode them.
 
 ## Player balance (program mode; hide when `devMock: true`)
 
 - `GET /api/game/balance/:wallet` → `{ wallet, devMock, balanceLamports: string|null }`
 - `POST /api/game/withdraw` — `{ playerWallet, amountLamports }` → `{ signature: string|null }`
   (null in dry-run). Balance too low → `API-305`.
-- **Deposit:** on-chain `player_deposit` instruction to the program `sol_core_vault` (devnet,
-  program ID `8R7PfDa6FYVZdYgg7mGD8kfXNRN66M9VenLjP1t2qaoG`), target PDA `player_vault`. The wallet
-  signs in the browser (see `lib/player-program.ts`); credited by the indexer in ~5–10s.
+- **Deposit:** on-chain `player_deposit` instruction to the program `sol_core_vault` (program ID
+  from `NEXT_PUBLIC_PROGRAM_ID` — devnet staging: `8R7PfDa6FYVZdYgg7mGD8kfXNRN66M9VenLjP1t2qaoG`,
+  mainnet: `<mainnet program id>`, see `docs/mainnet-migration.md`), target PDA `player_vault`. The
+  wallet signs in the browser (see `lib/player-program.ts`); credited by the indexer in ~5–10s.
 
 ## Bet limits (this app: `GET /api/limits`)
 
@@ -326,11 +336,19 @@ them knew the crash block (API-820…827). The table below is the overview, not 
 | API-311 | 400 | below minimum withdrawal (full balance always allowed) | notice |
 | API-500 | 5xx | server error | retry |
 
-PvP-specific (API-7xx): `API-700` lobby not found / not a member · `API-701` full · `API-702`
-expired · `API-703` wrong PIN · `API-704` already in another lobby (details `lobbyId`) · `API-705`
-self-match · `API-706` stake out of range · `API-707` seed rotated (refunded) · `API-708` balance
-too low at lock (refunded) · `API-709` PvP rate limit · `API-710` host-only / not the active seat
-(dice-duel move) · `API-711` already refunded · `API-712` stale dice-duel move (re-fetch the match
-view).
+PvP-specific (API-7xx): `API-700` lobby not found / not a member · `API-701` lobby full ·
+`API-702` lobby expired · `API-703` wrong PIN · `API-704` already in another lobby (details
+`lobbyId`) · `API-705` self-match blocked · `API-706` stake out of range · `API-707` seed session
+rotated (refunded) · `API-708` balance too low at lock (refunded) · `API-709` PvP rate limit ·
+`API-710` host-only action / not the active seat (dice-duel move) · `API-711` match already refunded ·
+`API-712` stale dice-duel move (re-fetch the match view).
+
+Live-crash (API-82x): `API-820` round gone (retry) · `API-821` betting closed, already flying ·
+`API-822` no open bet · `API-823` too late, already crashed · `API-824` auto-cashout out of range ·
+`API-825` already settled · `API-826` one bet per round · `API-827` not flying right now.
+
+Live-odds rounds (API-81x): `API-812` round not found · `API-813` betting closed · `API-814`
+outcome not on offer · `API-815` odds still being computed · `API-816` round fully booked ·
+`API-817` bet limit for this round reached.
 
 Note: the hosted service may have a ~30–50s cold start after idle — design generous loading states.

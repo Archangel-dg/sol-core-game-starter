@@ -17,7 +17,9 @@
  *      jede Einzahlung auf einer Creator-Domain an 403 scheitert.
  *   2. FEHLERTEXTE über den Server-Katalog — keine eigene, driftende Liste.
  *   3. HÖCHSTEINSATZ sichtbar — an der Geld-Leiste und an den Einsatzfeldern.
- *   4. VERIFY-LINK auf den Sol-Core Scanner — nicht auf rohes JSON.
+ *   4. SPRACHEN — Englisch als Hauptsprache, dazu Deutsch, Französisch,
+ *      Russisch; jeder Schlüssel in allen vieren, und ein Umschalter dafür.
+ *   5. VERIFY-LINK auf den Sol-Core Scanner — nicht auf rohes JSON.
  *
  * Lauf:  node scripts/check-contract.mjs   (auch Teil von `npm run check`)
  * Exit-Code 1, sobald eine Zusage gebrochen ist.
@@ -155,9 +157,14 @@ pruef(
   // Jede Datei mit einem Einsatzfeld muss die Zahl auch zeigen. Erkannt am
   // Paar aus Betragsfeld und Einsatz-Beschriftung — grob, aber es findet
   // genau den Fall, um den es geht: ein Feld ohne Grenze daneben.
+  // Ein Betragsfeld erkennt man daran, dass es einen EINSATZ setzt — nicht
+  // daran, dass irgendwo das Wort „bet" fällt. Sonst schlägt die Prüfung bei
+  // `EngineControls` an, das generische Zahlenfelder rendert und mit dem
+  // Einsatz nichts zu tun hat.
+  const SETZT_EINSATZ = /set(Bet|Amount|StakeSol|Stake)\b|onBet\(/;
   const mitEinsatzfeld = [...INHALT]
-    .filter(([p]) => /components[\\/][^\\/]+\.tsx$/.test(p))
-    .filter(([, t]) => /inputMode="decimal"/.test(t) && /(Einsatz|stake|Stake|bet)/.test(t))
+    .filter(([p]) => /components[\\/]/.test(p))
+    .filter(([, t]) => /inputMode="decimal"/.test(t) && SETZT_EINSATZ.test(t))
     .filter(([, t]) => !/MaxBetPick|BetLimitHint/.test(t))
     .map(([p]) => kurz(p));
   pruef(
@@ -170,8 +177,75 @@ pruef(
   );
 }
 
-// ── 4. Nachprüfbarkeit ──────────────────────────────────────────────────────
-console.log('\n4) Verify — Direktlink in den Sol-Core Scanner');
+// ── 4. Sprachen ─────────────────────────────────────────────────────────────
+console.log('\n4) Sprachen — Englisch als Hauptsprache, dazu de/fr/ru');
+pruef(dateiDa('src/lib/i18n.tsx'), 'Sprachschicht vorhanden (lib/i18n.tsx)');
+pruef(dateiDa('src/lib/strings.ts'), 'Textkatalog vorhanden (lib/strings.ts)');
+pruef(
+  gibt(/<LangProvider[\s>]/),
+  'Sprache umschliesst die App (LangProvider in Providers)',
+  'Ohne Provider bleibt jede Oberfläche auf der Hauptsprache stehen.',
+);
+pruef(
+  gibt(/<LangSwitch[\s/>]/),
+  'Der Spieler kann die Sprache wechseln (LangSwitch eingebunden)',
+  'Ein Katalog in vier Sprachen nützt nichts, wenn niemand umschalten kann.',
+);
+{
+  // Jeder Schlüssel MUSS alle vier Sprachen haben, und Englisch muss gefüllt
+  // sein — darauf fällt alles zurück. Eine fehlende Sprache fiele sonst erst
+  // dem Spieler auf, der sie gewählt hat.
+  const kat = existsSync(join(WURZEL, 'src/lib/strings.ts'))
+    ? readFileSync(join(WURZEL, 'src/lib/strings.ts'), 'utf8')
+    : '';
+  // Erfasst BEIDE Schreibweisen: mehrzeilige Blöcke und Einzeiler.
+  const bloecke = [...kat.matchAll(/^ {2}'([a-z][\w.]*)':\s*\{([\s\S]*?)\},?\s*$/gm)];
+  const luecken = [];
+  // Bewusst vier feste Ausdrücke statt eines gebauten: Ein `new RegExp` mit
+  // Anführungszeichen und Backslashes im Muster ist genau die Sorte Code, die
+  // beim nächsten Anfassen still kaputtgeht.
+  const SPRACHEN = [
+    ['en', /\ben:\s*(['"`])([\s\S]*?)\1/],
+    ['de', /\bde:\s*(['"`])([\s\S]*?)\1/],
+    ['fr', /\bfr:\s*(['"`])([\s\S]*?)\1/],
+    ['ru', /\bru:\s*(['"`])([\s\S]*?)\1/],
+  ];
+  for (const [, key, body] of bloecke) {
+    for (const [lang, re] of SPRACHEN) {
+      const m = body.match(re);
+      if (!m || !m[2].trim()) luecken.push(`${key}/${lang}`);
+    }
+  }
+  pruef(bloecke.length > 20, `Textkatalog gefüllt (${bloecke.length} Schlüssel)`);
+  pruef(
+    luecken.length === 0,
+    'Jeder Schlüssel hat alle vier Sprachen',
+    luecken.length ? `Fehlt: ${luecken.slice(0, 12).join(', ')}${luecken.length > 12 ? ' …' : ''}` : undefined,
+  );
+}
+{
+  // Der Rückfall in fest verdrahtete Sprache. Gesucht wird sichtbarer Text mit
+  // deutschen Umlauten in Komponenten — der häufigste Weg zurück, weil man
+  // beim Umgestalten schnell einen Satz direkt hinschreibt.
+  const DE = /[äöüßÄÖÜ]/;
+  const verdaechtig = [];
+  for (const [p, t] of INHALT) {
+    if (!/components[\/]|app[\/]/.test(p)) continue;
+    if (/strings\.ts$|i18n\.tsx$|pvp-i18n\.ts$/.test(p)) continue;
+    const ohneKommentare = t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    for (const m of ohneKommentare.matchAll(/>\s*([^<>{}\n][^<>{}]{2,120})\s*</g)) {
+      if (DE.test(m[1])) { verdaechtig.push(`${kurz(p)}: ${m[1].trim().slice(0, 40)}`); break; }
+    }
+  }
+  pruef(
+    verdaechtig.length === 0,
+    'Kein fest verdrahteter Text in einer einzelnen Sprache',
+    verdaechtig.length ? verdaechtig.slice(0, 6).join(' · ') : undefined,
+  );
+}
+
+// ── 5. Nachprüfbarkeit ──────────────────────────────────────────────────────
+console.log('\n5) Verify — Direktlink in den Sol-Core Scanner');
 pruef(dateiDa('src/components/VerifyLink.tsx'), 'Verify-Link-Komponente vorhanden');
 pruef(gibt(/verifyHref\(|<VerifyLink\b/), 'Verify-Link wird benutzt');
 {

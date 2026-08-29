@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 import { BetLimitHint } from './BetLimitHint';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -22,6 +23,7 @@ import { usePlayerAuth } from '@/lib/player-auth';
 export function BalanceBar({ devMock }: { devMock: boolean }) {
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
+  const t = useT();
   const { frozen } = useBalanceFreeze();
   // Auszahlen ist eine Geld-Route → Spieler-Token Pflicht (moneyFetch).
   // Die Leiste erscheint nur ausserhalb des Demo-Modus (siehe app/page.tsx),
@@ -65,10 +67,10 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
       const tx = await buildDepositTx(connection, publicKey, lamports);
       const sig = await sendTransaction(tx, connection);
       await warteAufBestaetigung(connection, sig);
-      setMsg('Einzahlung gesendet — Guthaben erscheint in ~5–10 s.');
+      setMsg(t('money.depositSent'));
       setTimeout(() => void refresh(), 6000);
     } catch (e) {
-      setMsg(`Einzahlung fehlgeschlagen: ${(e as Error).message}`);
+      setMsg(t('money.depositFailed', { msg: (e as Error).message }));
     } finally {
       setBusy(null);
     }
@@ -84,13 +86,13 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
         playerWallet: publicKey.toBase58(),
         amountLamports: lamports.toString(),
       });
-      if (r.error) setMsg(`Auszahlung: ${r.error.code}`);
+      if (r.error) setMsg(t('money.withdrawError', { code: String(r.error.code) }));
       else {
-        setMsg(r.signature ? 'Auszahlung gesendet.' : 'Auszahlung verbucht.');
+        setMsg(r.signature ? t('money.withdrawSent') : t('money.withdrawBooked'));
         void refresh();
       }
     } catch (e) {
-      setMsg(`Auszahlung fehlgeschlagen: ${(e as Error).message}`);
+      setMsg(t('money.withdrawFailed', { msg: (e as Error).message }));
     } finally {
       setBusy(null);
     }
@@ -99,7 +101,7 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
   if (devMock) {
     return (
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/50">
-        Test-Modus (devMock): kein echtes Guthaben nötig — einfach spielen.
+        {t('money.devMock')}
       </div>
     );
   }
@@ -108,7 +110,7 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
       <div className="flex items-baseline justify-between">
-        <span className="text-xs uppercase tracking-wide text-white/50">Guthaben</span>
+        <span className="text-xs uppercase tracking-wide text-white/50">{t('money.balance')}</span>
         <span className="font-bold tabular-nums text-accent">
           {balance === null ? '—' : `${toSol(balance)} ◎`}
         </span>
@@ -133,7 +135,7 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
           disabled={busy !== null}
           className="ml-auto rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-night disabled:opacity-40"
         >
-          {busy === 'deposit' ? '…' : 'Einzahlen'}
+          {busy === 'deposit' ? '…' : t('money.deposit')}
         </button>
         <button
           type="button"
@@ -141,7 +143,7 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
           disabled={busy !== null}
           className="rounded-full border border-white/15 px-4 py-1.5 text-sm disabled:opacity-40"
         >
-          {busy === 'withdraw' ? '…' : 'Auszahlen'}
+          {busy === 'withdraw' ? '…' : t('money.withdraw')}
         </button>
       </div>
       {msg && <p className="mt-2 text-xs text-white/60">{msg}</p>}

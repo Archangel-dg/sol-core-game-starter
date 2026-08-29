@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 import { toSol } from '@/lib/lamports';
 
@@ -19,6 +20,7 @@ export function ResultView({
   roll?: number | null;
   detail?: string;
 }) {
+  const t = useT();
   return (
     <div className="grid h-28 place-items-center rounded-xl bg-night text-center">
       <div>
@@ -26,7 +28,7 @@ export function ResultView({
           {(multiplierBps / 10000).toFixed(2)}×
         </div>
         <div className="mt-1 text-sm text-white/70">
-          {win ? `Gewonnen! Auszahlung ${toSol(payoutLamports)} ◎` : 'Verloren'}
+          {win ? t('result.won', { amount: toSol(payoutLamports) }) : t('result.lost')}
           {roll != null && <span className="text-white/40"> · Roll {roll}</span>}
         </div>
         {detail && <div className="mt-0.5 text-xs text-white/40">{detail}</div>}

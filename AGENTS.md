@@ -21,6 +21,9 @@ Standalone, the rules you must keep are:
   fails with 403.
 - **Show the maximum bet, quietly but always:** `BetLimitHint` at the balance, `MaxBetPick` at every
   bet field. It is the minimum of several caps and moves during operation.
+- **English is the main language; de/fr/ru ship with it.** Every visible string goes through
+  `t(...)` (`src/lib/i18n.tsx`); the catalog `src/lib/strings.ts` carries all four languages per
+  key. Keep `LangSwitch` reachable. Never hard-code a sentence into a component.
 - **Every finished round links into the Sol-Core Scanner** via `VerifyLink`/`verifyHref`
   (`<verifierUrl>/verify/<id>`) — for every mechanic, and never at a raw `/api/.../verify/...`
   JSON endpoint.
@@ -28,7 +31,7 @@ Standalone, the rules you must keep are:
 - **Every money call needs a player token** (wallet signature → `POST /api/game/authorize`, 15 min,
   bound to wallet + game). In the browser always `usePlayerAuth().moneyFetch(…)`; the route handlers
   forward it as `Authorization: Bearer`. Mainnet runs `PLAYER_AUTH_MODE=enforce` → `API-402` without it.
-- **Do not edit system-contract files:** `src/app/api/*`, `src/lib/{solcore,config,lamports,errors,engines,player-program,player-auth,bet-limits}.*`,
+- **Do not edit system-contract files:** `src/app/api/*`, `src/lib/{solcore,config,lamports,errors,engines,player-program,player-auth,bet-limits,i18n}.*`,
   `src/lib/error-catalog.generated.ts`, `src/components/{Providers,VerifyLink,BetLimitHint}.tsx`.
 
 Binding docs: `docs/RULES.md`, `docs/API-REFERENCE.md`, `docs/ENGINES.md`, `docs/CUSTOMIZE.md`.

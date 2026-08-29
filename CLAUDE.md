@@ -25,8 +25,10 @@ API. All engines are supported; the active engine comes from `NEXT_PUBLIC_ENGINE
 `src/app/api/*`, `src/lib/solcore.ts`, `src/lib/config.ts`, `src/lib/lamports.ts`,
 `src/lib/errors.ts`, `src/lib/error-catalog.generated.ts`, `src/lib/bet-limits.tsx`,
 `src/lib/engines.ts`, `src/lib/player-program.ts`, `src/lib/player-auth.ts`,
-`src/lib/crash-math.ts`, `src/components/Providers.tsx`, `src/components/VerifyLink.tsx`,
-`src/components/BetLimitHint.tsx`.
+`src/lib/crash-math.ts`, `src/lib/i18n.tsx`, `src/components/Providers.tsx`,
+`src/components/VerifyLink.tsx`, `src/components/BetLimitHint.tsx`.
+(`src/lib/strings.ts` is the exception: the wording is design zone — only the
+requirement that every key carries all four languages is contract.)
 
 These carry a do-not-edit / system-contract marker (`// ⚠ Nicht ändern — Systemvertrag`). Change
 them only if the user explicitly asks and you are certain the contract with the server is preserved.
@@ -49,6 +51,9 @@ them only if the user explicitly asks and you are certain the contract with the 
    every bet field. It is the minimum of several caps and moves during operation.
 9. Every finished round links into the Sol-Core Scanner via `VerifyLink`/`verifyHref` — never to a
    raw `/api/.../verify/...` JSON endpoint.
+10. English is the main language; de/fr/ru ship with it. Every visible string goes through `t(...)`
+    (`lib/i18n.tsx`), the catalog is `lib/strings.ts` with all four languages per key. Keep
+    `LangSwitch` reachable. Never hard-code a sentence into a component.
 
 ## Tasks that are safe
 
@@ -75,9 +80,9 @@ into a bundle cannot follow a switch.
 ## Before every commit
 
 `npm run typecheck` and `npm run build` must pass, and `npm run check:contract` must be green — it
-reads your own source and verifies the four promises are still wired (deposit/withdraw incl.
-`/api/rpc`, error texts from the server catalog, max bet at every bet field, Scanner link in every
-mechanic). For behavior changes, also `npm run check` against the configured backend.
+reads your own source and verifies the promises are still wired (deposit/withdraw incl.
+`/api/rpc`, error texts from the server catalog, max bet at every bet field, all four languages
+plus a switcher, Scanner link in every mechanic). For behavior changes, also `npm run check` against the configured backend.
 
 That check exists because none of this fails loudly: a re-skin that drops the max-bet line or
 repoints a verify link leaves a game that still runs, still pays out, and is quietly worse. All

@@ -1,25 +1,28 @@
 'use client';
 
 /**
- * Leichter i18n-Katalog NUR für die PvP-Oberfläche (keine neue Dependency).
- * Jeder sichtbare PvP-String läuft durch `t(key)`. Die aktive Sprache wird in
- * localStorage gehalten (Default 'en'); `usePvpLang()` liefert `{ lang, setLang, t }`.
- * Der restliche Starter bleibt wie er ist — hier wird nichts nachgerüstet.
+ * Textkatalog der PvP-Oberfläche (keine neue Dependency). Jeder sichtbare
+ * PvP-String läuft durch `t(key)`.
+ *
+ * DIE SPRACHE LIEGT NICHT MEHR HIER. Sie kommt seit dem 29.08.2026 aus
+ * `lib/i18n.tsx` und gilt für die GANZE Vorlage — vorher hielt diese Datei
+ * ihren eigenen localStorage-Schlüssel, und ein Spieler konnte in der Lobby
+ * auf Englisch stellen und daneben weiter „Guthaben" lesen. Zwei Wahrheiten
+ * über die Sprache sind genau die Sorte Drift, die dieses Repo an anderer
+ * Stelle schon einmal teuer bezahlt hat.
+ *
+ * Was hier bleibt: der Katalog. Er ist gross und PvP-spezifisch — ihn in
+ * `strings.ts` zu schieben, machte beide Dateien unübersichtlich.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { errorTextIn } from './errors';
+import { LANGS, useLang, type Lang } from './i18n';
 
-export type PvpLang = 'en' | 'de' | 'fr' | 'ru';
+/** Alias — die PvP-Oberfläche kennt dieselben vier Sprachen wie der Rest. */
+export type PvpLang = Lang;
 
-export const PVP_LANGS: { code: PvpLang; label: string }[] = [
-  { code: 'en', label: 'English' },
-  { code: 'de', label: 'Deutsch' },
-  { code: 'fr', label: 'Français' },
-  { code: 'ru', label: 'Русский' },
-];
-
-const STORE_KEY = 'sc_pvp_lang';
+export const PVP_LANGS = LANGS;
 
 type Catalog = Record<string, string>;
 
@@ -811,10 +814,14 @@ const RU: Catalog = {
 const CATALOG: Record<PvpLang, Catalog> = { en: EN, de: DE, fr: FR, ru: RU };
 
 /**
- * Rueckfalltext, wenn ein Code in KEINEM Katalog steht — der einzige Rest,
- * der hier noch sprachabhaengig liegen muss. Die Fehlertexte selbst kommen
- * seit dem 28.08.2026 aus dem Server-Katalog (lib/errors.ts); vorher lagen
- * sie hier als zweite Kopie mit abweichenden Formulierungen.
+ * Rückfalltext, wenn ein Code in KEINEM Katalog steht — der einzige Rest, der
+ * hier noch sprachabhängig liegen muss.
+ *
+ * Die Fehlertexte selbst standen bis zum 28.08.2026 als eigene Tabelle hier
+ * (18 Codes x 4 Sprachen) — eine zweite Kopie neben `lib/errors.ts`, mit
+ * abweichenden Formulierungen für dieselben Codes. Beide sind jetzt derselbe
+ * Server-Katalog; damit sagt die PvP-Oberflaeche zu einem Code dasselbe wie
+ * jedes andere Spiel.
  */
 const GENERIC: Record<PvpLang, string> = {
   en: 'Something went wrong — please try again.',
@@ -822,7 +829,6 @@ const GENERIC: Record<PvpLang, string> = {
   fr: 'Une erreur est survenue — réessayez.',
   ru: 'Что-то пошло не так — попробуйте снова.',
 };
-
 
 /**
  * Übersetzer-Funktion. `params` ist optional (bestehende Aufrufe `t('key')`
@@ -846,19 +852,9 @@ export function pvpErrorText(lang: PvpLang, code?: string, reason?: string): str
   return errorTextIn(lang, code, GENERIC[lang], reason);
 }
 
-function normalizeLang(raw: string | null): PvpLang {
-  return raw === 'de' || raw === 'fr' || raw === 'ru' ? raw : 'en';
-}
-
 export function usePvpLang(): { lang: PvpLang; setLang: (l: PvpLang) => void; t: TFn } {
-  const [lang, setLangState] = useState<PvpLang>('en');
-  useEffect(() => {
-    if (typeof window !== 'undefined') setLangState(normalizeLang(localStorage.getItem(STORE_KEY)));
-  }, []);
-  const setLang = useCallback((l: PvpLang) => {
-    setLangState(l);
-    if (typeof window !== 'undefined') localStorage.setItem(STORE_KEY, l);
-  }, []);
+  // Sprache aus dem geteilten Zustand — nicht aus einem eigenen Speicher.
+  const { lang, setLang } = useLang();
   const t = useCallback<TFn>((key, params) => translate(lang, key, params), [lang]);
   return { lang, setLang, t };
 }

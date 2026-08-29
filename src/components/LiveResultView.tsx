@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 // ★ DESIGN-ZONE — dieses Bar-Race ist bewusst schlicht. Baue hier deine
 // eigene Reveal-Animation (Pferderennen, Autorennen, Raketenstart, …).
@@ -50,6 +51,11 @@ export function LiveResultView({
   revealProgress,
   myBets,
 }: LiveResultViewProps) {
+  // `t` ist in dieser Datei bereits der Animations-Fortschritt (Systemvertrag:
+  // die Reveal-Mathematik). Der Uebersetzer heisst hier deshalb `tr` — die
+  // Formel anzufassen, nur um einen Namen frei zu bekommen, waere die
+  // riskantere Aenderung.
+  const tr = useT();
   const racing = phase === 'revealing' || phase === 'settled';
   const t = phase === 'settled' ? 1 : revealProgress;
   const winnerKnown = phase === 'settled' || (phase === 'revealing' && revealProgress >= 1);
@@ -88,10 +94,10 @@ export function LiveResultView({
         })}
       </div>
       {phase === 'betting' && (
-        <p className="mt-3 text-center text-xs text-white/40">Startaufstellung — platziere deine Bets.</p>
+        <p className="mt-3 text-center text-xs text-white/40">{tr('live.lineup')}</p>
       )}
       {phase === 'drawing' && (
-        <p className="mt-3 text-center text-xs text-white/40">Wettfenster geschlossen — Start…</p>
+        <p className="mt-3 text-center text-xs text-white/40">{tr('live.startingSoon')}</p>
       )}
       {winnerKnown && resultIndex !== null && (
         <p className="mt-3 text-center text-sm font-semibold text-accent">

@@ -1,6 +1,7 @@
 'use client';
 
 import { loadErrorCatalog } from '@/lib/errors';
+import { LangProvider } from '@/lib/i18n';
 
 import { useMemo, type ReactNode, useEffect } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -38,7 +39,11 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
+        <WalletModalProvider>
+          {/* Sprache umschliesst ALLES — auch die PvP-Oberflaeche, die ihren
+              eigenen Katalog hat, aber dieselbe Sprache liest. */}
+          <LangProvider>{children}</LangProvider>
+        </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );

@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 import { useEffect, useState } from 'react';
 import { toSol } from '@/lib/lamports';
@@ -56,18 +57,19 @@ export function SlotGrid({
 
   // Mount-Transition fürs Spalten-Stagger-Reveal: blendet NUR die Optik ein
   // (opacity/scale) — das Server-Grid selbst ändert sich dadurch nie.
+  const t = useT();
   const [revealed, setRevealed] = useState(false);
   useEffect(() => {
     setRevealed(false);
-    const t = requestAnimationFrame(() => setRevealed(true));
-    return () => cancelAnimationFrame(t);
+    const raf = requestAnimationFrame(() => setRevealed(true));
+    return () => cancelAnimationFrame(raf);
   }, [details]);
 
   // Idle: Paytable-Vorschau aus dem renderSpec (degradiert leer, wenn absent).
   if (!details) {
     return (
       <div className="rounded-xl bg-night p-4">
-        <p className="mb-2 text-center text-sm text-white/50">5×3 · Linien · Wild · Scatter</p>
+        <p className="mb-2 text-center text-sm text-white/50">{t('slot.paylines')}</p>
         {symbols.length > 0 && (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {symbols.map((s) => {
@@ -142,7 +144,7 @@ export function SlotGrid({
           {((multiplierBps ?? 0) / 10000).toFixed(2)}×
         </div>
         <div className="mt-0.5 text-sm text-white/70">
-          {win ? `Gewonnen! Auszahlung ${toSol(payoutLamports ?? '0')} ◎` : 'Verloren'}
+          {win ? t('result.won', { amount: toSol(payoutLamports ?? '0') }) : t('result.lost')}
         </div>
         {(lineWins.length > 0 || scatterPayBps > 0) && (
           <div className="mt-1 text-xs text-white/40">

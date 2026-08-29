@@ -1,4 +1,6 @@
 'use client';
+import { LangSwitch } from '@/components/LangSwitch';
+import { useT } from '@/lib/i18n';
 
 import { useEffect, useState } from 'react';
 import { WalletButton } from '@/components/WalletButton';
@@ -39,11 +41,12 @@ interface Meta {
 
 export default function Home() {
   const [meta, setMeta] = useState<Meta | null>(null);
+  const t = useT();
   useEffect(() => {
     fetch('/api/meta')
       .then((r) => r.json())
       .then(setMeta)
-      .catch(() => setMeta({ error: { message: 'Backend nicht erreichbar' } } as Meta));
+      .catch(() => setMeta({ error: { message: 'backend_unreachable' } } as Meta));
   }, []);
   return (
     <DemoProvider>
@@ -53,6 +56,7 @@ export default function Home() {
 }
 
 function HomeInner({ meta }: { meta: Meta | null }) {
+  const t = useT();
   const { demo, startDemo } = useDemo();
   const [seedHash, setSeedHash] = useState<string | null>(null);
   const [roundId, setRoundId] = useState<string | null>(null);
@@ -142,32 +146,38 @@ function HomeInner({ meta }: { meta: Meta | null }) {
           <p className="text-xs text-white/40">
             Devnet · {engine?.label ?? meta?.engine ?? '…'}
             {meta?.mechanic === 'session' ? ' · Session' : ''}
-            {meta?.mechanic === 'tournament' ? ' · Turnier' : ''}
+            {meta?.mechanic === 'tournament' ? ` · ${t('app.mechanic.tournament')}` : ''}
             {meta?.mechanic === 'live' ? ' · Live' : ''}
           </p>
         </div>
-        <WalletButton />
+        <div className="flex items-center gap-2">
+          <LangSwitch />
+          <WalletButton />
+        </div>
       </header>
 
       {meta?.error ? (
         <div className="rounded-xl border border-red-400/30 bg-red-400/[0.06] p-4 text-sm text-red-200">
-          {meta.error.message}
+          {meta.error.message === 'backend_unreachable'
+            ? t('app.backendUnreachable')
+            : meta.error.message}
           <br />
           <span className="text-xs text-red-200/70">
-            Prüfe SOLCORE_API_URL / API-Key / Game-ID und NEXT_PUBLIC_ENGINE / _MECHANIC.
+            {t('app.configHint')}
           </span>
         </div>
       ) : !meta || !engine ? (
-        <p className="text-white/40">Lädt…</p>
+        <p className="text-white/40">{t('app.loading')}</p>
       ) : (
         <BalanceFreezeProvider>
           <div className="space-y-4">
             {meta.warning === 'engine_mismatch' && (
               <div className="rounded-xl border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-200">
-                <strong>Engine-Konflikt:</strong> Dieses Spiel ist auf dem Server als{' '}
-                <code>{meta.serverMode}</code> registriert, die App ist aber als{' '}
-                <code>{meta.engine}</code> konfiguriert (NEXT_PUBLIC_ENGINE). Jede Runde wird
-                fehlschlagen — Env-Variablen an die Registrierung anpassen.
+                <strong>{t('app.engineMismatchTitle')}</strong>{' '}
+                {t('app.engineMismatchBody', {
+                  server: meta.serverMode ?? '?',
+                  app: meta.engine,
+                })}
               </div>
             )}
 
@@ -230,8 +240,8 @@ function HomeInner({ meta }: { meta: Meta | null }) {
             )}
             <p className="pt-2 text-center text-[11px] text-white/30">
               {demo && meta.mechanic !== 'live'
-                ? 'Demo-Modus — simuliertes Guthaben, jeder Spin ist echt provably-fair. Kein echtes Geld.'
-                : 'Ergebnisse kommen ausschließlich vom Sol-Core-Server. Nur Devnet-Test-SOL.'}
+                ? t('demo.note')
+                : `${t('app.serverDecides')} ${t('app.devnetOnly')}`}
             </p>
           </div>
         </BalanceFreezeProvider>

@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 import { useState } from 'react';
 import { useBetLimits } from '@/lib/bet-limits';
@@ -39,6 +40,7 @@ export function BetLimitHint({
   className?: string;
 }) {
   const { daten, maxSol } = useBetLimits();
+  const t = useT();
   const [offen, setOffen] = useState(false);
 
   if (!daten || maxSol === null) return null;
@@ -53,14 +55,14 @@ export function BetLimitHint({
   return (
     <div className={`text-xs ${className}`}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-white/50">{obergrenze ? 'Max. Einsatz bis zu' : 'Max. Einsatz jetzt'}</span>
+        <span className="text-white/50">{t(obergrenze ? 'limit.upTo' : 'limit.now')}</span>
         {gesperrt ? (
-          <span className="font-semibold text-rose-300">gerade nicht spielbar</span>
+          <span className="font-semibold text-rose-300">{t('limit.locked')}</span>
         ) : onPick ? (
           <button
             type="button"
             onClick={() => onPick(maxAnzeige)}
-            title="Höchsteinsatz übernehmen"
+            title={t('limit.take')}
             className="rounded border border-accent/40 bg-accent/10 px-1.5 py-0.5 font-semibold tabular-nums text-accent transition-colors hover:border-accent/70"
           >
             ◎ {maxAnzeige}
@@ -74,7 +76,7 @@ export function BetLimitHint({
           aria-expanded={offen}
           className="text-white/40 underline decoration-dotted underline-offset-2 hover:text-white/70"
         >
-          {offen ? 'weniger' : 'warum?'}
+          {t(offen ? 'limit.less' : 'limit.why')}
         </button>
       </div>
       {offen && (
@@ -101,19 +103,21 @@ export function BetLimitHint({
 export function MaxBetPick({
   onPick,
   className = '',
-  label = 'Max',
+  label,
 }: {
   onPick: (sol: string) => void;
   className?: string;
+  /** Ohne Angabe: „Max" in der aktiven Sprache. */
   label?: string;
 }) {
   const { daten, maxSol } = useBetLimits();
+  const t = useT();
   if (!daten || maxSol === null) return null;
 
   if (!daten.playable || maxSol <= 0) {
     return (
       <span className={`shrink-0 text-[11px] font-semibold text-rose-300 ${className}`}>
-        gerade nicht spielbar
+        {t('limit.locked')}
       </span>
     );
   }
@@ -127,7 +131,7 @@ export function MaxBetPick({
       title={daten.text}
       className={`shrink-0 text-[11px] font-semibold tabular-nums text-accent underline decoration-dotted underline-offset-2 hover:text-accent/80 ${className}`}
     >
-      {obergrenze ? `${label} bis` : label} ◎ {maxAnzeige}
+      {label ?? t(obergrenze ? 'limit.maxUpTo' : 'limit.max')} ◎ {maxAnzeige}
     </button>
   );
 }

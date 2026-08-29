@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 import { useState } from 'react';
 import { usePlayer, useDemo } from './DemoProvider';
@@ -64,6 +65,7 @@ export function SingleBetGame({
   onLog: (r: RoundLog) => void;
 }) {
   const { wallet, connected, apiBase, demo } = usePlayer();
+  const t = useT();
   const { refreshDemoBalance } = useDemo();
   // Echte Geld-Routen laufen ausschließlich über moneyFetch (hängt das
   // Spieler-Token an). Der Demo-Pfad (/api/demo/*) bewegt kein Geld und hat
@@ -122,7 +124,7 @@ export function SingleBetGame({
       let params: Record<string, unknown>;
       if (isRoulette) {
         if (rouletteSpots.length === 0) {
-          setError('Bitte mindestens ein Feld wählen.');
+          setError(t('bet.pickField'));
           setBusy(false);
           return;
         }
@@ -133,7 +135,7 @@ export function SingleBetGame({
           const n = BigInt(rouletteSpots.length);
           const base = betLamports / n;
           if (base <= 0n) {
-            setError('Einsatz zu klein für die Anzahl gewählter Chips.');
+            setError(t('bet.stakeTooSmall'));
             setBusy(false);
             return;
           }
@@ -245,7 +247,7 @@ export function SingleBetGame({
             Einsatz ist das Minimum aus Spiel-, Level-, Solvenz- und Tagesdeckel
             und bewegt sich im Betrieb. Ohne diese Zahl tippt der Spieler blind. */}
         <span className="flex items-baseline justify-between gap-2">
-          <span>Einsatz (SOL)</span>
+          <span>{t('bet.stake')}</span>
           <MaxBetPick onPick={setBet} />
         </span>
         <input
@@ -285,7 +287,7 @@ export function SingleBetGame({
         disabled={busy || !connected}
         className="mt-4 w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
       >
-        {!connected ? 'Wallet verbinden' : busy ? 'Läuft…' : 'Spielen'}
+        {!connected ? t('common.connectWallet') : busy ? t('bet.running') : t('common.play')}
       </button>
 
       {error && <p className="mt-3 text-sm text-red-400">{error}</p>}

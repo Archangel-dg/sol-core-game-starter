@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 import { useDemo } from './DemoProvider';
 import { toSol } from '@/lib/lamports';
@@ -10,6 +11,7 @@ import { toSol } from '@/lib/lamports';
  */
 export function DemoBar() {
   const { demo, demoBalance, starting, error, startDemo, exitDemo } = useDemo();
+  const t = useT();
 
   if (!demo) {
     return (
@@ -37,7 +39,7 @@ export function DemoBar() {
         <span className="rounded bg-accent/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
           Demo
         </span>
-        <span className="text-xs text-white/50">Guthaben</span>
+        <span className="text-xs text-white/50">{t('money.balance')}</span>
         <span className="font-bold tabular-nums text-accent">
           {demoBalance === null ? '—' : `${toSol(demoBalance)} ◎`}
         </span>

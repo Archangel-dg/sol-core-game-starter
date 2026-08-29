@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 import type { RoundLog } from './SingleBetGame';
 import { verifyHref } from './VerifyLink';
@@ -18,15 +19,16 @@ export function History({
   verifierUrl: string;
   demo?: boolean;
 }) {
+  const t = useT();
   if (rounds.length === 0) return null;
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-      <div className="mb-2 text-xs uppercase tracking-wide text-white/50">Letzte Runden</div>
+      <div className="mb-2 text-xs uppercase tracking-wide text-white/50">{t('verify.recentRounds')}</div>
       <ul className="space-y-1 text-xs">
         {rounds.slice(0, 8).map((r) => (
           <li key={r.roundId} className="flex items-center justify-between gap-2">
             <span className={r.win ? 'text-accent' : 'text-red-400'}>
-              {(r.multiplierBps / 10000).toFixed(2)}× {r.win ? `+${toSol(r.payoutLamports)} ◎` : 'verloren'}
+              {(r.multiplierBps / 10000).toFixed(2)}× {r.win ? `+${toSol(r.payoutLamports)} ◎` : t('verify.lost')}
             </span>
             <a
               href={demo ? `${apiUrl}/api/game/demo/verify/${r.roundId}` : verifyHref(verifierUrl, r.roundId)}
@@ -34,7 +36,7 @@ export function History({
               rel="noopener noreferrer"
               className="text-white/30 underline underline-offset-2 hover:text-white/60"
             >
-              verify
+              {t('verify.short')}
             </a>
           </li>
         ))}

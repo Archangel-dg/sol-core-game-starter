@@ -12,6 +12,8 @@ import {
 } from '@/lib/crash-math';
 import { solToLamports, toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
+import { useT } from '@/lib/i18n';
+import type { StringKey } from '@/lib/strings';
 import { usePlayerAuth } from '@/lib/player-auth';
 import { useBetLimits } from '@/lib/bet-limits';
 import { MaxBetPick } from './BetLimitHint';
@@ -93,18 +95,20 @@ const VORLAUF_MS = 900;
 
 type UiPhase = 'betting' | 'flying' | 'crashed' | 'settled';
 
-const PHASE_BADGE: Record<UiPhase, string> = {
-  betting: 'Wetten offen',
-  flying: 'Im Flug',
-  crashed: 'Crash',
-  settled: 'Ausgewertet',
+/** Beschriftung je Phase. Als FUNKTION statt Modul-Konstante: Texte haengen
+ *  an der Sprache, und die kommt aus einem Hook. */
+const PHASE_BADGE_KEY: Record<UiPhase, StringKey> = {
+  betting: 'crash.bettingOpen',
+  flying: 'crash.inFlight',
+  crashed: 'crash.phaseCrash',
+  settled: 'crash.phaseSettled',
 };
 
-const PLAYER_STATUS: Record<CrashPlayerView['status'], string> = {
-  placed: 'fliegt',
-  cashed: 'raus',
-  won: 'gewonnen',
-  lost: 'verloren',
+const PLAYER_STATUS_KEY: Record<CrashPlayerView['status'], StringKey> = {
+  placed: 'crash.playerFlying',
+  cashed: 'crash.playerOut',
+  won: 'crash.playerWon',
+  lost: 'crash.playerLost',
 };
 
 export function LiveCrashGame({
@@ -123,6 +127,7 @@ export function LiveCrashGame({
   // Hoechsteinsatz — dieselbe Quelle wie die Geld-Leiste, damit Feld und
   // Leiste nie zwei verschiedene Zahlen zeigen.
   const betLimits = useBetLimits();
+  const t = useT();
 
   const [state, setState] = useState<CrashStateView | null>(null);
   const [offsetMs, setOffsetMs] = useState(0);
@@ -283,7 +288,7 @@ export function LiveCrashGame({
   }, [roundId]);
 
   const showError = (e: { code?: string; message?: string; reason?: string }) => {
-    const ui = toUiError(e.code, e.message ?? 'Unbekannter Fehler', e.reason);
+    const ui = toUiError(e.code, e.message ?? t('common.unknownError'), e.reason);
     setMsg(`${ui.code}: ${ui.message}`);
   };
 
@@ -294,7 +299,7 @@ export function LiveCrashGame({
     try {
       betLamports = solToLamports(amount);
     } catch {
-      setMsg('Einsatz bitte als Zahl eingeben, z. B. 0.10.');
+      setMsg(t('crash.stakeNaN'));
       return;
     }
     let safetyTargetBps: number | null = null;
@@ -302,7 +307,7 @@ export function LiveCrashGame({
     if (raw !== '') {
       const x = Number(raw);
       if (!Number.isFinite(x)) {
-        setMsg('Auto-Ausstieg bitte als Zahl eingeben, z. B. 2.50 — oder leer lassen.');
+        setMsg(t('crash.autoNaN'));
         return;
       }
       const wanted = Math.round(x * 10_000);
@@ -312,8 +317,8 @@ export function LiveCrashGame({
       if (!safetyTargetAccepted(wanted, ceilingBps)) {
         setMsg(
           ceilingBps !== null && wanted > ceilingBps
-            ? `Auto-Ausstieg höchstens ${formatMultiplier(ceilingBps)}× — mehr zahlt dieses Spiel nicht aus.`
-            : 'Auto-Ausstieg muss über 1.00× liegen — oder leer bleiben.',
+            ? t('crash.autoTooHigh', { max: formatMultiplier(ceilingBps) })
+            : t('crash.autoTooLow'),
         );
         return;
       }
@@ -405,7 +410,7 @@ export function LiveCrashGame({
           color: 'var(--crash-muted)',
         }}
       >
-        Lade den geteilten Flug…
+        {t('crash.loadingFlight')}
       </div>
     );
   }
@@ -433,7 +438,8 @@ export function LiveCrashGame({
             {state.stream.displayName}
           </p>
           <p className="truncate text-xs" style={{ color: 'var(--crash-muted)' }}>
-            Runde #{round?.roundNo ?? '—'} · {realMoney ? 'Echtgeld' : 'Spielgeld'}
+            {t('verify.roundNo', { no: round?.roundNo ?? '—' })} ·{' '}
+            {t(realMoney ? 'crash.realMoney' : 'crash.playMoney')}
           </p>
         </div>
         <span
@@ -441,10 +447,10 @@ export function LiveCrashGame({
           style={{ color: badgeColor, background: 'var(--crash-panel-strong)' }}
         >
           {!round
-            ? 'Startet gleich'
+            ? t('crash.starting')
             : phase === 'betting'
-              ? `${PHASE_BADGE.betting} · ${Math.max(0, Math.ceil(lockInMs / 1000))}s`
-              : PHASE_BADGE[phase]}
+              ? `${t('crash.bettingOpen')} · ${Math.max(0, Math.ceil(lockInMs / 1000))}s`
+              : t(PHASE_BADGE_KEY[phase])}
         </span>
       </div>
 
@@ -464,7 +470,7 @@ export function LiveCrashGame({
             color: 'var(--crash-muted)',
           }}
         >
-          <strong style={{ color: 'var(--crash-text)' }}>Übungsmodus.</strong> Dieses Spiel
+          <strong style={{ color: 'var(--crash-text)' }}>{t('crash.practiceTitle')}</strong> Dieses Spiel
           bewegt gerade ein Übungs-Guthaben auf dem Server — dein Wallet-Guthaben bleibt
           unangetastet. Ein- und Auszahlen oben funktioniert trotzdem: das Guthaben gilt für
           alle Spiele der Plattform.
@@ -490,7 +496,7 @@ export function LiveCrashGame({
       >
         {!round && (
           <p className="py-2 text-center text-sm" style={{ color: 'var(--crash-muted)' }}>
-            Der nächste Flug wird vorbereitet…
+            {t('crash.preparing')}
           </p>
         )}
 
@@ -507,14 +513,14 @@ export function LiveCrashGame({
                   className="mb-1 flex items-baseline justify-between gap-2 text-[11px] uppercase tracking-wide"
                   style={{ color: 'var(--crash-muted)' }}
                 >
-                  <span>Einsatz (◎)</span>
+                  <span>{t('crash.stake')}</span>
                   <MaxBetPick onPick={setAmount} className="normal-case tracking-normal" />
                 </span>
                 <input
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   inputMode="decimal"
-                  aria-label="Einsatz in SOL"
+                  aria-label={t('crash.stakeAria')}
                   className="w-full rounded-lg border px-3 py-2 text-sm tabular-nums outline-none"
                   style={{
                     borderColor: 'var(--crash-line)',
@@ -537,8 +543,8 @@ export function LiveCrashGame({
                   placeholder={ceilingBps !== null ? `bis ${formatMultiplier(ceilingBps)}` : 'optional'}
                   aria-label={
                     ceilingBps !== null
-                      ? `Sicherheitsziel als Multiplikator, optional, höchstens ${formatMultiplier(ceilingBps)}`
-                      : 'Sicherheitsziel als Multiplikator, optional'
+                      ? t('crash.autoAria', { max: formatMultiplier(ceilingBps) })
+                      : t('crash.autoAriaNoCap')
                   }
                   className="w-full rounded-lg border px-3 py-2 text-sm tabular-nums outline-none"
                   style={{
@@ -556,14 +562,14 @@ export function LiveCrashGame({
               className="w-full rounded-lg px-4 py-3 text-base font-black uppercase tracking-wide disabled:opacity-40"
               style={{ background: 'var(--crash-up)', color: 'var(--crash-on-accent)' }}
             >
-              Mitfliegen
+              {t('crash.joinFlight')}
             </button>
             <p className="text-[11px] leading-relaxed" style={{ color: 'var(--crash-muted)' }}>
               {!connected
-                ? 'Wallet verbinden, um mitzufliegen.'
+                ? t('crash.connectToFly')
                 : ceilingBps !== null
-                  ? `Der Auto-Ausstieg steigt für dich aus, sobald die Kurve ihn erreicht — auch ohne Klick. Ohne Ziel klickst du selbst; mehr als ${formatMultiplier(ceilingBps)}× zahlt dieses Spiel dabei nie aus (Deckel des Creators). Der Flug selbst läuft für alle weiter.`
-                  : 'Der Auto-Ausstieg steigt für dich aus, sobald die Kurve ihn erreicht — auch ohne Klick. Ohne Ziel klickst du selbst.'}
+                  ? t('crash.autoHintCapped', { max: formatMultiplier(ceilingBps) })
+                  : t('crash.autoHint')}
             </p>
           </div>
         )}
@@ -571,7 +577,7 @@ export function LiveCrashGame({
         {round && phase === 'betting' && iAmIn && (
           <div className="text-center">
             <p className="text-sm font-bold" style={{ color: 'var(--crash-up)' }}>
-              Du bist an Bord.
+              {t('crash.aboard')}
             </p>
             <p className="mt-1 text-xs" style={{ color: 'var(--crash-muted)' }}>
               Abflug in {Math.max(0, Math.ceil(lockInMs / 1000))}s — dann steigt die Kurve.
@@ -581,7 +587,7 @@ export function LiveCrashGame({
 
         {phase === 'flying' && !iAmIn && (
           <p className="py-2 text-center text-sm" style={{ color: 'var(--crash-muted)' }}>
-            Du fliegst diese Runde nicht mit — gleich öffnet das nächste Wettfenster.
+            {t('crash.notAboard')}
           </p>
         )}
 
@@ -603,7 +609,7 @@ export function LiveCrashGame({
                   : 'Aussteigen'
                 : myCashoutBps !== null
                   ? `Raus bei ${formatMultiplier(myCashoutBps)}×`
-                  : 'Einen Moment…'}
+                  : t('crash.oneMoment')}
             </button>
             {canCashout && clickBps === null && (
               <p className="text-center text-xs leading-relaxed" style={{ color: 'var(--crash-muted)' }}>
@@ -635,27 +641,27 @@ export function LiveCrashGame({
           <div className="text-center">
             {mine?.status === 'won' || mine?.status === 'cashed' || cashoutThisRound ? (
               <p className="text-sm font-bold" style={{ color: 'var(--crash-up)' }}>
-                Rechtzeitig raus
+                {t('crash.outInTime')}
                 {myCashoutBps !== null ? ` bei ${formatMultiplier(myCashoutBps)}×` : ''}
                 {cashoutThisRound ? ` · ${toSol(cashoutThisRound.payoutLamports)} ◎` : ''}
               </p>
             ) : mine?.status === 'lost' ? (
               <p className="text-sm font-bold" style={{ color: 'var(--crash-down)' }}>
-                Zu lange gewartet — Einsatz weg.
+                {t('crash.waitedTooLong')}
               </p>
             ) : iAmIn ? (
               <p className="text-sm" style={{ color: 'var(--crash-muted)' }}>
-                Runde wird abgerechnet…
+                {t('crash.settling')}
               </p>
             ) : (
               <p className="text-sm" style={{ color: 'var(--crash-muted)' }}>
-                Diese Runde ist durch.
+                {t('crash.roundDone')}
               </p>
             )}
             <p className="mt-1 text-xs tabular-nums" style={{ color: 'var(--crash-muted)' }}>
               {nextInMs !== null && nextInMs > 0
-                ? `Nächste Runde in ${Math.ceil(nextInMs / 1000)}s`
-                : 'Nächste Runde startet…'}
+                ? t('live.nextRoundIn', { s: Math.ceil(nextInMs / 1000) })
+                : t('live.nextRoundStarts')}
             </p>
           </div>
         )}
@@ -686,7 +692,7 @@ export function LiveCrashGame({
         </div>
         {players.length === 0 ? (
           <p className="py-2 text-center text-xs" style={{ color: 'var(--crash-muted)' }}>
-            Noch niemand an Bord — sei der Erste.
+            {t('crash.nobodyAboard')}
           </p>
         ) : (
           <ul className="space-y-1">
@@ -719,7 +725,7 @@ export function LiveCrashGame({
                         der Server liefert dafür `null`. */}
                     {p.cashoutMultiplierBps !== null
                       ? `${formatMultiplier(p.cashoutMultiplierBps)}×`
-                      : PLAYER_STATUS[p.status]}
+                      : t(PLAYER_STATUS_KEY[p.status])}
                   </span>
                 </li>
               );
@@ -743,7 +749,7 @@ export function LiveCrashGame({
           color: 'var(--crash-muted)',
         }}
       >
-        <p>{engine.live?.hint ?? 'Einsatz setzen, Kurve steigen lassen, rechtzeitig aussteigen.'}</p>
+        <p>{engine.live?.hint ?? t('crash.hint')}</p>
         {round && (
           <p className="mt-2 break-all">
             <span className="uppercase tracking-wide">Seed-Hash</span> {round.serverSeedHash}

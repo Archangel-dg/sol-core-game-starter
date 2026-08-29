@@ -5,7 +5,9 @@ import { Providers } from '@/components/Providers';
 
 export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_GAME_NAME ?? 'Sol-Core Game',
-  description: 'Ein Sol-Core-Spiel (Devnet).',
+  // Metadaten rendert der Server, bevor die Sprache des Besuchers feststeht —
+  // deshalb bewusst die Hauptsprache Englisch (siehe lib/i18n.tsx).
+  description: 'A Sol-Core game (Devnet).',
 };
 
 /** Optionales Re-Skin ohne Code: NEXT_PUBLIC_ACCENT_COLOR=#RRGGBB

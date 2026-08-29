@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 import { VerifyLink } from './VerifyLink';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -42,6 +43,7 @@ function useCountdown(endsAt: string | undefined): string {
 
 export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; verifierUrl: string }) {
   const { publicKey, connected } = useWallet();
+  const t = useT();
   // Geld-Routen laufen ausschließlich über moneyFetch (hängt das Spieler-Token an).
   const { moneyFetch } = usePlayerAuth();
   const wallet = publicKey?.toBase58() ?? null;
@@ -156,17 +158,17 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
       {/* Turnier-Leiste: Countdown + Pot + Einsätze */}
       <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-center">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-white/40">Endet in</div>
+          <div className="text-[10px] uppercase tracking-wider text-white/40">{t('tournament.endsIn')}</div>
           <div className="text-sm font-semibold tabular-nums text-white">{countdown}</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-white/40">Pot</div>
+          <div className="text-[10px] uppercase tracking-wider text-white/40">{t('tournament.pot')}</div>
           <div className="text-sm font-semibold tabular-nums text-accent">
             {toSol(view?.cycle.potLamports ?? cycle?.potLamports ?? '0')} ◎
           </div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-white/40">Einsätze</div>
+          <div className="text-[10px] uppercase tracking-wider text-white/40">{t('tournament.entries')}</div>
           <div className="text-sm font-semibold tabular-nums text-white">
             {view?.cycle.entriesCount ?? cycle?.entriesCount ?? 0}
           </div>
@@ -179,11 +181,11 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
           {view ? (
             <div>
               <div className={`text-3xl font-bold tabular-nums ${view.status === 'busted' ? 'text-red-400' : 'text-accent'}`}>
-                {view.score} <span className="text-base font-semibold text-white/50">Punkte</span>
+                {view.score} <span className="text-base font-semibold text-white/50">{t('tournament.points')}</span>
               </div>
               <div className="mt-1 text-sm text-white/70">
                 {active && `Schritt ${view.steps}/${view.maxSteps}`}
-                {view.status === 'busted' && 'Bust — Lauf genullt'}
+                {view.status === 'busted' && t('tournament.bust')}
                 {(view.status === 'stopped' || view.status === 'expired') &&
                   `Gebankt${view.bestScore !== undefined ? ` · Bester Score: ${view.bestScore}` : ''}`}
               </div>
@@ -215,7 +217,13 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
               disabled={busy || !connected || !cycle}
               className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
             >
-              {!connected ? 'Wallet verbinden' : busy ? 'Läuft…' : ended ? 'Neuer Versuch' : 'Mitspielen'}
+              {!connected
+                ? t('common.connectWallet')
+                : busy
+                  ? t('bet.running')
+                  : ended
+                    ? t('tournament.retry')
+                    : t('tournament.join')}
             </button>
           </>
         ) : (
@@ -253,7 +261,8 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         {me && wallet && (
           <p className="mb-2 text-xs text-white/50">
-            Dein bester Score: <span className="font-semibold text-white">{me.bestScore}</span>
+            {t('tournament.bestScore')}{' '}
+            <span className="font-semibold text-white">{me.bestScore}</span>
             {me.rank !== null && (
               <>
                 {' '}· Platz <span className="font-semibold text-accent">#{me.rank}</span>
@@ -261,9 +270,9 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
             )}
           </p>
         )}
-        <div className="text-[10px] uppercase tracking-wider text-white/40">Leaderboard</div>
+        <div className="text-[10px] uppercase tracking-wider text-white/40">{t('tournament.leaderboard')}</div>
         {board.length === 0 ? (
-          <p className="pt-1 text-xs text-white/30">Noch keine Scores in diesem Zyklus.</p>
+          <p className="pt-1 text-xs text-white/30">{t('tournament.noScores')}</p>
         ) : (
           <ul className="pt-1 text-sm">
             {board.map((e) => (

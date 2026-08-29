@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 import { useCallback, useEffect, useState } from 'react';
 import type { EngineDef } from '@/lib/engines';
@@ -20,6 +21,7 @@ const RISK_LABEL: Record<string, { label: string; sub: string; cls: string }> = 
 
 export function DemoTournamentGame({ engine }: { engine: EngineDef }) {
   const { wallet, connected } = usePlayer();
+  const t = useT();
   const { refreshDemoBalance } = useDemo();
   const [view, setView] = useState<DemoRunView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -122,14 +124,14 @@ export function DemoTournamentGame({ engine }: { engine: EngineDef }) {
 
       {!view || ended ? (
         <>
-          <p className="mb-3 text-center text-xs text-white/40">Übungslauf im Demo-Modus — kein echter Pot, es geht um den Score.</p>
+          <p className="mb-3 text-center text-xs text-white/40">{t('demo.practiceRunNote')}</p>
           <button
             type="button"
             onClick={() => void enter()}
             disabled={busy || !connected}
             className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
           >
-            {busy ? 'Läuft…' : ended ? 'Neuer Versuch' : 'Übungslauf starten'}
+            {busy ? t('bet.running') : ended ? t('tournament.retry') : t('demo.startPracticeRun')}
           </button>
         </>
       ) : (

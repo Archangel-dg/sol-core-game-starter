@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -29,6 +30,7 @@ const CLIENT_LOCK_MS = 500;
 
 export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierUrl: string }) {
   const { publicKey, connected } = useWallet();
+  const t = useT();
   const wallet = publicKey?.toBase58() ?? null;
   const { freezeUntil, release } = useBalanceFreeze();
   // Geld-Routen laufen ausschließlich über moneyFetch (hängt das Spieler-Token an).
@@ -172,9 +174,9 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
       });
       if (r.error) {
         const reason = typeof r.error.reason === 'string' ? r.error.reason : undefined;
-        if (reason === 'betting_locked') setMsg('Wettfenster gerade geschlossen — nächste Runde.');
+        if (reason === 'betting_locked') setMsg(t('live.bettingClosed'));
         else if (reason === 'live_exposure_cap')
-          setMsg('Dieses Outcome ist voll — kleinerer Einsatz oder anderes Outcome.');
+          setMsg(t('live.outcomeFull'));
         else {
           const ui = toUiError(r.error.code, r.error.message, reason);
           setMsg(`${ui.code}: ${ui.message}`);
@@ -198,13 +200,16 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
   const nextInMs = state?.nextOpensAt ? new Date(state.nextOpensAt).getTime() - serverNow : null;
 
   const phaseLabel: Record<UiPhase, string> = {
-    loading: 'Lädt…',
-    paused: 'Stream pausiert',
-    intermission: nextInMs !== null && nextInMs > 0 ? `Nächste Runde in ${Math.ceil(nextInMs / 1000)}s` : 'Nächste Runde startet…',
-    betting: `Wetten offen · ${countdown}`,
-    drawing: 'Wettfenster geschlossen',
-    revealing: 'Rennen läuft…',
-    settled: 'Ergebnis',
+    loading: t('app.loading'),
+    paused: t('live.streamPaused'),
+    intermission:
+      nextInMs !== null && nextInMs > 0
+        ? t('live.nextRoundIn', { s: Math.ceil(nextInMs / 1000) })
+        : t('live.nextRoundStarts'),
+    betting: `${t('crash.bettingOpen')} · ${countdown}`,
+    drawing: t('live.bettingClosedBadge'),
+    revealing: t('live.racing'),
+    settled: t('live.result'),
   };
 
   const outcomes = displayRound?.outcomes ?? state?.stream.outcomes ?? [];
@@ -214,7 +219,7 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
   if (!state) {
     return (
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/40">
-        Lade Live-Stream…
+        {t('live.loadingStream')}
       </div>
     );
   }
@@ -267,7 +272,7 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
               inputMode="decimal"
               className="w-24 rounded-lg border border-white/10 bg-night px-3 py-2 text-sm tabular-nums outline-none focus:border-accent/50"
             />
-            <span className="text-xs text-white/50">SOL Einsatz</span>
+            <span className="text-xs text-white/50">{t('live.stakeSol')}</span>
             {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen): Bei Live
                 laeuft die Uhr; eine Ablehnung kostet die ganze Runde. */}
             <MaxBetPick onPick={setAmount} className="ml-auto" />
@@ -291,7 +296,7 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
             ))}
           </div>
           {!connected && (
-            <p className="mt-2 text-xs text-white/40">Wallet verbinden, um zu setzen.</p>
+            <p className="mt-2 text-xs text-white/40">{t('live.connectToBet')}</p>
           )}
           {msg && <p className="mt-2 text-xs text-amber-300/90">{msg}</p>}
         </div>
@@ -300,7 +305,7 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
       {/* Meine Bets dieser Runde */}
       {myBets.length > 0 && (
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Meine Bets</p>
+          <p className="mb-2 text-xs uppercase tracking-wide text-white/50">{t('live.myBets')}</p>
           <ul className="space-y-1 text-sm">
             {myBets.map((b) => (
               <li key={b.betId} className="flex items-baseline justify-between tabular-nums">
@@ -322,7 +327,7 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
                       : b.status === 'lost'
                         ? '—'
                         : b.status
-                    : `mögl. ${toSol(b.potentialPayoutLamports)} ◎`}
+                    : t('live.potential', { amount: toSol(b.potentialPayoutLamports) })}
                 </span>
               </li>
             ))}
@@ -335,7 +340,7 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
           Scanner. Live-Runden hatten bis zum 28.08.2026 gar keinen. */}
       {displayRound && (phase === 'settled' || phase === 'revealing') && (
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
-          <div className="mb-1 uppercase tracking-wide text-white/50">Provably Fair</div>
+          <div className="mb-1 uppercase tracking-wide text-white/50">{t('verify.title')}</div>
           <div className="break-all text-white/60">Runde #{displayRound.roundNo}</div>
           <VerifyLink verifierUrl={verifierUrl} id={displayRound.roundId} className="mt-1" />
         </div>
@@ -344,13 +349,13 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
       {/* Ergebnis-Ticker */}
       {recent.length > 0 && (
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <p className="mb-2 text-[11px] uppercase tracking-wide text-white/40">Letzte Ergebnisse</p>
+          <p className="mb-2 text-[11px] uppercase tracking-wide text-white/40">{t('live.recentResults')}</p>
           <div className="flex flex-wrap gap-1.5">
             {recent.map((r) => (
               <span
                 key={r.roundNo}
                 className="rounded-md bg-white/[0.06] px-2 py-1 text-xs tabular-nums text-white/60"
-                title={`Runde #${r.roundNo}`}
+                title={t('verify.roundNo', { no: r.roundNo })}
               >
                 #{r.outcomeIndex + 1}
               </span>

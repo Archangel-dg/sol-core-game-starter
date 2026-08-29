@@ -1,4 +1,5 @@
 'use client';
+import { useT, type TFn } from '@/lib/i18n';
 
 import { useId } from 'react';
 import type { CSSProperties } from 'react';
@@ -152,12 +153,21 @@ export function numberSizeClasses(text: string): { value: string; suffix: string
   return { value: 'text-5xl', suffix: 'text-2xl' };
 }
 
-const PHASE_CAPTION: Record<CrashCurveViewProps['phase'], string> = {
-  betting: 'Bereit zum Abflug',
-  flying: 'Der Flug läuft',
-  crashed: 'Abgestürzt',
-  settled: 'Runde ausgewertet',
-};
+/** Beschriftung je Phase. Als FUNKTION und nicht als Modul-Konstante: Texte
+ *  haengen an der Sprache, und die kommt aus einem Hook — der auf Modulebene
+ *  nicht laufen darf. */
+function phaseCaption(t: TFn, phase: CrashCurveViewProps['phase']): string {
+  switch (phase) {
+    case 'betting':
+      return t('crash.readyForTakeoff');
+    case 'flying':
+      return t('crash.flying');
+    case 'crashed':
+      return t('crash.crashed');
+    default:
+      return t('crash.roundSettled');
+  }
+}
 
 export function CrashCurveView({
   phase,
@@ -165,6 +175,7 @@ export function CrashCurveView({
   cashoutMultiplierBps,
   crashMultiplierBps,
 }: CrashCurveViewProps) {
+  const t = useT();
   // Eigene Verlaufs-ID je Instanz: bei einer festen ID greift `url(#…)` auf
   // die ERSTE Definition im Dokument zu — zwei Kurven auf einer Seite teilten
   // sich sonst die Farbe der ersten (bei der Sichtprüfung real passiert: eine
@@ -211,7 +222,7 @@ export function CrashCurveView({
       <div className="mb-2 flex items-end justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'var(--crash-muted)' }}>
-            {PHASE_CAPTION[phase]}
+            {phaseCaption(t, phase)}
           </p>
           <p
             className={`${numberSize.value} font-black leading-none tabular-nums`}
@@ -224,7 +235,7 @@ export function CrashCurveView({
         {cashedOut && (
           <div className="shrink-0 text-right">
             <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'var(--crash-muted)' }}>
-              Ausgestiegen
+              {t('crash.cashedOut')}
             </p>
             <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--crash-mark)' }}>
               {formatMultiplier(cashoutMultiplierBps)}×
@@ -360,7 +371,7 @@ export function CrashCurveView({
             className="pointer-events-none absolute left-0 -translate-y-full px-1 text-[10px] font-bold tabular-nums"
             style={{ top: `${markY}%`, color: 'var(--crash-mark)' }}
           >
-            dein Ausstieg
+            {t('crash.yourExit')}
           </span>
         )}
 
@@ -371,9 +382,9 @@ export function CrashCurveView({
               ↗
             </span>
             <span className="text-xs leading-relaxed" style={{ color: 'var(--crash-muted)' }}>
-              Gleich hebt die Kurve ab. Je länger sie steigt, desto mehr zahlt sie —
+              {t('crash.aboutToTakeOff')}{' '}
               <br />
-              und irgendwann platzt sie.
+              {t('crash.andItBursts')}
             </span>
           </div>
         )}

@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 /**
  * Der Verify-Link — EINE Stelle für alle Mechaniken.
@@ -33,25 +34,27 @@ export function verifyHref(verifierUrl: string, id: string): string {
 export function VerifyLink({
   verifierUrl,
   id,
-  label = 'Runde verifizieren →',
+  label,
   className = '',
 }: {
   verifierUrl: string;
   /** Runden-, Match- oder Lauf-ID. Fehlt sie, wird nichts gezeigt. */
   id: string | null | undefined;
+  /** Ohne Angabe: „Runde verifizieren" in der aktiven Sprache. */
   label?: string;
   className?: string;
 }) {
+  const t = useT();
   if (!id) return null;
   return (
     <a
       href={verifyHref(verifierUrl, id)}
       target="_blank"
       rel="noopener noreferrer"
-      title="Im Sol-Core Scanner nachrechnen — im eigenen Browser, ohne uns zu glauben"
+      title={t('verify.hint')}
       className={`inline-block text-accent underline underline-offset-2 hover:text-accent/80 ${className}`}
     >
-      {label}
+      {label ?? t('verify.round')}
     </a>
   );
 }

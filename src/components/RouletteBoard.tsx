@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 // Design-Zone: Roulette-Tableau für BEIDE Varianten.
 // - Easy (config.betMode fehlt/easy): Einfachauswahl EINER klassischen Wette.
@@ -88,6 +89,7 @@ export function RouletteBoard({
   selected: Set<string>;
   onToggle: (spot: RouletteSpot) => void;
 }) {
+  const t = useT();
   const hasDoubleZero = pocketCount >= 38;
   const isOn = (s: RouletteSpot) => selected.has(spotKey(s));
 
@@ -175,7 +177,7 @@ export function RouletteBoard({
                   )
                 : dot(
                     { betType: 'six-line', value: r },
-                    `Doppelstraße ${3 * r + 1}-${3 * r + 6} · 6×`,
+                    t('roulette.doubleStreet', { from: 3 * r + 1, to: 3 * r + 6 }),
                     '-bottom-2 -right-2',
                   ))}
           </>
@@ -189,9 +191,7 @@ export function RouletteBoard({
   return (
     <div className="space-y-3">
       <p className="text-xs text-white/50">
-        {pro
-          ? 'Mehrere Felder wählen — auch auf den Linien zwischen den Zahlen. Der Einsatz wird gleichmäßig auf die Chips verteilt.'
-          : 'Ein Feld wählen.'}
+        {t(pro ? 'roulette.pickMany' : 'roulette.pickOne')}
       </p>
 
       {/* Klassisches Tableau: 0 (+00) links, daneben 12 Reihen × 3 Zahlen.
@@ -246,7 +246,7 @@ export function RouletteBoard({
       {/* Null-Wetten: Geometrie unterscheidet sich je Rad → beschriftet. */}
       {pro && zeros.length > 0 && (
         <div>
-          <p className="mb-1 text-[11px] uppercase tracking-wide text-white/40">Null-Wetten</p>
+          <p className="mb-1 text-[11px] uppercase tracking-wide text-white/40">{t('roulette.zeroBets')}</p>
           <div className="flex flex-wrap gap-1">
             {zeros.map((z) => (
               <button
@@ -295,8 +295,7 @@ export function RouletteBoard({
 
       {pro && (
         <p className="text-[11px] text-white/40">
-          Zahl 36× · Split 18× · Street 12× · Ecke 9× · Doppelstraße 6× · Dutzend/Kolonne 3× ·
-          einfache Chance 2×
+          {t('roulette.payouts')}
         </p>
       )}
       {pro && selected.size > 0 && (

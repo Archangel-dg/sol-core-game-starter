@@ -9,6 +9,7 @@ import { toUiError } from '@/lib/errors';
 import { usePlayerAuth } from '@/lib/player-auth';
 import type { RoundLog } from './SingleBetGame';
 import { MaxBetPick } from './BetLimitHint';
+import { useT } from '@/lib/i18n';
 
 /** towers-Reveal: `bombColumns` ist `number[][]` (eine Spalten-Menge je
  * Etage, `c.bombs` Bomben pro Etage). Rein defensiv — akzeptiert auch ältere
@@ -178,6 +179,7 @@ export function SessionGame({
   // Spieler-Token an). Der Demo-Pfad (/api/demo/*) bewegt kein Geld und hat
   // kein Solana-Wallet, das signieren könnte — er bleibt bewusst tokenlos.
   const { moneyFetch } = usePlayerAuth();
+  const t = useT();
   const [bet, setBet] = useState('0.01');
   const [view, setView] = useState<SessionView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -356,12 +358,12 @@ export function SessionGame({
     spinTower && spinTower.towers.length > 0 ? (
       <div className="rounded-lg border border-white/10 bg-night p-2">
         <div className="mb-1 flex items-baseline justify-between gap-2">
-          <span className="text-[11px] text-white/40">Türme — Multiplikator je Stufe</span>
+          <span className="text-[11px] text-white/40">{t('session.towers')}</span>
           {spinTower.failMode && (
             <span className="text-[10px] text-red-300/70">
               {spinTower.failMode === 'reset'
-                ? 'FAIL: alle Türme auf 0, Runde endet'
-                : 'FAIL: jeder Turm eine Stufe runter, Runde läuft weiter'}
+                ? t('session.failReset')
+                : t('session.failStepdown')}
             </span>
           )}
         </div>
@@ -391,16 +393,14 @@ export function SessionGame({
                   </div>
                 ))}
                 <div className="text-center text-[10px] text-white/40">
-                  {current === 0 ? 'Boden' : `Stufe ${current}`}
+                  {current === 0 ? t('session.ground') : t('session.level', { n: current })}
                 </div>
               </div>
             );
           })}
         </div>
         <p className="mt-1 text-[10px] leading-relaxed text-white/30">
-          ★ = höchste Stufe: der nächste Treffer auf diesen Turm zahlt den Multiplikator als
-          GESICHERT (FAIL-immun, Auszahlung am Rundenende) — der Turm bleibt oben stehen und zählt
-          weiter im Pot.
+          {t('session.topLevelNote')}
         </p>
       </div>
     ) : null;
@@ -418,10 +418,26 @@ export function SessionGame({
             </div>
             <div className="mt-1 text-sm text-white/70">
               {active && steps &&
-                `Stufe ${steps.rung}${steps.livesLeft !== null ? ` · Leben ${steps.livesLeft}${steps.lives !== null ? `/${steps.lives}` : ''}` : ''} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
+                t('session.stepInfo', {
+                  n: steps.rung,
+                  lives:
+                    steps.livesLeft !== null
+                      ? t('session.livesLeft', {
+                          left: steps.livesLeft,
+                          of: steps.lives !== null ? `/${steps.lives}` : '',
+                        })
+                      : '',
+                  amount: toSol(view.potentialPayoutLamports),
+                })}
               {active && !steps && costPerStep &&
                 `Spin ${spinsUsed}${maxSpins !== null ? `/${maxSpins}` : ''} · Cashout ${toSol(view.potentialPayoutLamports)} ◎`}
-              {active && !steps && !costPerStep && `Schritt ${view.steps} · möglich ${toSol(view.potentialPayoutLamports)} ◎`}
+              {active &&
+                !steps &&
+                !costPerStep &&
+                t('session.step', {
+                  n: view.steps,
+                  amount: toSol(view.potentialPayoutLamports),
+                })}
               {/* Bei Kosten je Schritt wäre „alles verloren" gelogen: ein FAIL
                   nimmt nur den Pot, das Gesicherte wird trotzdem ausgezahlt. */}
               {view.status === 'busted' && costPerStep &&
@@ -430,16 +446,17 @@ export function SessionGame({
                     ? ` · gesichert ${toSol(view.payoutLamports)} ◎ ausgezahlt`
                     : ''
                 }`}
-              {view.status === 'busted' && !costPerStep && 'Geplatzt — verloren'}
-              {view.status === 'cashed_out' && `Cashout ${toSol(view.payoutLamports ?? '0')} ◎`}
+              {view.status === 'busted' && !costPerStep && t('session.busted')}
+              {view.status === 'cashed_out' &&
+                t('session.cashedOut', { amount: toSol(view.payoutLamports ?? '0') })}
             </div>
             {active && steps?.lastFall && (
               <div className="mt-1 text-[11px] text-amber-300/80">
                 Abgestürzt: Stufe {steps.lastFall.from} → {steps.lastFall.to}
-                {steps.lastFall.to > 0 ? ' (Safe-Point fängt dich)' : ' (Boden)'}
+                {steps.lastFall.to > 0 ? ` ${t('session.safePoint')}` : ` ${t('session.ground')}`}
               </div>
             )}
-            {ended && view.capped && <div className="text-xs text-white/40">Payout-Limit erreicht</div>}
+            {ended && view.capped && <div className="text-xs text-white/40">{t('session.payoutLimit')}</div>}
             {towersBombText && <div className="mt-1 text-[11px] text-white/30">{towersBombText}</div>}
           </div>
         ) : (
@@ -460,7 +477,7 @@ export function SessionGame({
           <label className="block text-xs text-white/50">
             {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen). */}
             <span className="flex items-baseline justify-between gap-2">
-              <span>{costPerStep ? 'Einsatz JE SPIN (SOL)' : 'Einsatz (SOL)'}</span>
+              <span>{t(costPerStep ? 'session.stakePerSpin' : 'bet.stake')}</span>
               {!stakeLocked && <MaxBetPick onPick={setBet} />}
             </span>
             <input
@@ -480,7 +497,7 @@ export function SessionGame({
             // Schritte für gratis — die Annahme, die jede andere Engine erfüllt.
             <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-[11px] leading-relaxed text-amber-100/90">
               <span className="font-semibold text-amber-200">
-                Achtung: JEDER Spin kostet erneut diesen Einsatz
+                {t('session.everySpinCosts')}
               </span>{' '}
               — nicht nur der Rundenstart. Ab dem ersten Spin ist der Einsatz für die ganze Runde
               gesperrt und nicht mehr änderbar.
@@ -491,7 +508,7 @@ export function SessionGame({
                   {maxSpendText ? ` — maximal ${maxSpendText} ◎ Gesamteinsatz` : ''}.
                 </>
               )}{' '}
-              Cashout ist ab dem ersten Spin jederzeit möglich und zahlt Pot + Gesichertes.
+              {t('session.cashoutNote')}
             </div>
           )}
           <button
@@ -500,7 +517,13 @@ export function SessionGame({
             disabled={busy || !connected}
             className="mt-4 w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
           >
-            {!connected ? 'Wallet verbinden' : busy ? 'Läuft…' : ended ? 'Neue Runde' : 'Runde starten'}
+            {!connected
+              ? t('common.connectWallet')
+              : busy
+                ? t('bet.running')
+                : ended
+                  ? t('session.newRound')
+                  : t('session.start')}
           </button>
         </>
       ) : (
@@ -513,7 +536,7 @@ export function SessionGame({
             <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 p-3">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-xs font-semibold text-amber-200">
-                  Jeder Spin kostet erneut den Einsatz
+                  {t('session.everySpinCostsShort')}
                 </span>
                 <span className="text-[11px] tabular-nums text-amber-100/70">
                   Spin {spinsUsed}
@@ -521,19 +544,18 @@ export function SessionGame({
                 </span>
               </div>
               <label className="mt-2 block text-[11px] text-amber-100/70">
-                Einsatz je Spin (SOL) — für diese Runde gesperrt
+                {t('session.stakePerSpinLocked')}
                 <input
                   value={spinCostText ?? bet}
                   readOnly
                   aria-readonly
-                  aria-label="Einsatz je Spin — für diese Runde gesperrt"
+                  aria-label={t('session.stakeLockedShort')}
                   className="mt-1 w-full cursor-not-allowed rounded-lg border border-amber-400/30 bg-night px-3 py-2 tabular-nums text-white/70 outline-none"
                 />
               </label>
               {spinCostText === null && (
                 <p className="mt-1 text-[10px] text-amber-100/60">
-                  Der Server meldet den Rundeneinsatz nicht — angezeigt ist der zuletzt eingegebene
-                  Wert.
+                  {t('session.stakeUnknown')}
                 </p>
               )}
             </div>
@@ -544,23 +566,23 @@ export function SessionGame({
             // Entscheidung verwischen, um die es in dieser Engine geht.
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-lg border border-white/10 bg-night px-2 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-white/40">Pot</div>
+                <div className="text-[10px] uppercase tracking-wide text-white/40">{t('session.pot')}</div>
                 <div className="text-sm font-semibold tabular-nums text-white">{potText}</div>
-                <div className="mt-0.5 text-[10px] text-red-300/60">FAIL nimmt ihn</div>
+                <div className="mt-0.5 text-[10px] text-red-300/60">{t('session.failTakesIt')}</div>
               </div>
               <div className="rounded-lg border border-accent/30 bg-night px-2 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-white/40">Gesichert</div>
+                <div className="text-[10px] uppercase tracking-wide text-white/40">{t('session.secured')}</div>
                 <div className="text-sm font-semibold tabular-nums text-accent">{securedText}</div>
                 <div className="mt-0.5 text-[10px] text-white/40">
                   FAIL-immun · zahlt am Rundenende
                 </div>
               </div>
               <div className="rounded-lg border border-white/10 bg-night px-2 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-white/40">Cashout jetzt</div>
+                <div className="text-[10px] uppercase tracking-wide text-white/40">{t('session.cashout')}</div>
                 <div className="text-sm font-semibold tabular-nums text-white">
                   {toSol(view.potentialPayoutLamports)} ◎
                 </div>
-                <div className="mt-0.5 text-[10px] text-white/40">Pot + Gesichertes</div>
+                <div className="mt-0.5 text-[10px] text-white/40">{t('session.potPlusSecured')}</div>
               </div>
             </div>
           )}
@@ -579,9 +601,9 @@ export function SessionGame({
               )}
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" disabled={busy} onClick={() => void step({ guess: 'higher' })}
-                  className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">Höher</button>
+                  className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t('session.higher')}</button>
                 <button type="button" disabled={busy} onClick={() => void step({ guess: 'lower' })}
-                  className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">Tiefer</button>
+                  className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t('session.lower')}</button>
               </div>
             </>
           )}
@@ -590,7 +612,7 @@ export function SessionGame({
               <div className="mb-1 flex items-baseline justify-between">
                 <span className="text-xs text-white/40">{idxStep.label} wählen</span>
                 {boundsAssumed && (
-                  <span className="text-[10px] text-amber-300/70">Config nicht geladen — Standardwerte angenommen</span>
+                  <span className="text-[10px] text-amber-300/70">{t('session.configNotLoaded')}</span>
                 )}
               </div>
               <div

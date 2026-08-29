@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 import type { Control } from '@/lib/engines';
 
@@ -18,8 +19,9 @@ export function EngineControls({
   engineConfig?: Record<string, number> | null;
   onChange: (name: string, value: string) => void;
 }) {
+  const t = useT();
   if (controls.length === 0) {
-    return <p className="text-xs text-white/40">Diese Engine braucht keine Zusatz-Eingaben.</p>;
+    return <p className="text-xs text-white/40">{t('bet.noExtraInputs')}</p>;
   }
   // intlist-Grenzen: echte Werte aus der Server-Config, sonst Fallback.
   const listBounds = (c: Extract<Control, { kind: 'intlist' }>) =>

@@ -53,7 +53,17 @@ payout-ready game — automatically.
     same source, so they cannot disagree. Without that number a player types blind and gets a
     rejection with no visible reason.
 
-11. **Every money call carries a player token.** The API key only identifies the game — the player
+11. **English is the main language, and de/fr/ru ship with it.** Every visible
+    string goes through `t(...)` from `lib/i18n.tsx`; the catalog lives in
+    `lib/strings.ts` with all four languages per key, English always filled —
+    everything falls back to it. Keep a way for the player to switch
+    (`LangSwitch`); a catalog nobody can reach is decoration. The PvP surface
+    and the server error texts follow the same language automatically, so one
+    screen never mixes two. Never hard-code a sentence into a component: this
+    template was German-only until 2026-08-29 (81 strings in 16 files), and it
+    is forked worldwide.
+
+12. **Every money call carries a player token.** The API key only identifies the game — the player
    proves who they are with a wallet signature (`POST /api/game/authorize`, token valid 15 min,
    bound to wallet + game). In the browser always use `usePlayerAuth().moneyFetch(…)`, never a raw
    `fetch` to a money route; the server routes forward the token as `Authorization: Bearer`.
@@ -64,8 +74,8 @@ payout-ready game — automatically.
 ## Off-limits files (they work — don't rebuild them)
 
 `app/api/*` · `lib/solcore.ts` · `lib/config.ts` · `lib/lamports.ts` · `lib/errors.ts` ·
-`lib/error-catalog.generated.ts` · `lib/bet-limits.tsx` · `components/VerifyLink.tsx` ·
-`components/BetLimitHint.tsx` ·
+`lib/error-catalog.generated.ts` · `lib/bet-limits.tsx` · `lib/i18n.tsx` ·
+`components/VerifyLink.tsx` · `components/BetLimitHint.tsx` ·
 `lib/engines.ts` · `lib/player-program.ts` · `lib/player-auth.ts` · `lib/crash-math.ts` ·
 `components/Providers.tsx`
 
@@ -74,9 +84,9 @@ They carry the `// ⚠ Nicht ändern — Systemvertrag` (do-not-edit / system-co
 ## Prove it before you commit
 
 `npm run check` runs two things. `scripts/check-contract.mjs` reads your own source and verifies
-the four promises above are still wired: deposit/withdraw reachable (incl. `/api/rpc`), error texts
-from the server catalog, maximum bet visible at every bet field, and a Scanner link in every
-mechanic. `scripts/check.mjs` then talks to the configured backend.
+the promises above are still wired: deposit/withdraw reachable (incl. `/api/rpc`), error texts
+from the server catalog, maximum bet visible at every bet field, all four languages present with a
+switcher, and a Scanner link in every mechanic. `scripts/check.mjs` then talks to the configured backend.
 
 The contract check exists because none of this fails loudly. A re-skin that drops the max-bet line
 or repoints a verify link leaves a game that still runs, still pays out, and is quietly worse.

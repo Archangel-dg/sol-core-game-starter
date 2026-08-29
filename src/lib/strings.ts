@@ -648,6 +648,36 @@ export const STRINGS = {
     fr: 'Encaissez à tout moment dès le premier tour — cela paie la cagnotte + le sécurisé.',
     ru: 'Забрать можно в любой момент с первого спина — платит банк + закреплённое.',
   },
+  // ── spin-tower-pro ────────────────────────────────────────────────────────
+  // Diese fünf standen bis zum 29.08.2026 als deutsche Zeichenketten direkt im
+  // Bauteil. Sie sind der Prüfung entgangen, weil sie in Ausdrücken und
+  // Template-Literalen steckten, nicht als JSX-Text — ein Franzose las im
+  // laufenden Spiel plötzlich „Abgestürzt: Stufe 3 → 1".
+  'session.tower': { en: 'Tower {n}', de: 'Turm {n}', fr: 'Tour {n}', ru: 'Башня {n}' },
+  'session.spinInfo': {
+    en: 'Spin {n}{max} · Cash out {amount} ◎',
+    de: 'Spin {n}{max} · Cashout {amount} ◎',
+    fr: 'Spin {n}{max} · Encaisser {amount} ◎',
+    ru: 'Спин {n}{max} · Кэшаут {amount} ◎',
+  },
+  'session.failPotLost': {
+    en: 'FAIL — pot lost',
+    de: 'FAIL — Pot verloren',
+    fr: 'FAIL — pot perdu',
+    ru: 'FAIL — пот потерян',
+  },
+  'session.failSecuredPaid': {
+    en: 'secured {amount} ◎ paid out',
+    de: 'gesichert {amount} ◎ ausgezahlt',
+    fr: 'sécurisé {amount} ◎ versé',
+    ru: 'обеспеченные {amount} ◎ выплачены',
+  },
+  'session.fell': {
+    en: 'Fell: level {from} → {to}',
+    de: 'Abgestürzt: Stufe {from} → {to}',
+    fr: 'Chute : niveau {from} → {to}',
+    ru: 'Падение: уровень {from} → {to}',
+  },
   'session.ground': { en: '(ground)', de: '(Boden)', fr: '(sol)', ru: '(низ)' },
   'session.failTakesIt': {
     en: 'FAIL takes it', de: 'FAIL nimmt ihn', fr: 'L’ÉCHEC l’emporte', ru: 'ПРОВАЛ забирает',

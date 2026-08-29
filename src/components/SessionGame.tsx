@@ -93,7 +93,12 @@ function stepsInfo(
  * und `bombColumns`. Liefert null, wenn weder Türme noch Stufen ankommen (alter
  * API-Stand ⇒ es bleibt bei der generischen Aktions-UI, nichts crasht). */
 function spinTowerInfo(
-  progress: unknown,
+  /** Die GANZE Sicht — nicht `progress`. Der Server legt Stufen, Pot und
+   * Gesichertes bei dieser Engine auf die oberste Ebene und sendet gar kein
+   * `progress`. Der alte Zugriff darauf lieferte still ein leeres Objekt:
+   * jeder Turm stand auf Stufe 0, nichts war markiert, der Pot zeigte 0.00×.
+   * `progress` bleibt als Rückfall drin, falls ein API-Stand es doch dort führt. */
+  sicht: unknown,
   cfg: Record<string, unknown> | null,
 ): {
   towers: { levels: number; multipliersBps: number[] }[];
@@ -106,7 +111,10 @@ function spinTowerInfo(
   maxSpins: number | null;
   failMode: 'reset' | 'stepdown' | null;
 } | null {
-  const p = progress && typeof progress === 'object' ? (progress as Record<string, unknown>) : {};
+  const v = sicht && typeof sicht === 'object' ? (sicht as Record<string, unknown>) : {};
+  const innen = v.progress && typeof v.progress === 'object' ? (v.progress as Record<string, unknown>) : {};
+  /** Oberste Ebene zuerst, `progress` als Rückfall. */
+  const p = { ...innen, ...v } as Record<string, unknown>;
   const c = (cfg ?? {}) as Record<string, unknown>;
   const numOrNull = (v: unknown): number | null =>
     typeof v === 'number' && Number.isFinite(v) ? v : null;
@@ -122,8 +130,11 @@ function spinTowerInfo(
     : [];
   const levels = nums(p.levels);
   if (towers.length === 0 && levels.length === 0) return null;
-  // Pot lokal aus Brett + Stufen — die Lamport-Zahl kommt zwar vom Server
-  // (`potLamports`), aber die Multiplikator-Sicht funktioniert auch ohne sie.
+  // Der Server rechnet den Pot selbst (`potBps`) — die lokale Summe unten ist
+  // nur der Rückfall, wenn er ihn nicht mitschickt.
+  const potBpsServer = numOrNull(p.potBps);
+  // Pot lokal aus Brett + Stufen — nur der Rückfall für den Fall, dass ein
+  // API-Stand `potBps` nicht mitschickt.
   const potBps = towers.reduce((sum, t, i) => {
     const lvl = levels[i] ?? 0;
     return lvl > 0 ? sum + (t.multipliersBps[lvl - 1] ?? 0) : sum;
@@ -132,7 +143,7 @@ function spinTowerInfo(
   return {
     towers,
     levels,
-    potBps,
+    potBps: potBpsServer ?? potBps,
     securedBps: numOrNull(p.securedBps),
     maxSpins: numOrNull(c.maxSpins),
     failMode: rawFail === 'reset' || rawFail === 'stepdown' ? rawFail : null,
@@ -209,7 +220,8 @@ export function SessionGame({
           onRound(v.proof.serverSeedHash, v.roundId);
           onLog({
             win: v.status === 'cashed_out' && v.payoutLamports !== '0',
-            multiplierBps: v.multiplierBps,
+            // Derselbe Rückfall wie im HUD — sonst stand im Verlauf NaN×.
+            multiplierBps: v.multiplierBps ?? v.returnBps ?? 0,
             payoutLamports: v.payoutLamports ?? '0',
             roundId: v.roundId,
           });
@@ -311,16 +323,19 @@ export function SessionGame({
   // fehlt das Feld (alle anderen Engines), bleibt jede Zeile unten wirkungslos
   // und die Oberfläche rendert exakt wie bisher.
   const costPerStep = sess.costPerStep === true;
-  const spinTower = costPerStep ? spinTowerInfo(view?.progress ?? null, cfg) : null;
+  const spinTower = costPerStep ? spinTowerInfo(view ?? null, cfg) : null;
   // `spins` ist die Wahrheit des Servers für bezahlte Spins; `steps` ist der
   // generische Zähler und dient nur als Rückfall für ältere API-Stände.
   const spinsUsed = view?.spins ?? view?.steps ?? 0;
   const maxSpins = view?.maxSpins ?? spinTower?.maxSpins ?? null;
   const stepsTaken = costPerStep ? spinsUsed : (view?.steps ?? 0);
   // Preis eines Spins: in der laufenden Runde sagt ihn der Server
-  // (`spinCostLamports`) — nach einem Reload weiß das lokale Einsatz-Feld
-  // nichts über die Runde, eine Anzeige daraus wäre schlicht falsch.
-  const spinCostText = view?.spinCostLamports ? toSol(view.spinCostLamports) : null;
+  // (`totalChargePerSpinLamports` — Einsatz PLUS Fees, also exakt der Betrag,
+  // der abgebucht wird) — nach einem Reload weiß das lokale Einsatz-Feld nichts
+  // über die Runde, eine Anzeige daraus wäre schlicht falsch.
+  const spinCostText = view?.totalChargePerSpinLamports
+    ? toSol(view.totalChargePerSpinLamports)
+    : null;
   // Vor dem Start ist die Eingabe selbst der Preis je Spin — daraus lässt sich
   // ehrlich zeigen, was eine bis zum Deckel durchgespielte Runde MAXIMAL kostet.
   const plannedStake = (() => {
@@ -343,15 +358,28 @@ export function SessionGame({
   // während einer aktiven Runde gerendert wird.
   const stakeLocked = costPerStep && view?.status === 'active';
   // Pot und Gesichertes sind ZWEI Zahlen und werden nie zu einer verrechnet:
-  // der Pot ist bei einem FAIL weg, das Gesicherte nicht. Lamports bevorzugt
-  // (Server), sonst die aus dem Brett abgeleitete Multiplikator-Sicht.
-  const potText = view?.potLamports
-    ? `${toSol(view.potLamports)} ◎`
+  // der Pot ist bei einem FAIL weg, das Gesicherte nicht. Der Server führt
+  // beide in bps EINES Einsatzes; zusammen mit dem gesperrten Einsatz
+  // (`stakeLamports`) wird daraus ein exakter Betrag — ohne Rundung, weil in
+  // Lamports gerechnet wird. Fehlt der Einsatz (alter Stand), bleibt die
+  // Multiplikator-Sicht.
+  const inSol = (bps: number | null | undefined): string | null => {
+    if (bps === null || bps === undefined || !view?.stakeLamports) return null;
+    try {
+      return toSol(((BigInt(view.stakeLamports) * BigInt(Math.round(bps))) / 10000n).toString());
+    } catch {
+      return null;
+    }
+  };
+  const potSol = inSol(spinTower?.potBps);
+  const potText = potSol
+    ? `${potSol} ◎`
     : spinTower
       ? `${(spinTower.potBps / 10000).toFixed(2)}×`
       : '—';
-  const securedText = view?.securedLamports
-    ? `${toSol(view.securedLamports)} ◎`
+  const securedSol = inSol(spinTower?.securedBps);
+  const securedText = securedSol
+    ? `${securedSol} ◎`
     : spinTower && spinTower.securedBps !== null
       ? `${(spinTower.securedBps / 10000).toFixed(2)}×`
       : '—';
@@ -381,23 +409,45 @@ export function SessionGame({
             const rows = tower.multipliersBps.length;
             return (
               <div key={ti} className="space-y-1">
-                <div className="text-center text-[10px] text-white/40">Turm {ti + 1}</div>
-                {Array.from({ length: rows }, (_, i) => rows - i).map((lvl) => (
-                  <div
-                    key={lvl}
-                    className={`flex items-center justify-between rounded px-1.5 py-1 text-[11px] tabular-nums ${
-                      lvl === current
-                        ? 'bg-accent/15 text-accent ring-1 ring-accent/50'
-                        : lvl < current
-                          ? 'text-white/50'
-                          : 'text-white/25'
-                    }`}
-                  >
-                    <span>{lvl === rows ? '★' : lvl}</span>
-                    <span>{((tower.multipliersBps[lvl - 1] ?? 0) / 10000).toFixed(2)}×</span>
-                  </div>
-                ))}
                 <div className="text-center text-[10px] text-white/40">
+                  {t('session.tower', { n: ti + 1 })}
+                </div>
+                {Array.from({ length: rows }, (_, i) => rows - i).map((lvl) => {
+                  // Drei Zustände, jeder eigenständig erkennbar — nicht nur
+                  // heller/dunkler: erstiegen (getönt, ausgefüllter Punkt),
+                  // AKTUELL (Ring + Pfeil, der Multiplikator, der im Pot zählt)
+                  // und offen (blass, leerer Punkt). Ohne das musste ein Spieler
+                  // raten, wo sein Turm steht.
+                  const erreicht = lvl < current;
+                  const aktuell = lvl === current;
+                  return (
+                    <div
+                      key={lvl}
+                      aria-current={aktuell ? 'step' : undefined}
+                      className={`flex items-center gap-1 rounded px-1.5 py-1 text-[11px] tabular-nums ${
+                        aktuell
+                          ? 'bg-accent/20 font-semibold text-accent ring-1 ring-accent/60'
+                          : erreicht
+                            ? 'bg-accent/[0.07] text-accent/60'
+                            : 'text-white/25'
+                      }`}
+                    >
+                      <span aria-hidden className="w-2 shrink-0 text-center">
+                        {aktuell ? '▸' : ''}
+                      </span>
+                      <span className="w-3 shrink-0">{lvl === rows ? '★' : lvl}</span>
+                      <span aria-hidden className="shrink-0 text-[9px] leading-none">
+                        {aktuell || erreicht ? '●' : '○'}
+                      </span>
+                      <span className="ml-auto">
+                        {((tower.multipliersBps[lvl - 1] ?? 0) / 10000).toFixed(2)}×
+                      </span>
+                    </div>
+                  );
+                })}
+                <div
+                  className={`text-center text-[10px] ${current > 0 ? 'text-accent/70' : 'text-white/40'}`}
+                >
                   {current === 0 ? t('session.ground') : t('session.level', { n: current })}
                 </div>
               </div>
@@ -419,7 +469,10 @@ export function SessionGame({
         {view ? (
           <div>
             <div className={`text-3xl font-bold tabular-nums ${ended && view.status === 'busted' ? 'text-red-400' : 'text-accent'}`}>
-              {(view.multiplierBps / 10000).toFixed(2)}×
+              {/* `multiplierBps` gibt es nur bei den klassischen Engines;
+                  spin-tower-pro nennt dieselbe Zahl `returnBps` (Pot +
+                  Gesichertes). Ohne diesen Rückfall stand hier NaN×. */}
+              {((view.multiplierBps ?? view.returnBps ?? 0) / 10000).toFixed(2)}×
             </div>
             <div className="mt-1 text-sm text-white/70">
               {active && steps &&
@@ -435,20 +488,27 @@ export function SessionGame({
                   amount: toSol(view.potentialPayoutLamports),
                 })}
               {active && !steps && costPerStep &&
-                `Spin ${spinsUsed}${maxSpins !== null ? `/${maxSpins}` : ''} · Cashout ${toSol(view.potentialPayoutLamports)} ◎`}
+                t('session.spinInfo', {
+                  n: spinsUsed,
+                  max: maxSpins !== null ? `/${maxSpins}` : '',
+                  amount: toSol(view.potentialPayoutLamports),
+                })}
               {active &&
                 !steps &&
                 !costPerStep &&
                 t('session.step', {
-                  n: view.steps,
+                  // `steps` ist bei spin-tower-pro nicht gesetzt; dieser Zweig
+                  // laeuft ohnehin nur ohne costPerStep, der Rueckfall haelt
+                  // den Typ ehrlich.
+                  n: view.steps ?? 0,
                   amount: toSol(view.potentialPayoutLamports),
                 })}
               {/* Bei Kosten je Schritt wäre „alles verloren" gelogen: ein FAIL
                   nimmt nur den Pot, das Gesicherte wird trotzdem ausgezahlt. */}
               {view.status === 'busted' && costPerStep &&
-                `FAIL — Pot verloren${
+                `${t('session.failPotLost')}${
                   view.payoutLamports && view.payoutLamports !== '0'
-                    ? ` · gesichert ${toSol(view.payoutLamports)} ◎ ausgezahlt`
+                    ? ` · ${t('session.failSecuredPaid', { amount: toSol(view.payoutLamports) })}`
                     : ''
                 }`}
               {view.status === 'busted' && !costPerStep && t('session.busted')}
@@ -457,7 +517,7 @@ export function SessionGame({
             </div>
             {active && steps?.lastFall && (
               <div className="mt-1 text-[11px] text-amber-300/80">
-                Abgestürzt: Stufe {steps.lastFall.from} → {steps.lastFall.to}
+                {t('session.fell', { from: steps.lastFall.from, to: steps.lastFall.to })}
                 {steps.lastFall.to > 0 ? ` ${t('session.safePoint')}` : ` ${t('session.ground')}`}
               </div>
             )}

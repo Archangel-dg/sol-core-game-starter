@@ -173,24 +173,36 @@ export interface SessionView {
   gameId: string;
   mode: string;
   status: 'active' | 'busted' | 'cashed_out';
-  steps: number;
-  multiplierBps: number;
   potentialPayoutLamports: string;
   proof: { serverSeedHash: string; clientSeed: string; nonce: number };
   /** Aufgelöste Engine-Dimensionen (fehlt bei alten API-Ständen). */
   engine?: { mode: string; config: Record<string, number> };
-  progress: Record<string, unknown>;
-  // ── Nur bei Engines mit `session.costPerStep` (spin-tower-pro) ──
-  // Bei allen anderen Session-Engines kostet die Runde EINMAL beim Start; dort
-  // fehlen diese Felder komplett. Deshalb durchgehend OPTIONAL — sie werden
-  // defensiv gelesen (siehe SessionGame), nie vorausgesetzt.
-  /** Was JEDER weitere Schritt kostet: der für die Runde gesperrte Einsatz. */
-  spinCostLamports?: string;
-  /** FAIL-immun gesicherter Teil — geht nicht mehr verloren, wird aber erst mit
-   * der Schluss-Abrechnung am Rundenende ausgezahlt. */
-  securedLamports?: string;
-  /** Aktueller, noch verlierbarer Pot (Summe der erreichten Stufen). */
-  potLamports?: string;
+  // ── Klassische Session-Engines (mines/hilo/towers/pump/dice-ladder/steps) ──
+  // OPTIONAL, weil `spin-tower-pro` eine ANDERE Antwortform auf denselben
+  // Routen liefert: dort gibt es weder `progress` noch `steps` noch
+  // `multiplierBps`. Das als Pflichtfeld zu tippen war der Grund, warum die
+  // Turm-Anzeige still auf NaN und Stufe 0 lief — TypeScript hielt für sicher,
+  // was zur Laufzeit fehlte. Immer mit Rückfall lesen.
+  steps?: number;
+  multiplierBps?: number;
+  progress?: Record<string, unknown>;
+  // ── Nur `spin-tower-pro` (session.costPerStep) — alles OBERSTE EBENE ──────
+  /** Aktuelle Stufe je Turm (0 = Boden). */
+  levels?: number[];
+  /** Gezogene Ergebnisse der Runde, ein Eintrag je bezahltem Spin. */
+  outcomes?: number[];
+  /** Noch verlierbarer Pot in bps EINES Einsatzes (FAIL nimmt ihn). */
+  potBps?: number;
+  /** FAIL-immun gesichert, in bps eines Einsatzes — Auszahlung am Rundenende. */
+  securedBps?: number;
+  /** Was die Runde JETZT auszahlen würde, in bps eines Einsatzes (= Pot + Gesichertes). */
+  returnBps?: number;
+  /** Der für die Runde gesperrte Einsatz. */
+  stakeLamports?: string;
+  /** Einsatz + Fees je Spin — exakt der Betrag, den ein Spin abbucht. */
+  totalChargePerSpinLamports?: string;
+  /** Σ der bisher bezahlten Einsätze (ohne Fees). */
+  totalStakedLamports?: string;
   /** Bezahlte Spins und der harte Spin-Deckel der Runde. */
   spins?: number;
   maxSpins?: number;

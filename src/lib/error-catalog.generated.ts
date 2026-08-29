@@ -9,7 +9,7 @@
 import type { ErrorCatalog } from './errors';
 
 export const CATALOG_SNAPSHOT: ErrorCatalog = {
-  "version": "bd80cc465f04",
+  "version": "a3564ef3ce45",
   "langs": [
     "en",
     "de",
@@ -68,6 +68,14 @@ export const CATALOG_SNAPSHOT: ErrorCatalog = {
             "de": "Ungültige Auswahl — außerhalb des Spielfelds.",
             "fr": "Choix invalide — hors du terrain de jeu.",
             "ru": "Неверный выбор — за пределами игрового поля."
+          }
+        },
+        "protocol_handshake_required": {
+          "text": {
+            "en": "This game cannot start a round — its build is out of date. Please tell the operator.",
+            "de": "Dieses Spiel kann keine Runde starten — sein Stand ist veraltet. Bitte dem Betreiber melden.",
+            "fr": "Ce jeu ne peut pas lancer de partie — sa version est obsolète. Merci de prévenir l'exploitant.",
+            "ru": "Эта игра не может начать раунд — её сборка устарела. Сообщите оператору."
           }
         }
       }

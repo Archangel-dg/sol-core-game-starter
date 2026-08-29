@@ -6,11 +6,17 @@ import { serverConfig } from '@/lib/config';
 export async function POST(req: Request) {
   try {
     const cfg = serverConfig();
-    const body = (await req.json()) as { playerWallet?: string; betLamports?: string; clientSeed?: string };
+    const body = (await req.json()) as {
+      playerWallet?: string;
+      betLamports?: string;
+      clientSeed?: string;
+      // Derselbe Handschlag wie im Echtgeld-Pfad — der Demo-Flow ist derselbe.
+      protocol?: string;
+    };
     if (!body.playerWallet || !body.betLamports) {
       return NextResponse.json({ error: { code: 'API-204' } }, { status: 400 });
     }
-    return NextResponse.json(await demoSessionStart({ gameId: cfg.gameId, playerWallet: body.playerWallet, betLamports: body.betLamports, clientSeed: body.clientSeed }));
+    return NextResponse.json(await demoSessionStart({ gameId: cfg.gameId, playerWallet: body.playerWallet, betLamports: body.betLamports, clientSeed: body.clientSeed, protocol: body.protocol }));
   } catch (err) {
     if (err instanceof SolcoreError) {
       return NextResponse.json({ error: { code: err.code, message: err.message, reason: err.reason } }, { status: err.status });

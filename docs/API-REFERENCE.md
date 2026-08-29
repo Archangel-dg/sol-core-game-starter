@@ -106,7 +106,13 @@ Response:
 Start a round → steps → cash out any time (after ≥1 step). The whole outcome is committed at start
 via `serverSeedHash`.
 
-- `POST /api/game/session/start` — `{ gameId, playerWallet, betLamports, clientSeed? }`
+- `POST /api/game/session/start` — `{ gameId, playerWallet, betLamports, clientSeed?, protocol? }`
+  - **Pay-per-spin engines (`spin-tower-pro`) must send `protocol: "spin-tower/1"`.** Without it the
+    server refuses with `API-204 { reason: 'protocol_handshake_required' }` and no round opens —
+    fail-closed on purpose: a client that thinks steps are free spends someone else's money. The
+    template sends it from `SessionGame` whenever `engine.session.costPerStep` is set, and both
+    `app/api/session/start` and `app/api/demo/session/start` forward it. It is a promise that the
+    player was TOLD every spin costs — so keep the cost warning if you keep the handshake.
 - `GET /api/game/session/:id` — current state (**reconnect after reload!**)
 - `POST /api/game/session/:id/step` — body per engine (see ENGINES.md)
 - `POST /api/game/session/:id/cashout`

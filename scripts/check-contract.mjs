@@ -368,6 +368,47 @@ pruef(dateiDa('src/components/PoweredBy.tsx'), 'Herkunftszeile vorhanden (Powere
   );
 }
 
+// ── 8. Pay-per-Spin ─────────────────────────────────────────────────────────
+{
+  // Gilt nur für Engines, bei denen JEDER Schritt erneut Einsatz kostet
+  // (`session.costPerStep`, heute spin-tower-pro). Kennt diese Kopie den
+  // Begriff nicht, gibt es hier auch nichts zu prüfen.
+  const sg = existsSync(join(WURZEL, 'src/components/SessionGame.tsx'))
+    ? readFileSync(join(WURZEL, 'src/components/SessionGame.tsx'), 'utf8')
+    : '';
+  if (/costPerStep/.test(sg)) {
+    console.log('\n8) Pay-per-Spin — Kosten sagen UND anmelden');
+    // Nicht "steht irgendwo in der Datei" — der Import allein reicht nicht.
+    // Geprueft wird der Rumpf des START-Aufrufs.
+    const startCall = sg.slice(sg.indexOf('/session/start`'), sg.indexOf('/session/start`') + 700);
+    pruef(
+      sg.includes('/session/start`') &&
+        /protocol:\s*(SPIN_TOWER_PROTOCOL|['"`]spin-tower\/1['"`])/.test(startCall),
+      'Der Handschlag wird beim Rundenstart mitgeschickt',
+      'SessionGame startet ohne `protocol` — der Server lehnt jede Runde mit ' +
+        'API-204 protocol_handshake_required ab. Genau so war am 29.08.2026 ' +
+        'kein spin-tower-pro-Spiel aus dieser Vorlage spielbar.',
+    );
+    for (const rel of ['src/app/api/session/start/route.ts', 'src/app/api/demo/session/start/route.ts']) {
+      const p2 = join(WURZEL, rel);
+      if (!existsSync(p2)) continue;
+      pruef(
+        /protocol/.test(readFileSync(p2, 'utf8')),
+        `Die Route reicht ihn weiter: ${rel.replace('src/app/api/', '')}`,
+        `${rel} liest \`protocol\` nicht aus dem Body — der Handschlag geht auf ` +
+          'dem Weg zum Server verloren.',
+      );
+    }
+    pruef(
+      /session\.everySpinCosts/.test(sg),
+      'Der Spieler wird vor dem ersten Spin gewarnt',
+      'Kein Kostenhinweis an `costPerStep`. Der Handschlag sagt dem Server ' +
+        '„dieser Client kennt das Kostenmodell" — das darf er nur behaupten, ' +
+        'wenn der Spieler es auch liest.',
+    );
+  }
+}
+
 console.log(
   `\n${fehler === 0 ? '✅ Vertrag eingehalten.' : `❌ ${fehler} Zusage(n) gebrochen.`}`,
 );

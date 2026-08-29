@@ -88,7 +88,16 @@ let roundId = null;
 if (MECHANIC === 'session') {
   const r = await fetch(`${API}/api/game/session/start`, {
     method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': KEY },
-    body: JSON.stringify({ gameId: GAME, playerWallet: PLAYER, betLamports: '10000000' }),
+    // Pay-per-Spin-Engines (spin-tower-pro) verlangen den Handschlag, sonst
+    // lehnt der Server mit API-204 protocol_handshake_required ab — und der
+    // steht bewusst NICHT in der Liste erwarteter Antworten unten: Er heisst
+    // nicht "kein Guthaben", er heisst "dieser Client ist kaputt".
+    body: JSON.stringify({
+      gameId: GAME,
+      playerWallet: PLAYER,
+      betLamports: '10000000',
+      ...(ENGINE === 'spin-tower-pro' ? { protocol: 'spin-tower/1' } : {}),
+    }),
     signal: AbortSignal.timeout(90000),
   });
   const b = await j(r);

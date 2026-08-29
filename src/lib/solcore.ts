@@ -202,12 +202,29 @@ export interface SessionView {
   capped?: boolean;
 }
 
+/**
+ * Pay-per-Spin-Handschlag (`spin-tower-pro`).
+ *
+ * Der Server öffnet eine Runde dieser Engines NUR, wenn der Client mitschickt,
+ * dass er das Kostenmodell kennt — jeder Spin kostet erneut den vollen Einsatz.
+ * Fehlt die Zeichenkette, kommt `API-204 protocol_handshake_required`.
+ *
+ * Fail-closed ist hier richtig: Ein Client, der Schritte für gratis hält,
+ * verklickt fremdes Geld. Der Preis dafür ist, dass diese eine Zeichenkette
+ * NIE fehlen darf — vom 29.08.2026 bis zum Fix konnte kein einziges
+ * spin-tower-pro-Spiel aus dieser Vorlage eine Runde starten, weil sie hier
+ * fehlte. `npm run check:contract`, Abschnitt 8, prüft das jetzt.
+ */
+export const SPIN_TOWER_PROTOCOL = 'spin-tower/1';
+
 export function sessionStart(
   input: {
     gameId: string;
     playerWallet: string;
     betLamports: string;
     clientSeed?: string;
+    /** Nur `spin-tower-pro`: siehe SPIN_TOWER_PROTOCOL. */
+    protocol?: string;
   },
   playerToken?: string,
 ): Promise<SessionView> {
@@ -372,6 +389,9 @@ export function demoSessionStart(input: {
   playerWallet: string;
   betLamports: string;
   clientSeed?: string;
+  /** Nur `spin-tower-pro`: siehe SPIN_TOWER_PROTOCOL. Der Demo-Pfad verlangt
+   * denselben Handschlag — er läuft durch denselben Flow. */
+  protocol?: string;
 }): Promise<SessionView> {
   return request<SessionView>('/api/game/demo/session/start', { method: 'POST', body: JSON.stringify(input) });
 }

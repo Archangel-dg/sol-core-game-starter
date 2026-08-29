@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePlayer, useDemo } from './DemoProvider';
 import type { EngineDef } from '@/lib/engines';
-import type { SessionView } from '@/lib/solcore';
+import { SPIN_TOWER_PROTOCOL, type SessionView } from '@/lib/solcore';
 import { solToLamports, toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
 import { usePlayerAuth } from '@/lib/player-auth';
@@ -266,6 +266,11 @@ export function SessionGame({
     const v = await call(`${apiBase}/session/start`, {
       playerWallet: wallet,
       betLamports: solToLamports(bet).toString(),
+      // Pay-per-Spin-Handschlag: Der Server oeffnet eine Runde dieser Engines
+      // nur, wenn der Client bestaetigt, dass er das Kostenmodell kennt. Das
+      // darf er hier, weil die Kostenwarnung direkt darueber steht (sie haengt
+      // an genau demselben `costPerStep`) — nicht, weil es den Fehler wegmacht.
+      ...(sess.costPerStep === true ? { protocol: SPIN_TOWER_PROTOCOL } : {}),
     });
     if (v) {
       localStorage.setItem(storeKey, v.sessionId);

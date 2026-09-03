@@ -1,4 +1,4 @@
-CHANGELOG — Coin Flip Classic (built on the Sol-Core Game Starter)
+CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 

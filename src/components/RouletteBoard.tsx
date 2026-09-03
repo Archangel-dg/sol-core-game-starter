@@ -1,5 +1,6 @@
 'use client';
 import { useT } from '@/lib/i18n';
+import type { StringKey } from '@/lib/strings';
 
 // Design-Zone: Roulette-Tableau für BEIDE Varianten.
 // - Easy (config.betMode fehlt/easy): Einfachauswahl EINER klassischen Wette.
@@ -30,22 +31,22 @@ export function spotKey(s: RouletteSpot): string {
   return `${s.betType}:${s.value ?? ''}`;
 }
 
-const OUTSIDE: { betType: string; label: string }[] = [
-  { betType: 'red', label: 'Rot' },
-  { betType: 'black', label: 'Schwarz' },
-  { betType: 'odd', label: 'Ungerade' },
-  { betType: 'even', label: 'Gerade' },
-  { betType: 'low', label: '1–18' },
-  { betType: 'high', label: '19–36' },
+const OUTSIDE: { betType: string; label: StringKey }[] = [
+  { betType: 'red', label: 'roulette.red' },
+  { betType: 'black', label: 'roulette.black' },
+  { betType: 'odd', label: 'roulette.odd' },
+  { betType: 'even', label: 'roulette.even' },
+  { betType: 'low', label: 'roulette.low' },
+  { betType: 'high', label: 'roulette.high' },
 ];
 
-const GROUPS: { betType: string; value: number; label: string }[] = [
-  { betType: 'dozen', value: 1, label: '1. Dutzend' },
-  { betType: 'dozen', value: 2, label: '2. Dutzend' },
-  { betType: 'dozen', value: 3, label: '3. Dutzend' },
-  { betType: 'column', value: 1, label: 'Kolonne 1' },
-  { betType: 'column', value: 2, label: 'Kolonne 2' },
-  { betType: 'column', value: 3, label: 'Kolonne 3' },
+const GROUPS: { betType: string; value: number; label: StringKey }[] = [
+  { betType: 'dozen', value: 1, label: 'roulette.dozen1' },
+  { betType: 'dozen', value: 2, label: 'roulette.dozen2' },
+  { betType: 'dozen', value: 3, label: 'roulette.dozen3' },
+  { betType: 'column', value: 1, label: 'roulette.column1' },
+  { betType: 'column', value: 2, label: 'roulette.column2' },
+  { betType: 'column', value: 3, label: 'roulette.column3' },
 ];
 
 const RED = new Set([
@@ -150,7 +151,7 @@ export function RouletteBoard({
             {r <= 10 &&
               dot(
                 { betType: 'split', value: 24 + 3 * r + c },
-                `Split ${n}/${n + 3} · 18×`,
+                t('roulette.split', { a: n, b: n + 3 }),
                 '-right-2 top-1/2 -translate-y-1/2',
               )}
 
@@ -158,12 +159,12 @@ export function RouletteBoard({
             {c >= 1
               ? dot(
                   { betType: 'split', value: 2 * r + (c - 1) },
-                  `Split ${n - 1}/${n} · 18×`,
+                  t('roulette.split', { a: n - 1, b: n }),
                   '-bottom-2 left-1/2 -translate-x-1/2',
                 )
               : dot(
                   { betType: 'street', value: r },
-                  `Street ${3 * r + 1}-${3 * r + 2}-${3 * r + 3} · 12×`,
+                  t('roulette.street', { a: 3 * r + 1, b: 3 * r + 2, c: 3 * r + 3 }),
                   '-bottom-2 left-1/2 -translate-x-1/2',
                 )}
 
@@ -172,7 +173,7 @@ export function RouletteBoard({
               (c >= 1
                 ? dot(
                     { betType: 'corner', value: 2 * r + (c - 1) },
-                    `Ecke ${n - 1}/${n}/${n + 2}/${n + 3} · 9×`,
+                    t('roulette.corner', { a: n - 1, b: n, c: n + 2, d: n + 3 }),
                     '-bottom-2 -right-2',
                   )
                 : dot(
@@ -271,7 +272,7 @@ export function RouletteBoard({
             className={chipCls(isOn(g), 'neutral')}
             onClick={() => onToggle({ betType: g.betType, value: g.value })}
           >
-            {g.label}
+            {t(g.label)}
           </button>
         ))}
       </div>
@@ -288,7 +289,7 @@ export function RouletteBoard({
             )}
             onClick={() => onToggle({ betType: o.betType })}
           >
-            {o.label}
+            {t(o.label)}
           </button>
         ))}
       </div>
@@ -299,7 +300,7 @@ export function RouletteBoard({
         </p>
       )}
       {pro && selected.size > 0 && (
-        <p className="text-[11px] text-white/40">{selected.size} Chip(s) gewählt.</p>
+        <p className="text-[11px] text-white/40">{t('roulette.chipsSelected', { n: selected.size })}</p>
       )}
     </div>
   );

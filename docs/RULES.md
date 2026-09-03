@@ -26,7 +26,8 @@ payout-ready game — automatically.
    hides itself automatically. `/health` carries no `network` — that field is on the admin-only
    `GET /health/full`; the game's network comes from `NEXT_PUBLIC_SOLANA_NETWORK`.
 
-6. **Make provably-fair visible — with a working link.** Seed hash before the round, and after it
+6. **Keep provably-fair reachable — with a working link.** The seed hash and the round links sit in
+   the game menu (`GameMenu`), one tap away in every mechanic. Seed hash before the round, and after it
    a DIRECT link into the Sol-Core Scanner for EVERY mechanic (single, session, tournament, live,
    crash, PvP). Always build it with `components/VerifyLink.tsx` (`<VerifyLink>` / `verifyHref`),
    which points at `<verifierUrl>/verify/<id>` — the page that recomputes the round in the
@@ -49,8 +50,9 @@ payout-ready game — automatically.
 10. **Show the maximum bet, quietly but always.** The allowed bet is the MINIMUM of the game,
     level, solvency, single- and daily-payout caps, and the tightest of them moves during
     operation (measured 2026-08-28: game and level cap 50 SOL each, actually allowed 0.0365 SOL).
-    Use `BetLimitHint` next to the balance and `MaxBetPick` next to every bet field — both read the
-    same source, so they cannot disagree. Without that number a player types blind and gets a
+    Use `MaxBetPick` at the label and `BetLimitHint` under the input of every bet field — both read
+    the same source, so they cannot disagree. It is a game limit, not an account limit: deposit and
+    withdraw limits come back from the server as errors, the money menu shows none. Without that number a player types blind and gets a
     rejection with no visible reason.
 
 11. **The demo mode stays.** `/api/demo/*` plus `DemoProvider`/`DemoBar` let a visitor play with a

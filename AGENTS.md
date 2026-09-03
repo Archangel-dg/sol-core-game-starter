@@ -19,8 +19,9 @@ Standalone, the rules you must keep are:
 - **Deposit and withdraw stay reachable in every mechanic.** One balance per wallet, valid across
   all games on the platform. `/api/rpc` must exist — without it every deposit on a creator domain
   fails with 403.
-- **Show the maximum bet, quietly but always:** `BetLimitHint` at the balance, `MaxBetPick` at every
-  bet field. It is the minimum of several caps and moves during operation.
+- **Show the maximum bet, quietly but always, at the stake field:** `MaxBetPick` at the label and
+  `BetLimitHint` under the input of every bet field. It is the minimum of several caps and moves
+  during operation.
 - **The demo mode stays.** `/api/demo/*` plus `DemoProvider`/`DemoBar` let a visitor try the game
   on a simulated balance before depositing. Every demo spin is server-decided and verifiable like a
   real one. Restyle it freely, but never remove it and keep the entry point reachable.

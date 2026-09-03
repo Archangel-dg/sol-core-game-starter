@@ -10,7 +10,9 @@ result animation.
 - `src/components/ResultView.tsx` — result display (animation pays off here).
 - `src/components/SingleBetGame.tsx` / `SessionGame.tsx` — play area / HUD.
 - `src/components/EngineControls.tsx` — the look of the inputs.
-- `src/components/FairnessPanel.tsx`, `History.tsx`, `BalanceBar.tsx`.
+- `src/components/FairnessPanel.tsx`, `History.tsx`, `BalanceBar.tsx`, `HeaderBar.tsx`, `GameMenu.tsx`,
+  `DemoBar.tsx`, `Popover.tsx`, and the sound set (`src/lib/sounds.ts`, `public/sounds/*.wav`,
+  regenerate with `npm run generate-sounds`).
 
 None of this touches the money flow — reshape it freely.
 

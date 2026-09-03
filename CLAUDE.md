@@ -45,11 +45,15 @@ them only if the user explicitly asks and you are certain the contract with the 
    SERVER (`/api/error-catalog`) and only falls back to the built-in snapshot. Never add a second
    code→text table; a list baked into a build cannot stay current.
 5. `devMock: true` ⇒ hide the money UI.
-6. Keep provably-fair visible; honor session rules; never self-bet; be responsible by construction.
+6. Keep provably-fair reachable: seed hash and Scanner links live in the game menu (`GameMenu`),
+   one tap away in every mechanic; honor session rules; never self-bet; be responsible by
+   construction.
 7. Deposit and withdraw stay reachable in EVERY mechanic — the balance is one account per wallet
    and works across all games. `/api/rpc` must exist or every deposit on a creator domain hits 403.
-8. The maximum bet is shown quietly but always: `BetLimitHint` at the balance, `MaxBetPick` at
-   every bet field. It is the minimum of several caps and moves during operation.
+8. The maximum bet is shown quietly but always, AT THE STAKE FIELD: `MaxBetPick` at the label and
+   `BetLimitHint` under the input of every bet field. It is a game limit, not an account limit —
+   deposit and withdraw limits come back from the server as errors. It is the minimum of several
+   caps and moves during operation.
 9. Every finished round links into the Sol-Core Scanner via `VerifyLink`/`verifyHref` — never to a
    raw `/api/.../verify/...` JSON endpoint.
 10. The demo mode stays. `/api/demo/*` + `DemoProvider`/`DemoBar` let a visitor try the game with a

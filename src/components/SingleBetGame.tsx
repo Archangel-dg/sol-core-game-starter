@@ -11,9 +11,12 @@ import { EngineControls } from './EngineControls';
 import { ResultView } from './ResultView';
 import { SlotGrid } from './SlotGrid';
 import { RouletteBoard, spotKey, type RouletteSpot } from './RouletteBoard';
-import { MaxBetPick } from './BetLimitHint';
+import { BetLimitHint, MaxBetPick } from './BetLimitHint';
+import { useSound } from '@/lib/sounds';
 
 export interface RoundLog {
+  /** Einsatz in Lamports (Anzeige in der Runden-Historie). */
+  betLamports: string;
   win: boolean;
   multiplierBps: number;
   payoutLamports: string;
@@ -71,6 +74,7 @@ export function SingleBetGame({
   // Spieler-Token an). Der Demo-Pfad (/api/demo/*) bewegt kein Geld und hat
   // kein Solana-Wallet, das signieren könnte — er bleibt bewusst tokenlos.
   const { moneyFetch } = usePlayerAuth();
+  const { play: sfx } = useSound();
   const [bet, setBet] = useState('0.01');
   const [values, setValues] = useState<Record<string, string>>({});
   /** Roulette: gewählte Wettfelder (Easy = genau eins, Pro = mehrere Chips). */
@@ -119,6 +123,7 @@ export function SingleBetGame({
     setBusy(true);
     setError(null);
     setResult(null);
+    sfx('bet');
     try {
       const betLamports = solToLamports(bet);
       let params: Record<string, unknown>;
@@ -178,8 +183,10 @@ export function SingleBetGame({
         const reason = typeof details?.reason === 'string' ? details.reason : undefined;
         const ui = toUiError(r.error.code, r.error.message, reason, details);
         setError(`${ui.code}: ${ui.message}`);
+        sfx('error');
         return;
       }
+      sfx(r.result.win ? 'win' : 'lose');
       setResult({
         win: r.result.win,
         multiplierBps: r.result.multiplierBps,
@@ -189,6 +196,7 @@ export function SingleBetGame({
       });
       onRound(r.proof.serverSeedHash, r.roundId);
       onLog({
+        betLamports: betLamports.toString(),
         win: r.result.win,
         multiplierBps: r.result.multiplierBps,
         payoutLamports: r.result.payoutLamports,
@@ -197,14 +205,19 @@ export function SingleBetGame({
       if (demo) void refreshDemoBalance();
     } catch (e) {
       setError((e as Error).message);
+      sfx('error');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      <div className="mb-4">
+    <div className="space-y-4">
+      {/* Spielfeld — nur Animation und Ergebnis. Die Bedienelemente stehen
+          bewusst im eigenen Block darunter: So kann ein Creator das Spielfeld
+          frei gestalten oder ersetzen, ohne die Eingaben mit umzubauen.
+          Quadratisch (aspect-square): so hoch wie breit, auf jedem Gerät. */}
+      <div className="grid aspect-square rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         {(() => {
           const slotsDetails =
             engine.key === 'slots-modular' && result && Array.isArray((result.details as { grid?: unknown } | null)?.grid)
@@ -229,12 +242,12 @@ export function SingleBetGame({
             <ResultView {...result} />
           ) : (
             /* bisheriger Idle-Block unverändert (nicht-slots Engines) */
-            <div className="grid min-h-28 place-items-center rounded-xl bg-night px-4 py-3 text-center">
+            <div className="grid h-full place-items-center overflow-auto rounded-xl bg-night px-4 py-3 text-center">
               <div>
-                <p className="text-white/40">{engine.blurb}</p>
+                <p className="text-white/40">{t(engine.blurb)}</p>
                 {/* Income/Outcome in einfachen Worten — was man tut, was passieren kann. */}
                 <p className="mt-2 text-xs text-white/30">
-                  {engine.playerFacts.inputs} {engine.playerFacts.outcomes}
+                  {t(engine.playerFacts.inputs)} {t(engine.playerFacts.outcomes)}
                 </p>
               </div>
             </div>
@@ -242,55 +255,63 @@ export function SingleBetGame({
         })()}
       </div>
 
-      <label className="block text-xs text-white/50">
-        {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen): Der erlaubte
-            Einsatz ist das Minimum aus Spiel-, Level-, Solvenz- und Tagesdeckel
-            und bewegt sich im Betrieb. Ohne diese Zahl tippt der Spieler blind. */}
-        <span className="flex items-baseline justify-between gap-2">
-          <span>{t('bet.stake')}</span>
-          <MaxBetPick onPick={setBet} />
-        </span>
-        <input
-          value={bet}
-          onChange={(e) => setBet(e.target.value)}
-          inputMode="decimal"
-          className="mt-1 w-full rounded-lg border border-white/10 bg-night px-3 py-2 tabular-nums text-white outline-none focus:border-accent/50"
-        />
-      </label>
+      {/* Bedienfeld — Einsatz, Auswahl, Spielen. Getrennt vom Spielfeld. */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <label className="block text-xs text-white/50">
+          {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen): Der erlaubte
+              Einsatz ist das Minimum aus Spiel-, Level-, Solvenz- und Tagesdeckel
+              und bewegt sich im Betrieb. Ohne diese Zahl tippt der Spieler blind. */}
+          <span className="flex items-baseline justify-between gap-2">
+            <span>{t('bet.stake')}</span>
+            <MaxBetPick onPick={setBet} />
+          </span>
+          <input
+            value={bet}
+            onChange={(e) => setBet(e.target.value)}
+            inputMode="decimal"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-night px-3 py-2 tabular-nums text-white outline-none focus:border-accent/50"
+          />
+          {/* Was JETZT hoechstens gesetzt werden darf, direkt unter dem Feld:
+              die engste Grenze ist meist die Pool-Groesse, und die bewegt sich
+              im Betrieb. Steht seit dem 03.09.2026 hier statt am Guthaben —
+              es ist eine Spielgrenze, keine Kontogrenze. */}
+          <BetLimitHint className="mt-1" />
+        </label>
 
-      <div className="mt-3">
-        {isRoulette ? (
-          <RouletteBoard
-            pro={roulettePro}
-            pocketCount={pocketCount}
-            selected={rouletteSelected}
-            onToggle={toggleSpot}
-          />
-        ) : (
-          <EngineControls
-            controls={singleControls}
-            values={values}
-            engineConfig={engineConfig}
-            onChange={(name, value) => setValues((v) => ({ ...v, [name]: value }))}
-          />
-        )}
-        {engine.key === 'keno' && (
-          <p className="mt-1 text-[11px] text-white/30">
-            Erlaubt: bis zu {kenoMaxPicks} Zahlen aus 1–{kenoPool}.
-          </p>
-        )}
+        <div className="mt-3">
+          {isRoulette ? (
+            <RouletteBoard
+              pro={roulettePro}
+              pocketCount={pocketCount}
+              selected={rouletteSelected}
+              onToggle={toggleSpot}
+            />
+          ) : (
+            <EngineControls
+              controls={singleControls}
+              values={values}
+              engineConfig={engineConfig}
+              onChange={(name, value) => setValues((v) => ({ ...v, [name]: value }))}
+            />
+          )}
+          {engine.key === 'keno' && (
+            <p className="mt-1 text-[11px] text-white/30">
+              {t('engine.keno.allowed', { max: kenoMaxPicks, pool: kenoPool })}
+            </p>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void play()}
+          disabled={busy || !connected}
+          className="mt-4 w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
+        >
+          {!connected ? t('common.connectWallet') : busy ? t('bet.running') : t('common.play')}
+        </button>
+
+        {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
       </div>
-
-      <button
-        type="button"
-        onClick={() => void play()}
-        disabled={busy || !connected}
-        className="mt-4 w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
-      >
-        {!connected ? t('common.connectWallet') : busy ? t('bet.running') : t('common.play')}
-      </button>
-
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
     </div>
   );
 }

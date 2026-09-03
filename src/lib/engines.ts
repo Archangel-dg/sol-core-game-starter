@@ -2,6 +2,16 @@
 // Zentrale Definition ALLER Sol-Core-Engines: Mechanik, Eingabe-Controls,
 // params-Bauer (für /bet bzw. Session-Steps) und Ergebnis-Text. Datengesteuert,
 // damit eine generische UI jede Engine bedienen kann.
+//
+// TEXTE (03.09.2026): Alles, was der Spieler liest — Beschreibung, Hinweise,
+// Feld- und Optionsbeschriftungen — steht hier nur noch als Schlüssel in den
+// Katalog `strings.ts` (`engine.<key>.…`, vier Sprachen, Englisch zuerst).
+// Vorher waren die Sätze fest auf Deutsch eingebaut, und ein englisches Spiel
+// zeigte „Kopf oder Zahl“ im Dropdown. Die Komponenten lösen die Schlüssel
+// mit `t(…)` auf. Die params-Namen und -Werte (`name`, `value`, `default`)
+// bleiben unverändert — sie sind der Vertrag mit dem Server.
+
+import type { StringKey } from './strings';
 
 export type Mechanic = 'single' | 'session' | 'tournament' | 'live' | 'pvp';
 
@@ -14,16 +24,16 @@ export type EngineConfig = Record<string, number>;
 
 /** Eingabe-Control für die generische Param-UI. */
 export type Control =
-  | { kind: 'select'; name: string; label: string; options: { value: string; label: string }[]; default: string }
+  | { kind: 'select'; name: string; label: StringKey; options: { value: string; label: StringKey }[]; default: string }
   | {
-      kind: 'number'; name: string; label: string; min?: number; max?: number; step?: number; default: number;
+      kind: 'number'; name: string; label: StringKey; min?: number; max?: number; step?: number; default: number;
       /** echte Grenzen aus der Server-Config; min/max sind nur Fallback (wie
        * intlist). Teilweise Ergebnisse (nur min ODER nur max) sind erlaubt —
        * das jeweils andere Ende bleibt beim statischen Fallback. */
       boundsFrom?: (cfg: EngineConfig) => { min?: number; max?: number };
     }
   | {
-      kind: 'intlist'; name: string; label: string; min: number; max: number; maxCount: number; hint?: string;
+      kind: 'intlist'; name: string; label: StringKey; min: number; max: number; maxCount: number; hint?: StringKey;
       /** echte Grenzen aus der Server-Config; min/max sind nur Fallback. */
       boundsFrom?: (cfg: EngineConfig) => { min: number; max: number };
     };
@@ -34,11 +44,11 @@ export interface EngineDef {
   category: string;
   /** Welche Mechaniken diese Engine unterstützt. */
   mechanics: Mechanic[];
-  /** Kurzbeschreibung fürs UI. */
-  blurb: string;
+  /** Kurzbeschreibung fürs UI (Katalogschlüssel). */
+  blurb: StringKey;
   /** Income/Outcome in einfachen Worten (Quelle: DevKit spec/engines.json):
    * was der Spieler wählt und was mit dem Einsatz passieren kann. */
-  playerFacts: { inputs: string; outcomes: string };
+  playerFacts: { inputs: StringKey; outcomes: StringKey };
   // ── Single-Bet ──
   /** Controls für einen Einzel-Bet (leer = keine Params). */
   singleControls?: Control[];
@@ -51,7 +61,7 @@ export interface EngineDef {
     step:
       | { kind: 'guess' } // higher/lower (hilo)
       | {
-          kind: 'index'; label: string; min: number; max: number; // tile/column
+          kind: 'index'; label: StringKey; min: number; max: number; // tile/column
           /** echte Grenzen aus der Server-Config; min/max sind nur Fallback
            * (Fallback = Engine-DEFAULTS des Servers, nie das Maximum!).
            * `currentStep` (0-basiert = bereits absolvierte Schritte) erlaubt
@@ -60,7 +70,7 @@ export interface EngineDef {
            * Parameter einfach. */
           boundsFrom?: (cfg: EngineConfig, currentStep?: number) => { min: number; max: number };
         }
-      | { kind: 'action'; label: string }; // pump
+      | { kind: 'action'; label: StringKey }; // pump
     /** Baut den Step-Body. */
     buildStep: (input: { value?: number; guess?: 'higher' | 'lower' }) => Record<string, unknown>;
     /**
@@ -78,7 +88,7 @@ export interface EngineDef {
      * müssen unübersehbar sein (siehe SessionGame).
      */
     costPerStep?: true;
-    hint: string;
+    hint: StringKey;
   };
   // ── Turnier (Pot-basierte Highscore-Läufe) ──
   /** Turnier-Lauf: enter (fester Einsatz → Pot) → step* (Risikostufe) →
@@ -86,20 +96,20 @@ export interface EngineDef {
   tournament?: {
     step: { kind: 'risk'; tiers: readonly ['safe', 'medium', 'risky'] };
     buildStep: (input: { risk: 'safe' | 'medium' | 'risky' }) => Record<string, unknown>;
-    hint: string;
+    hint: StringKey;
   };
   // ── Live (geteilte Wettrunden auf Operator-Streams) ──
   /** Live-Runde: Outcome wählen + Einsatz während des Wettfensters; das
    * Ergebnis zieht der Server für ALLE Skins des Streams identisch. Die
    * Controls sind datengetrieben aus /api/live/state (Outcomes + Quoten),
    * nicht statisch — daher hier nur der Hinweistext. */
-  live?: { hint: string };
+  live?: { hint: StringKey };
   // ── PvP (Spieler-gegen-Spieler mit Lobby-System) ──
   /** PvP-Runde: Lobby erstellen/beitreten → Ready-Check → Server-Draw um den
    * Pot. Grenzen (Einsatz, PIN) kommen als aufgelöste Engine-Config vom Server
    * (publicEngineConfig-Echo: minStakeLamports/maxStakeLamports/allowPin/…),
    * daher hier nur der Hinweistext. */
-  pvp?: { hint: string };
+  pvp?: { hint: StringKey };
 }
 
 const num = (v: Record<string, string>, k: string, d = 0): number => {
@@ -134,14 +144,14 @@ export const ENGINES: EngineDef[] = [
     label: 'Coin Flip',
     category: 'Instant',
     mechanics: ['single'],
-    blurb: 'Kopf oder Zahl — 50/50 mit House-Edge.',
+    blurb: 'engine.coin-flip.blurb',
     playerFacts: {
-      inputs: 'Kopf oder Zahl wählen, Einsatz setzen — ein Klick.',
-      outcomes: 'Richtige Seite: Einsatz mal ~1,96x (vom Spiel festgelegt). Falsche Seite: Einsatz weg.',
+      inputs: 'engine.coin-flip.inputs',
+      outcomes: 'engine.coin-flip.outcomes',
     },
     singleControls: [
-      { kind: 'select', name: 'side', label: 'Seite', default: 'heads', options: [
-        { value: 'heads', label: 'Kopf' }, { value: 'tails', label: 'Zahl' } ] },
+      { kind: 'select', name: 'side', label: 'engine.coin-flip.ctl.side', default: 'heads', options: [
+        { value: 'heads', label: 'engine.coin-flip.opt.side.heads' }, { value: 'tails', label: 'engine.coin-flip.opt.side.tails' } ] },
     ],
     buildSingleParams: (v) => ({ side: v.side ?? 'heads' }),
   },
@@ -150,14 +160,14 @@ export const ENGINES: EngineDef[] = [
     label: 'Dice',
     category: 'Instant',
     mechanics: ['single'],
-    blurb: 'Über/Unter einen Zielwert 0–99,99.',
+    blurb: 'engine.dice.blurb',
     playerFacts: {
-      inputs: 'Zielzahl wählen (0–99,99) und auf darüber oder darunter wetten.',
-      outcomes: 'Treffer: je riskanter die Wahl, desto höher der Multiplikator (kleine Chance = großer Gewinn). Daneben: Einsatz weg.',
+      inputs: 'engine.dice.inputs',
+      outcomes: 'engine.dice.outcomes',
     },
     singleControls: [
       {
-        kind: 'number', name: 'target', label: 'Zielwert (0.01–99.99)', min: 0.01, max: 99.99, step: 0.01, default: 50,
+        kind: 'number', name: 'target', label: 'engine.dice.ctl.target', min: 0.01, max: 99.99, step: 0.01, default: 50,
         // rangeMin/rangeMax werden IMMER echot (Default 0/100) — der Server
         // clampt das Ziel aber mit Sicherheitsabstand von einem Rasterschritt
         // zu beiden Rändern (siehe resolveDiceFromRollInt), NICHT auf
@@ -169,8 +179,8 @@ export const ENGINES: EngineDef[] = [
           return { min: (c.rangeMin ?? 0) + step, max: (c.rangeMax ?? 100) - step };
         },
       },
-      { kind: 'select', name: 'direction', label: 'Richtung', default: 'over', options: [
-        { value: 'over', label: 'Über' }, { value: 'under', label: 'Unter' } ] },
+      { kind: 'select', name: 'direction', label: 'engine.dice.ctl.direction', default: 'over', options: [
+        { value: 'over', label: 'engine.dice.opt.direction.over' }, { value: 'under', label: 'engine.dice.opt.direction.under' } ] },
     ],
     buildSingleParams: (v) => ({ target: num(v, 'target', 50), direction: v.direction ?? 'over' }),
   },
@@ -179,14 +189,14 @@ export const ENGINES: EngineDef[] = [
     label: 'Limbo',
     category: 'Instant',
     mechanics: ['single'],
-    blurb: 'Ziel-Multiplikator setzen — triffst du ihn, gewinnst du.',
+    blurb: 'engine.limbo.blurb',
     playerFacts: {
-      inputs: 'Ziel-Multiplikator setzen (z. B. 5x) — mehr nicht.',
-      outcomes: 'Die Runde zieht eine Zahl: erreicht sie dein Ziel, gewinnst du genau dein Ziel — darunter ist der Einsatz weg.',
+      inputs: 'engine.limbo.inputs',
+      outcomes: 'engine.limbo.outcomes',
     },
     singleControls: [
       {
-        kind: 'number', name: 'target', label: 'Ziel-Multiplikator (×)', min: 1.01, step: 0.01, default: 2,
+        kind: 'number', name: 'target', label: 'engine.limbo.ctl.target', min: 1.01, step: 0.01, default: 2,
         // Nur die Ceiling (maxTargetBps, optional) wird gespiegelt — die
         // Floor (minTargetBps) wird IMMER echot (Default 10000 = 1.00×) und
         // würde den statischen min:1.01-Fallback fälschlich auf 1.00
@@ -207,16 +217,16 @@ export const ENGINES: EngineDef[] = [
     // `/bet` für bereits live stehende Spiele weiter (Legacy), neu gebaut
     // wird Mines ausschließlich als Session.
     mechanics: ['session'],
-    blurb: 'Felder aufdecken ohne auf eine Mine zu treffen.',
+    blurb: 'engine.mines.blurb',
     playerFacts: {
-      inputs: 'Pro Zug EIN Feld auf dem Raster aufdecken (Größe legt das Spiel fest, Standard 5×5).',
-      outcomes: 'Jedes sichere Feld erhöht den Multiplikator; nach jedem Feld kannst du cashen. Mine getroffen = Einsatz weg.',
+      inputs: 'engine.mines.inputs',
+      outcomes: 'engine.mines.outcomes',
     },
     session: {
-      step: { kind: 'index', label: 'Feld', min: 0, max: 24,
+      step: { kind: 'index', label: 'engine.mines.step', min: 0, max: 24,
         boundsFrom: (c) => ({ min: 0, max: (c.gridSize ?? 25) - 1 }) },
       buildStep: (i) => ({ tile: i.value ?? 0 }),
-      hint: 'Pro Schritt EIN Feld aufdecken; jederzeit cashout.',
+      hint: 'engine.mines.hint',
     },
   },
   {
@@ -228,15 +238,15 @@ export const ENGINES: EngineDef[] = [
     // das ist `dice` mit Karten-Optik, nicht Hi-Lo. In der Session teilt das
     // Spiel die Karte aus, und der Multiplikator wächst über die Kette.
     mechanics: ['session'],
-    blurb: 'Höher oder tiefer als die aktuelle Karte?',
+    blurb: 'engine.hilo.blurb',
     playerFacts: {
-      inputs: 'Das Spiel deckt eine Karte auf; du tippst, ob die nächste höher oder tiefer ist.',
-      outcomes: 'Richtig: der Multiplikator wächst (unwahrscheinliche Tipps stärker); jederzeit Cashout. Falsch oder Gleichstand: Einsatz weg. Kette endet nach der im Spiel gesetzten Schrittzahl.',
+      inputs: 'engine.hilo.inputs',
+      outcomes: 'engine.hilo.outcomes',
     },
     session: {
       step: { kind: 'guess' },
       buildStep: (i) => ({ guess: i.guess ?? 'higher' }),
-      hint: 'Höher/Tiefer tippen; Gleichstand verliert. Die Kette endet nach der im Spiel gesetzten Schrittzahl.',
+      hint: 'engine.hilo.hint',
     },
   },
   {
@@ -244,18 +254,18 @@ export const ENGINES: EngineDef[] = [
     label: 'Plinko',
     category: 'Interactive',
     mechanics: ['single'],
-    blurb: 'Kugel fällt durch Pins in einen Multiplikator-Slot.',
+    blurb: 'engine.plinko.blurb',
     playerFacts: {
-      inputs: 'Kugel fallen lassen — Reihen und Risikoprofil legt das Spiel fest.',
-      outcomes: 'Die Kugel landet in einem Multiplikator-Fach: außen zahlt groß, die Mitte klein — teils weniger als der Einsatz.',
+      inputs: 'engine.plinko.inputs',
+      outcomes: 'engine.plinko.outcomes',
     },
     singleControls: [
       // Optionen bis maxBalls werden vom Client gefiltert (siehe
       // SingleBetGame); Default-Config (maxBalls 1) blendet die Auswahl
       // ganz aus — identisch zu heute (kein Multi-Shot-Control).
-      { kind: 'select', name: 'balls', label: 'Bälle', default: '1', options: [
-        { value: '1', label: '1 Kugel' }, { value: '3', label: '3 Kugeln' },
-        { value: '10', label: '10 Kugeln' }, { value: '100', label: '100 Kugeln' } ] },
+      { kind: 'select', name: 'balls', label: 'engine.plinko.ctl.balls', default: '1', options: [
+        { value: '1', label: 'engine.plinko.opt.balls.1' }, { value: '3', label: 'engine.plinko.opt.balls.3' },
+        { value: '10', label: 'engine.plinko.opt.balls.10' }, { value: '100', label: 'engine.plinko.opt.balls.100' } ] },
     ],
     buildSingleParams: (v) => ({ balls: Number(v.balls ?? 1) }),
   },
@@ -264,10 +274,10 @@ export const ENGINES: EngineDef[] = [
     label: 'Wheel',
     category: 'Interactive',
     mechanics: ['single'],
-    blurb: 'Glücksrad — ein Segment gewinnt.',
+    blurb: 'engine.wheel.blurb',
     playerFacts: {
-      inputs: 'Rad drehen — Segmente und Chancen legt das Spiel fest.',
-      outcomes: 'Ein Segment gewinnt: jedes hat seinen eigenen Multiplikator, von 0x bis zum Top-Segment des Spiels.',
+      inputs: 'engine.wheel.inputs',
+      outcomes: 'engine.wheel.outcomes',
     },
     singleControls: [],
     buildSingleParams: () => ({}),
@@ -277,14 +287,14 @@ export const ENGINES: EngineDef[] = [
     label: 'Keno',
     category: 'Table',
     mechanics: ['single'],
-    blurb: '1–10 Zahlen aus 1–40 tippen; Treffer zahlen aus.',
+    blurb: 'engine.keno.blurb',
     playerFacts: {
-      inputs: '1–10 Zahlen aus 40 tippen.',
-      outcomes: '10 Zahlen werden gezogen: je mehr Treffer, desto höher die Auszahlung — wenige Treffer zahlen nichts.',
+      inputs: 'engine.keno.inputs',
+      outcomes: 'engine.keno.outcomes',
     },
     singleControls: [
-      { kind: 'intlist', name: 'picks', label: 'Zahlen tippen', min: 1, max: 40, maxCount: 10,
-        hint: 'z. B. 3,7,12,25',
+      { kind: 'intlist', name: 'picks', label: 'engine.keno.ctl.picks', min: 1, max: 40, maxCount: 10,
+        hint: 'engine.keno.ctl.picks.hint',
         boundsFrom: (c) => ({ min: 1, max: c.pool ?? 40 }) },
     ],
     buildSingleParams: (v) => ({ picks: intList(v, 'picks') }),
@@ -294,11 +304,10 @@ export const ENGINES: EngineDef[] = [
     label: 'Scratch',
     category: 'Instant',
     mechanics: ['single'],
-    blurb: 'Rubbellos — ein Los, eine Ziehung aus der Gewinntabelle.',
+    blurb: 'engine.scratch.blurb',
     playerFacts: {
-      inputs: 'Los kaufen — es gibt nichts zu wählen.',
-      outcomes:
-        'Eine Ziehung aus der Gewinntabelle des Spiels entscheidet die Runde: jede Gewinnklasse hat ein Gewicht (wie oft sie kommt) und einen Multiplikator (was sie zahlt). Die meisten Lose sind Nieten — Einsatz weg. Das Rubbeln ist Optik: der Preis steht fest, bevor das erste Feld freigelegt wird.',
+      inputs: 'engine.scratch.inputs',
+      outcomes: 'engine.scratch.outcomes',
     },
     // `fields`/`reveals` aus der Engine-Config sind REINE Präsentation für
     // dein eigenes Frontend (wie viele Rubbelfelder gezeichnet und wie viele
@@ -312,20 +321,20 @@ export const ENGINES: EngineDef[] = [
     label: 'Roulette',
     category: 'Table',
     mechanics: ['single'],
-    blurb: 'Klassische Roulette-Wetten.',
+    blurb: 'engine.roulette.blurb',
     playerFacts: {
-      inputs: 'Klassische Wette setzen: Rot/Schwarz, Gerade/Ungerade, 1–18/19–36, Dutzend, Kolonne oder eine Zahl (0–36).',
-      outcomes: 'Feste klassische Quoten: einfache Chancen zahlen 2x, Dutzend/Kolonne 3x, einzelne Zahl 36x. Daneben: Einsatz weg.',
+      inputs: 'engine.roulette.inputs',
+      outcomes: 'engine.roulette.outcomes',
     },
     singleControls: [
-      { kind: 'select', name: 'betType', label: 'Wette', default: 'red', options: [
-        { value: 'red', label: 'Rot' }, { value: 'black', label: 'Schwarz' },
-        { value: 'odd', label: 'Ungerade' }, { value: 'even', label: 'Gerade' },
-        { value: 'low', label: '1–18' }, { value: 'high', label: '19–36' },
-        { value: 'dozen', label: 'Dutzend (value 0–2)' }, { value: 'column', label: 'Kolonne (value 0–2)' },
-        { value: 'straight', label: 'Zahl (value 0–36)' } ] },
+      { kind: 'select', name: 'betType', label: 'engine.roulette.ctl.betType', default: 'red', options: [
+        { value: 'red', label: 'engine.roulette.opt.betType.red' }, { value: 'black', label: 'engine.roulette.opt.betType.black' },
+        { value: 'odd', label: 'engine.roulette.opt.betType.odd' }, { value: 'even', label: 'engine.roulette.opt.betType.even' },
+        { value: 'low', label: 'engine.roulette.opt.betType.low' }, { value: 'high', label: 'engine.roulette.opt.betType.high' },
+        { value: 'dozen', label: 'engine.roulette.opt.betType.dozen' }, { value: 'column', label: 'engine.roulette.opt.betType.column' },
+        { value: 'straight', label: 'engine.roulette.opt.betType.straight' } ] },
       {
-        kind: 'number', name: 'value', label: 'value (nur straight/dozen/column)', min: 0, max: 36, step: 1, default: 0,
+        kind: 'number', name: 'value', label: 'engine.roulette.ctl.value', min: 0, max: 36, step: 1, default: 0,
         // straight geht auf dem amerikanischen Rad (pocketCount 38) bis 37
         // ('00'); pocketCount wird IMMER echot (Default 37 → max 36,
         // identisch zum statischen Fallback).
@@ -343,10 +352,10 @@ export const ENGINES: EngineDef[] = [
     label: 'Slots 3×3',
     category: 'Slot',
     mechanics: ['single'],
-    blurb: 'Drei-Walzen-Slot; Linien-Symbole zahlen aus.',
+    blurb: 'engine.slots-3x3.blurb',
     playerFacts: {
-      inputs: 'Walzen drehen — ein Einsatz, keine weitere Auswahl.',
-      outcomes: 'Die Mittellinie entscheidet: drei gleiche Symbole zahlen den Dreifach-Wert, zwei gleiche den Paar-Wert, sonst ist der Einsatz weg.',
+      inputs: 'engine.slots-3x3.inputs',
+      outcomes: 'engine.slots-3x3.outcomes',
     },
     singleControls: [],
     buildSingleParams: () => ({}),
@@ -356,12 +365,10 @@ export const ENGINES: EngineDef[] = [
     label: 'Slots Modular',
     category: 'Slot',
     mechanics: ['single'],
-    blurb: '5×3-Video-Slot: Linien, Wilds, Scatter.',
+    blurb: 'engine.slots-modular.blurb',
     playerFacts: {
-      inputs: 'Walzen drehen — ein Einsatz, keine weitere Auswahl.',
-      outcomes:
-        'Bis zu 20 Gewinnlinien zahlen 3/4/5 gleiche Symbole von links (Wild ersetzt); ' +
-        '3+ Scatter zahlen überall. Alle Treffer eines Spins summieren sich — sonst ist der Einsatz weg.',
+      inputs: 'engine.slots-modular.inputs',
+      outcomes: 'engine.slots-modular.outcomes',
     },
     singleControls: [],
     buildSingleParams: () => ({}),
@@ -371,10 +378,10 @@ export const ENGINES: EngineDef[] = [
     label: 'Towers',
     category: 'Chain',
     mechanics: ['session'],
-    blurb: 'Etage für Etage hoch — die sichere Spalte wählen.',
+    blurb: 'engine.towers.blurb',
     playerFacts: {
-      inputs: 'Pro Etage eine Spalte wählen (2–4 Spalten, legt das Spiel fest — meist 3). Eine Spalte pro Etage versteckt eine Bombe.',
-      outcomes: 'Jede sichere Etage erhöht den Multiplikator; jederzeit Cashout. Bombe getroffen = Einsatz weg. Oberste Etage = Maximum.',
+      inputs: 'engine.towers.inputs',
+      outcomes: 'engine.towers.outcomes',
     },
     session: {
       // Fallback max: 2 = Server-Default (3 Spalten, Indizes 0–2). Bevorzugt
@@ -382,13 +389,13 @@ export const ENGINES: EngineDef[] = [
       // mit variierenden Spaltenzahlen je Etage); fehlt `floors` (alte,
       // uniforme Configs), fällt dies auf den Skalar `columns` zurück —
       // identisch zum bisherigen Verhalten.
-      step: { kind: 'index', label: 'Spalte', min: 0, max: 2,
+      step: { kind: 'index', label: 'engine.towers.step', min: 0, max: 2,
         boundsFrom: (c, currentStep) => {
           const columns = towersFloorColumns(c, currentStep ?? 0) ?? c.columns ?? 3;
           return { min: 0, max: columns - 1 };
         } },
       buildStep: (i) => ({ column: i.value ?? 0 }),
-      hint: 'Pro Etage eine Spalte wählen; jederzeit cashout.',
+      hint: 'engine.towers.hint',
     },
   },
   {
@@ -396,12 +403,10 @@ export const ENGINES: EngineDef[] = [
     label: 'Dice Ladder',
     category: 'Chain',
     mechanics: ['session'],
-    blurb: 'Höher oder tiefer als die aktuelle Augensumme?',
+    blurb: 'engine.dice-ladder.blurb',
     playerFacts: {
-      inputs:
-        'Zwei Würfel (Standard) werden geworfen — tippen, ob die Summe des nächsten Wurfs höher oder tiefer ist. Anders als bei Karten sind die Summen NICHT gleich wahrscheinlich: die Mitte kommt oft, die Ränder selten.',
-      outcomes:
-        'Richtig: der Multiplikator wächst — je unwahrscheinlicher der Tipp, desto stärker; jederzeit Cashout. Falsch oder Gleichstand: Einsatz weg. Die Kette endet nach der im Spiel gesetzten Schrittzahl.',
+      inputs: 'engine.dice-ladder.inputs',
+      outcomes: 'engine.dice-ladder.outcomes',
     },
     session: {
       // Identischer Step-Body wie hilo (`{ guess }`) — der Server akzeptiert
@@ -409,7 +414,7 @@ export const ENGINES: EngineDef[] = [
       // generische Starter-UI bietet wie bei hilo nur höher/tiefer an.
       step: { kind: 'guess' },
       buildStep: (i) => ({ guess: i.guess ?? 'higher' }),
-      hint: 'Höher/Tiefer auf die nächste Augensumme tippen; Gleichstand verliert (sofern das Spiel nichts anderes setzt).',
+      hint: 'engine.dice-ladder.hint',
     },
   },
   {
@@ -417,12 +422,10 @@ export const ENGINES: EngineDef[] = [
     label: 'Steps',
     category: 'Chain',
     mechanics: ['session'],
-    blurb: 'Stufe für Stufe hoch — klettern oder cashen.',
+    blurb: 'engine.steps.blurb',
     playerFacts: {
-      inputs:
-        'Eine Wahl pro Zug: Cashout oder eine Stufe hochklettern (ein Knopf). Jeder Versuch gelingt mit einer festen, vom Spiel gesetzten Chance.',
-      outcomes:
-        'Jede Stufe zahlt einen festen Leiter-Multiplikator; Cashout jederzeit ab der Mindest-Stufe. Ohne Safe-Points verliert ein Absturz den Einsatz. MIT Safe-Points hast du Leben: nur Fehlschläge kosten eins — je nach Spiel bleibst du auf dem Safe-Point stehen oder fällst auf den nächsttieferen. Ein Fehlschlag ohne Restleben verliert den Einsatz.',
+      inputs: 'engine.steps.inputs',
+      outcomes: 'engine.steps.outcomes',
     },
     session: {
       // Leerer Step-Body wie pump — „Klettern" ist die einzige Aktion. Die
@@ -431,9 +434,9 @@ export const ENGINES: EngineDef[] = [
       // vom Server (publicEngineConfig-Echo); die Restleben stehen live in
       // `progress.livesLeft`, die aktuelle STUFE in `progress.currentStep` —
       // `steps` im SessionView zählt bei dieser Engine die VERSUCHE.
-      step: { kind: 'action', label: 'Klettern' },
+      step: { kind: 'action', label: 'engine.steps.step' },
       buildStep: () => ({}),
-      hint: 'Klettern oder cashen — Safe-Points und Leben fangen Fehlschläge ab, bis der Schutz verbraucht ist.',
+      hint: 'engine.steps.hint',
     },
   },
   {
@@ -444,12 +447,10 @@ export const ENGINES: EngineDef[] = [
     // NUR der Preis pro Schritt (`session.costPerStep`), nicht der Ablauf:
     // start → step* → cashout, identische Routen, identischer Reconnect.
     mechanics: ['session'],
-    blurb: 'Türme hochspinnen — JEDER Spin kostet erneut den Einsatz.',
+    blurb: 'engine.spin-tower-pro.blurb',
     playerFacts: {
-      inputs:
-        'Ein Knopf: spinnen. Achtung, das ist der Unterschied zu jedem anderen Spiel hier — JEDER Spin kostet erneut deinen vollen Einsatz, nicht nur der Rundenstart. Ab dem ersten Spin ist der Einsatz für die ganze Runde gesperrt und nicht mehr änderbar.',
-      outcomes:
-        'Jeder Spin zieht genau ein Ergebnis: ein Turm steigt eine Stufe, ein Turm auf seiner höchsten Stufe zahlt seinen Top-Multiplikator als GESICHERT aus (und bleibt oben stehen), der Joker lässt alle Türme steigen bzw. sichern, „Nichts" passiert, oder FAIL. Dein Pot ist die Summe der Multiplikatoren der AKTUELL erreichten Stufen — FAIL nimmt ihn: je nach Spiel fallen alle Türme auf 0 und die Runde endet, oder jeder Turm rutscht eine Stufe runter und die Runde läuft weiter. Gesichertes ist FAIL-immun: es kann dir kein FAIL mehr nehmen, ausgezahlt wird es aber erst mit der Schluss-Abrechnung am Rundenende, nicht sofort. Cashout ab dem ersten Spin jederzeit — er zahlt Pot + Gesichertes. Spätestens nach der im Spiel gesetzten Spin-Zahl endet die Runde von selbst.',
+      inputs: 'engine.spin-tower-pro.inputs',
+      outcomes: 'engine.spin-tower-pro.outcomes',
     },
     session: {
       // Leerer Step-Body wie pump/steps — „Spin" ist die einzige Aktion. Die
@@ -457,10 +458,10 @@ export const ENGINES: EngineDef[] = [
       // (`jokerEnabled`), der Spin-Deckel (`maxSpins`) und die gespielten
       // Wahrscheinlichkeiten (`probsBps`) kommen als aufgelöstes Server-Echo in
       // der Engine-Config; Stufen und Gesichertes stehen live im Fortschritt.
-      step: { kind: 'action', label: 'Spin' },
+      step: { kind: 'action', label: 'engine.spin-tower-pro.step' },
       buildStep: () => ({}),
       costPerStep: true,
-      hint: 'Jeder Spin kostet erneut den Einsatz. Pot (verlierbar) und Gesichertes (FAIL-immun) getrennt lesen — und rechtzeitig cashen.',
+      hint: 'engine.spin-tower-pro.hint',
     },
   },
   {
@@ -468,17 +469,15 @@ export const ENGINES: EngineDef[] = [
     label: 'Gauntlet',
     category: 'Tournament',
     mechanics: ['tournament'],
-    blurb: 'Highscore-Turnier: Risikostufe wählen, Punkte banken — Pot an die Top-Plätze.',
+    blurb: 'engine.gauntlet.blurb',
     playerFacts: {
-      inputs:
-        'Fester Einsatz pro Lauf. Pro Schritt eine Risikostufe wählen: Safe (90%, +10), Medium (60%, +15) oder Risky (30%, +30) — gleicher Erwartungswert, deine Strategie entscheidet.',
-      outcomes:
-        'Der Einsatz geht in den Zyklus-Pot. Punkte sammeln und rechtzeitig banken — ein Bust nullt den Lauf (neuer Versuch möglich, bester Score zählt). Am Zyklusende geht der Pot zu 100% an die Top-Plätze.',
+      inputs: 'engine.gauntlet.inputs',
+      outcomes: 'engine.gauntlet.outcomes',
     },
     tournament: {
       step: { kind: 'risk', tiers: ['safe', 'medium', 'risky'] },
       buildStep: (i) => ({ risk: i.risk }),
-      hint: 'Pro Schritt eine Risikostufe; „Banken" sichert den Score — Bust nullt ihn.',
+      hint: 'engine.gauntlet.hint',
     },
   },
   {
@@ -486,15 +485,15 @@ export const ENGINES: EngineDef[] = [
     label: 'Pump',
     category: 'Curve',
     mechanics: ['session'],
-    blurb: 'Immer weiter pumpen — bis es platzt.',
+    blurb: 'engine.pump.blurb',
     playerFacts: {
-      inputs: 'Ballon aufpumpen — ein Knopf, immer wieder.',
-      outcomes: 'Jeder Pump erhöht den Multiplikator; jederzeit Cashout. Der Ballon platzt an einem verdeckten Punkt — dann ist der Einsatz weg.',
+      inputs: 'engine.pump.inputs',
+      outcomes: 'engine.pump.outcomes',
     },
     session: {
-      step: { kind: 'action', label: 'Pump' },
+      step: { kind: 'action', label: 'engine.pump.step' },
       buildStep: () => ({}),
-      hint: 'Jeder Pump erhöht den Multiplikator; rechtzeitig cashen.',
+      hint: 'engine.pump.hint',
     },
   },
   {
@@ -502,15 +501,13 @@ export const ENGINES: EngineDef[] = [
     label: 'Live Betting',
     category: 'Live',
     mechanics: ['live'],
-    blurb: 'Geteilte Live-Runden: auf ein Outcome setzen — überall gewinnt dasselbe.',
+    blurb: 'engine.live-odds.blurb',
     playerFacts: {
-      inputs:
-        'Während des Wettfensters auf ein Outcome setzen (z. B. Starter 1–4 eines Rennens), feste Quote pro Outcome. Mehrere Bets pro Runde erlaubt.',
-      outcomes:
-        'Nach Ablauf des Countdowns zieht der Server EIN Ergebnis für alle Spiele dieses Streams (provably fair, Hash vor Wettbeginn committed). Treffer zahlt Einsatz × Quote — die Gutschrift ist sofort auf dem Konto, die Anzeige folgt der Reveal-Animation.',
+      inputs: 'engine.live-odds.inputs',
+      outcomes: 'engine.live-odds.outcomes',
     },
     live: {
-      hint: 'Outcome wählen, Einsatz setzen, Countdown abwarten — das Rennen zeigt das Ergebnis.',
+      hint: 'engine.live-odds.hint',
     },
   },
   {
@@ -518,15 +515,27 @@ export const ENGINES: EngineDef[] = [
     label: 'Live Crash',
     category: 'Live',
     mechanics: ['live'],
-    blurb: 'Ein geteilter Flug: alle sehen dieselbe steigende Kurve — wer zu spät aussteigt, verliert.',
+    blurb: 'engine.live-crash.blurb',
     playerFacts: {
-      inputs:
-        'Vor dem Start Einsatz setzen, optional ein Sicherheitsziel. Während der Flug läuft, jederzeit per Klick aussteigen. Eine Wette pro Runde.',
-      outcomes:
-        'Die Kurve steigt, bis sie platzt — der Crash-Punkt ist für alle Spieler derselbe und steht vor dem Wettfenster fest (Hash committed, nach der Runde nachrechenbar). Wer rechtzeitig aussteigt, bekommt Einsatz × angezeigtem Multiplikator; wer zu spät klickt, verliert den Einsatz.',
+      inputs: 'engine.live-crash.inputs',
+      outcomes: 'engine.live-crash.outcomes',
     },
     live: {
-      hint: 'Einsatz setzen, Kurve steigen lassen, rechtzeitig aussteigen — der Crash-Punkt gilt für alle gleich.',
+      hint: 'engine.live-crash.hint',
+    },
+  },
+  {
+    key: 'live-drift',
+    label: 'Live Drift',
+    category: 'Live',
+    mechanics: ['live'],
+    blurb: 'engine.live-drift.blurb',
+    playerFacts: {
+      inputs: 'engine.live-drift.inputs',
+      outcomes: 'engine.live-drift.outcomes',
+    },
+    live: {
+      hint: 'engine.live-drift.hint',
     },
   },
   {
@@ -534,15 +543,13 @@ export const ENGINES: EngineDef[] = [
     label: 'PvP Coin Flip',
     category: 'PvP',
     mechanics: ['pvp'],
-    blurb: 'Spieler gegen Spieler: Münzwurf um den ganzen Pot — 50/50, kein House-Edge.',
+    blurb: 'engine.pvp-coinflip.blurb',
     playerFacts: {
-      inputs:
-        'Lobby mit Einsatz erstellen (optional per PIN sperren) oder einer offenen Lobby beitreten. Beide setzen „Bereit"; der Server wirft dann die Münze.',
-      outcomes:
-        'Der Gewinner erhält den ganzen Pot (beide Einsätze) — Fees bleiben einbehalten. Exakt 50/50 und provably fair; verlierst du, ist dein Einsatz weg. Geld wird erst beim Spielstart (alle bereit) gebucht, nie beim Erstellen der Lobby.',
+      inputs: 'engine.pvp-coinflip.inputs',
+      outcomes: 'engine.pvp-coinflip.outcomes',
     },
     pvp: {
-      hint: 'Lobby erstellen oder beitreten, „Bereit" setzen — der Server wirft die Münze, sobald beide bereit sind.',
+      hint: 'engine.pvp-coinflip.hint',
     },
   },
   {
@@ -550,15 +557,13 @@ export const ENGINES: EngineDef[] = [
     label: 'Dice Risk',
     category: 'PvP',
     mechanics: ['pvp'],
-    blurb: 'Spieler gegen Spieler: rundenbasiertes Würfel-Risiko (Farkle) um den ganzen Pot.',
+    blurb: 'engine.pvp-dice-duel.blurb',
     playerFacts: {
-      inputs:
-        'Lobby mit Einsatz erstellen (optional per PIN sperren) oder einer offenen Lobby beitreten. Beide setzen „Bereit"; dann wird abwechselnd gewürfelt: pro Wurf mindestens einen wertenden Würfel beiseitelegen, dann erneut würfeln oder die Zugpunkte sichern.',
-      outcomes:
-        'Wer mehr sichert, gewinnt den ganzen Pot (beide Einsätze) — Fees bleiben einbehalten. Kein wertender Würfel = Farkle (Zugpunkte verfallen). Format quick3 (3 Züge je Spieler) oder race10000 (bis 10.000). Provably fair; verlierst du, ist dein Einsatz weg. Geld wird erst beim Spielstart (alle bereit) gebucht.',
+      inputs: 'engine.pvp-dice-duel.inputs',
+      outcomes: 'engine.pvp-dice-duel.outcomes',
     },
     pvp: {
-      hint: 'Lobby erstellen oder beitreten, „Bereit" setzen — dann abwechselnd würfeln: wertende Würfel beiseitelegen, weiter würfeln oder sichern. Farkle verliert den Zug.',
+      hint: 'engine.pvp-dice-duel.hint',
     },
   },
   {
@@ -566,8 +571,7 @@ export const ENGINES: EngineDef[] = [
     label: 'Dice Pro',
     category: 'PvP',
     mechanics: ['pvp'],
-    blurb:
-      'Spieler gegen Spieler: konfigurierbares Würfel-Duell (Einzelwurf-Vergleich, Push-your-luck oder Punktesystem mit eigener Wertungstabelle) um den ganzen Pot.',
+    blurb: 'engine.pvp-dice-pro.blurb',
     // Die aufgelöste Config kommt beim PvP nicht über ein Control mit
     // `boundsFrom`, sondern als Server-Echo (publicEngineConfig → template,
     // scoreMode, winCondition, diceCount, faces, targetScore, turnsPerSeat,
@@ -578,13 +582,11 @@ export const ENGINES: EngineDef[] = [
     // passende Steuerung/Wertung — daher hier wie bei allen PvP-Engines nur der
     // Hinweistext.
     playerFacts: {
-      inputs:
-        'Lobby mit Einsatz erstellen (optional per PIN sperren) oder einer offenen Lobby beitreten. Beide setzen „Bereit"; dann wird nach dem vom Creator gewählten Format abwechselnd gespielt: Einzelwurf-Vergleich (würfeln, höherer Score gewinnt), Push-your-luck-Farkle oder Punktesystem (wertende Würfel behalten, sichern oder riskieren — nach der vom Creator festgelegten Wertungstabelle).',
-      outcomes:
-        'Wer nach dem Format vorn liegt, gewinnt den ganzen Pot (beide Einsätze) — Fees bleiben einbehalten. Siegbedingung: höchster Score über N Züge oder Erster am Ziel (der Gegner bekommt seine Last-Licks-Züge). Gleichstand ⇒ Sudden Death. Beim Punktesystem bestimmt die im Spiel angezeigte Creator-Paytable, welche Kombinationen wie viele Punkte bringen. Provably fair; verlierst du, ist dein Einsatz weg. Geld wird erst beim Spielstart (alle bereit) gebucht.',
+      inputs: 'engine.pvp-dice-pro.inputs',
+      outcomes: 'engine.pvp-dice-pro.outcomes',
     },
     pvp: {
-      hint: 'Lobby erstellen oder beitreten, „Bereit" setzen — dann nach Format spielen: Einzelwurf-Vergleich, Push-your-luck-Farkle oder Punktesystem (wertende Würfel behalten, sichern oder riskieren — Wertung laut angezeigter Tabelle).',
+      hint: 'engine.pvp-dice-pro.hint',
     },
   },
 ];

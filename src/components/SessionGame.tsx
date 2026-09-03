@@ -8,22 +8,23 @@ import { solToLamports, toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
 import { usePlayerAuth } from '@/lib/player-auth';
 import type { RoundLog } from './SingleBetGame';
-import { MaxBetPick } from './BetLimitHint';
-import { useT } from '@/lib/i18n';
+import { BetLimitHint, MaxBetPick } from './BetLimitHint';
+import { useSound } from '@/lib/sounds';
+import { useT, type TFn } from '@/lib/i18n';
 
 /** towers-Reveal: `bombColumns` ist `number[][]` (eine Spalten-Menge je
  * Etage, `c.bombs` Bomben pro Etage). Rein defensiv — akzeptiert auch ältere
  * `number[]`-Formen ohne zu crashen und liefert '' wenn nichts zu zeigen ist. */
-function formatTowersBombs(bombColumns: unknown): string {
+function formatTowersBombs(bombColumns: unknown, t: TFn): string {
   if (!Array.isArray(bombColumns)) return '';
   const rows = bombColumns
     .map((row: unknown, i: number) => {
       const cols = Array.isArray(row) ? row : typeof row === 'number' ? [row] : [];
       const nums = cols.filter((n): n is number => typeof n === 'number');
-      return nums.length ? `E${i + 1}: ${nums.map((n) => n + 1).join(',')}` : null;
+      return nums.length ? t('session.floorShort', { n: i + 1, cols: nums.map((n) => n + 1).join(',') }) : null;
     })
     .filter((s): s is string => s !== null);
-  return rows.length ? `Bomben je Etage — ${rows.join(' · ')}` : '';
+  return rows.length ? t('session.bombsPerFloor', { rows: rows.join(' · ') }) : '';
 }
 
 /** Aktueller Bezugswert eines Tipp-Schritts, gegen den „höher/tiefer" gilt:
@@ -195,6 +196,7 @@ export function SessionGame({
   const [view, setView] = useState<SessionView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { play } = useSound();
   const storeKey = `sc_session_${gameId}${demo ? '_demo' : ''}`;
   const sess = engine.session!;
 
@@ -219,6 +221,7 @@ export function SessionGame({
         if (v.roundId) {
           onRound(v.proof.serverSeedHash, v.roundId);
           onLog({
+            betLamports: v.stakeLamports ?? '0',
             win: v.status === 'cashed_out' && v.payoutLamports !== '0',
             // Derselbe Rückfall wie im HUD — sonst stand im Verlauf NaN×.
             multiplierBps: v.multiplierBps ?? v.returnBps ?? 0,
@@ -262,11 +265,13 @@ export function SessionGame({
         const reason = typeof details?.reason === 'string' ? details.reason : undefined;
         const ui = toUiError(r.error.code, r.error.message, reason, details);
         setError(`${ui.code}: ${ui.message}`);
+        play('error');
         return null;
       }
       return r as SessionView;
     } catch (e) {
       setError((e as Error).message);
+      play('error');
       return null;
     } finally {
       setBusy(false);
@@ -275,6 +280,7 @@ export function SessionGame({
 
   const start = async () => {
     if (!wallet) return;
+    play('bet');
     const v = await call(`${apiBase}/session/start`, {
       playerWallet: wallet,
       betLamports: solToLamports(bet).toString(),
@@ -292,8 +298,11 @@ export function SessionGame({
 
   const step = async (arg: { value?: number; guess?: 'higher' | 'lower' }) => {
     if (!view) return;
+    play('click');
     const v = await call(`${apiBase}/session/${view.sessionId}/step`, sess.buildStep(arg));
     if (v) {
+      if (v.status === 'busted') play('lose');
+      else if (v.status !== 'active') play(v.payoutLamports && v.payoutLamports !== '0' ? 'win' : 'lose');
       setView(v);
       finishIfEnded(v);
     }
@@ -303,6 +312,7 @@ export function SessionGame({
     if (!view) return;
     const v = await call(`${apiBase}/session/${view.sessionId}/cashout`);
     if (v) {
+      play('cashout');
       setView(v);
       finishIfEnded(v);
     }
@@ -311,7 +321,7 @@ export function SessionGame({
   const active = view?.status === 'active';
   const ended = view && view.status !== 'active';
   const towersBombText =
-    view && view.status === 'busted' && engine.key === 'towers' ? formatTowersBombs(view.reveal?.bombColumns) : '';
+    view && view.status === 'busted' && engine.key === 'towers' ? formatTowersBombs(view.reveal?.bombColumns, t) : '';
   const guessValue = sess.step.kind === 'guess' ? currentGuessValue(view?.progress) : null;
   const steps = engine.key === 'steps' && view ? stepsInfo(view.progress, cfg) : null;
   // steps: Cashout erst ab Stufe 1 sinnvoll (der Server lehnt am Boden ohnehin
@@ -461,300 +471,313 @@ export function SessionGame({
     ) : null;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      {/* HUD — min-Höhe statt fixer Höhe: die Engine-Erklärtexte (playerFacts,
-          z. B. steps' Leben/Safe-Point-Regeln) sind unterschiedlich lang und
-          liefen bei h-28 sichtbar über Einsatz-Feld und Button hinaus. */}
-      <div className="mb-4 grid min-h-[7rem] place-items-center rounded-xl bg-night px-2 py-3 text-center">
-        {view ? (
-          <div>
-            <div className={`text-3xl font-bold tabular-nums ${ended && view.status === 'busted' ? 'text-red-400' : 'text-accent'}`}>
-              {/* `multiplierBps` gibt es nur bei den klassischen Engines;
-                  spin-tower-pro nennt dieselbe Zahl `returnBps` (Pot +
-                  Gesichertes). Ohne diesen Rückfall stand hier NaN×. */}
-              {((view.multiplierBps ?? view.returnBps ?? 0) / 10000).toFixed(2)}×
-            </div>
-            <div className="mt-1 text-sm text-white/70">
-              {active && steps &&
-                t('session.stepInfo', {
-                  n: steps.rung,
-                  lives:
-                    steps.livesLeft !== null
-                      ? t('session.livesLeft', {
-                          left: steps.livesLeft,
-                          of: steps.lives !== null ? `/${steps.lives}` : '',
-                        })
-                      : '',
-                  amount: toSol(view.potentialPayoutLamports),
-                })}
-              {active && !steps && costPerStep &&
-                t('session.spinInfo', {
-                  n: spinsUsed,
-                  max: maxSpins !== null ? `/${maxSpins}` : '',
-                  amount: toSol(view.potentialPayoutLamports),
-                })}
-              {active &&
-                !steps &&
-                !costPerStep &&
-                t('session.step', {
-                  // `steps` ist bei spin-tower-pro nicht gesetzt; dieser Zweig
-                  // laeuft ohnehin nur ohne costPerStep, der Rueckfall haelt
-                  // den Typ ehrlich.
-                  n: view.steps ?? 0,
-                  amount: toSol(view.potentialPayoutLamports),
-                })}
-              {/* Bei Kosten je Schritt wäre „alles verloren" gelogen: ein FAIL
-                  nimmt nur den Pot, das Gesicherte wird trotzdem ausgezahlt. */}
-              {view.status === 'busted' && costPerStep &&
-                `${t('session.failPotLost')}${
-                  view.payoutLamports && view.payoutLamports !== '0'
-                    ? ` · ${t('session.failSecuredPaid', { amount: toSol(view.payoutLamports) })}`
-                    : ''
-                }`}
-              {view.status === 'busted' && !costPerStep && t('session.busted')}
-              {view.status === 'cashed_out' &&
-                t('session.cashedOut', { amount: toSol(view.payoutLamports ?? '0') })}
-            </div>
-            {active && steps?.lastFall && (
-              <div className="mt-1 text-[11px] text-amber-300/80">
-                {t('session.fell', { from: steps.lastFall.from, to: steps.lastFall.to })}
-                {steps.lastFall.to > 0 ? ` ${t('session.safePoint')}` : ` ${t('session.ground')}`}
+    <div className="space-y-4">
+      {/* Spielfeld — nur Animation und Ergebnis. Die Bedienelemente stehen
+          bewusst im eigenen Block darunter: So kann ein Creator das Spielfeld
+          frei gestalten oder ersetzen, ohne die Eingaben mit umzubauen.
+          Min-Höhe statt fixer Höhe: die Engine-Erklärtexte (playerFacts, z. B.
+          steps' Leben/Safe-Point-Regeln) sind unterschiedlich lang und liefen
+          bei h-28 sichtbar über das Feld hinaus. Quadratisch (aspect-square):
+          so hoch wie breit, auf jedem Gerät. */}
+      <div className="grid aspect-square rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <div className="grid h-full place-items-center overflow-auto rounded-xl bg-night px-2 py-3 text-center">
+          {view ? (
+            <div>
+              <div className={`text-3xl font-bold tabular-nums ${ended && view.status === 'busted' ? 'text-red-400' : 'text-accent'}`}>
+                {/* `multiplierBps` gibt es nur bei den klassischen Engines;
+                    spin-tower-pro nennt dieselbe Zahl `returnBps` (Pot +
+                    Gesichertes). Ohne diesen Rückfall stand hier NaN×. */}
+                {((view.multiplierBps ?? view.returnBps ?? 0) / 10000).toFixed(2)}×
               </div>
-            )}
-            {ended && view.capped && <div className="text-xs text-white/40">{t('session.payoutLimit')}</div>}
-            {towersBombText && <div className="mt-1 text-[11px] text-white/30">{towersBombText}</div>}
-          </div>
-        ) : (
-          <div className="px-4">
-            <p className="text-white/40">{engine.blurb}</p>
-            {/* Income/Outcome in einfachen Worten — was man tut, was passieren kann. */}
-            <p className="mt-2 text-xs text-white/30">
-              {engine.playerFacts.inputs} {engine.playerFacts.outcomes}
-            </p>
-          </div>
-        )}
+              <div className="mt-1 text-sm text-white/70">
+                {active && steps &&
+                  t('session.stepInfo', {
+                    n: steps.rung,
+                    lives:
+                      steps.livesLeft !== null
+                        ? t('session.livesLeft', {
+                            left: steps.livesLeft,
+                            of: steps.lives !== null ? `/${steps.lives}` : '',
+                          })
+                        : '',
+                    amount: toSol(view.potentialPayoutLamports),
+                  })}
+                {active && !steps && costPerStep &&
+                  t('session.spinInfo', {
+                    n: spinsUsed,
+                    max: maxSpins !== null ? `/${maxSpins}` : '',
+                    amount: toSol(view.potentialPayoutLamports),
+                  })}
+                {active &&
+                  !steps &&
+                  !costPerStep &&
+                  t('session.step', {
+                    // `steps` ist bei spin-tower-pro nicht gesetzt; dieser Zweig
+                    // laeuft ohnehin nur ohne costPerStep, der Rueckfall haelt
+                    // den Typ ehrlich.
+                    n: view.steps ?? 0,
+                    amount: toSol(view.potentialPayoutLamports),
+                  })}
+                {/* Bei Kosten je Schritt wäre „alles verloren" gelogen: ein FAIL
+                    nimmt nur den Pot, das Gesicherte wird trotzdem ausgezahlt. */}
+                {view.status === 'busted' && costPerStep &&
+                  `${t('session.failPotLost')}${
+                    view.payoutLamports && view.payoutLamports !== '0'
+                      ? ` · ${t('session.failSecuredPaid', { amount: toSol(view.payoutLamports) })}`
+                      : ''
+                  }`}
+                {view.status === 'busted' && !costPerStep && t('session.busted')}
+                {view.status === 'cashed_out' &&
+                  t('session.cashedOut', { amount: toSol(view.payoutLamports ?? '0') })}
+              </div>
+              {active && steps?.lastFall && (
+                <div className="mt-1 text-[11px] text-amber-300/80">
+                  {t('session.fell', { from: steps.lastFall.from, to: steps.lastFall.to })}
+                  {steps.lastFall.to > 0 ? ` ${t('session.safePoint')}` : ` ${t('session.ground')}`}
+                </div>
+              )}
+              {ended && view.capped && <div className="text-xs text-white/40">{t('session.payoutLimit')}</div>}
+              {towersBombText && <div className="mt-1 text-[11px] text-white/30">{towersBombText}</div>}
+            </div>
+          ) : (
+            <div className="px-4">
+              <p className="text-white/40">{t(engine.blurb)}</p>
+              {/* Income/Outcome in einfachen Worten — was man tut, was passieren kann. */}
+              <p className="mt-2 text-xs text-white/30">
+                {t(engine.playerFacts.inputs)} {t(engine.playerFacts.outcomes)}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {!view || ended ? (
-        // Start-Ansicht
-        <>
-          {towerBoard && <div className="mb-3">{towerBoard}</div>}
-          <label className="block text-xs text-white/50">
-            {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen). */}
-            <span className="flex items-baseline justify-between gap-2">
-              <span>{t(costPerStep ? 'session.stakePerSpin' : 'bet.stake')}</span>
-              {!stakeLocked && <MaxBetPick onPick={setBet} />}
-            </span>
-            <input
-              value={bet}
-              onChange={(e) => setBet(e.target.value)}
-              readOnly={stakeLocked}
-              aria-readonly={stakeLocked}
-              inputMode="decimal"
-              className={`mt-1 w-full rounded-lg border border-white/10 bg-night px-3 py-2 tabular-nums text-white outline-none focus:border-accent/50 ${
-                stakeLocked ? 'cursor-not-allowed text-white/60' : ''
-              }`}
-            />
-          </label>
-          {costPerStep && (
-            // Anzeigepflicht vor dem ersten Klick: hier kostet nicht die Runde,
-            // sondern JEDER Spin. Ohne diesen Kasten hielte ein Spieler die
-            // Schritte für gratis — die Annahme, die jede andere Engine erfüllt.
-            <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-[11px] leading-relaxed text-amber-100/90">
-              <span className="font-semibold text-amber-200">
-                {t('session.everySpinCosts')}
-              </span>{' '}
-              — nicht nur der Rundenstart. Ab dem ersten Spin ist der Einsatz für die ganze Runde
-              gesperrt und nicht mehr änderbar.
-              {maxSpins !== null && (
-                <>
-                  {' '}
-                  Die Runde endet spätestens nach {maxSpins} Spins
-                  {maxSpendText ? ` — maximal ${maxSpendText} ◎ Gesamteinsatz` : ''}.
-                </>
-              )}{' '}
-              {t('session.cashoutNote')}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => void start()}
-            disabled={busy || !connected}
-            className="mt-4 w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
-          >
-            {!connected
-              ? t('common.connectWallet')
-              : busy
-                ? t('bet.running')
-                : ended
-                  ? t('session.newRound')
-                  : t('session.start')}
-          </button>
-        </>
-      ) : (
-        // Aktive Session: Schritt-Controls + Cashout
-        <div className="space-y-3">
-          <p className="text-xs text-white/40">{sess.hint}</p>
-          {costPerStep && (
-            // Kosten-Kopf der laufenden Runde: Preis je Spin, der GESPERRTE
-            // Einsatz als read-only Feld und der Spin-Zähler gegen den Deckel.
-            <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 p-3">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-xs font-semibold text-amber-200">
-                  {t('session.everySpinCostsShort')}
-                </span>
-                <span className="text-[11px] tabular-nums text-amber-100/70">
-                  Spin {spinsUsed}
-                  {maxSpins !== null ? `/${maxSpins}` : ''}
-                </span>
+      {/* Bedienfeld — Einsatz, Auswahl, Spielen. Getrennt vom Spielfeld. */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        {!view || ended ? (
+          // Start-Ansicht
+          <>
+            {towerBoard && <div className="mb-3">{towerBoard}</div>}
+            <label className="block text-xs text-white/50">
+              {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen). */}
+              <span className="flex items-baseline justify-between gap-2">
+                <span>{t(costPerStep ? 'session.stakePerSpin' : 'bet.stake')}</span>
+                {!stakeLocked && <MaxBetPick onPick={setBet} />}
+              </span>
+              <input
+                value={bet}
+                onChange={(e) => setBet(e.target.value)}
+                readOnly={stakeLocked}
+                aria-readonly={stakeLocked}
+                inputMode="decimal"
+                className={`mt-1 w-full rounded-lg border border-white/10 bg-night px-3 py-2 tabular-nums text-white outline-none focus:border-accent/50 ${
+                  stakeLocked ? 'cursor-not-allowed text-white/60' : ''
+                }`}
+              />
+              {/* Hoechsteinsatz direkt unter dem Feld — Spielgrenze, keine
+                  Kontogrenze (seit 03.09.2026 hier statt am Guthaben). */}
+              {!stakeLocked && <BetLimitHint className="mt-1" />}
+            </label>
+            {costPerStep && (
+              // Anzeigepflicht vor dem ersten Klick: hier kostet nicht die Runde,
+              // sondern JEDER Spin. Ohne diesen Kasten hielte ein Spieler die
+              // Schritte für gratis — die Annahme, die jede andere Engine erfüllt.
+              <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-[11px] leading-relaxed text-amber-100/90">
+                <span className="font-semibold text-amber-200">
+                  {t('session.everySpinCosts')}
+                </span>{' '}
+                {t('session.everySpinCostsBody')}
+                {maxSpins !== null && (
+                  <>
+                    {' '}
+                    {t('session.roundEndsAfter', {
+                      max: maxSpins,
+                      maxSpend: maxSpendText ? t('session.maxTotalStake', { amount: maxSpendText }) : '',
+                    })}
+                  </>
+                )}{' '}
+                {t('session.cashoutNote')}
               </div>
-              <label className="mt-2 block text-[11px] text-amber-100/70">
-                {t('session.stakePerSpinLocked')}
-                <input
-                  value={spinCostText ?? bet}
-                  readOnly
-                  aria-readonly
-                  aria-label={t('session.stakeLockedShort')}
-                  className="mt-1 w-full cursor-not-allowed rounded-lg border border-amber-400/30 bg-night px-3 py-2 tabular-nums text-white/70 outline-none"
-                />
-              </label>
-              {spinCostText === null && (
-                <p className="mt-1 text-[10px] text-amber-100/60">
-                  {t('session.stakeUnknown')}
-                </p>
-              )}
-            </div>
-          )}
-          {costPerStep && (
-            // Pot und Gesichertes bewusst als ZWEI Zahlen: der Pot ist bei
-            // einem FAIL weg, das Gesicherte nicht. Eine Summe würde genau die
-            // Entscheidung verwischen, um die es in dieser Engine geht.
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-lg border border-white/10 bg-night px-2 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-white/40">{t('session.pot')}</div>
-                <div className="text-sm font-semibold tabular-nums text-white">{potText}</div>
-                <div className="mt-0.5 text-[10px] text-red-300/60">{t('session.failTakesIt')}</div>
-              </div>
-              <div className="rounded-lg border border-accent/30 bg-night px-2 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-white/40">{t('session.secured')}</div>
-                <div className="text-sm font-semibold tabular-nums text-accent">{securedText}</div>
-                <div className="mt-0.5 text-[10px] text-white/40">
-                  FAIL-immun · zahlt am Rundenende
+            )}
+            <button
+              type="button"
+              onClick={() => void start()}
+              disabled={busy || !connected}
+              className="mt-4 w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
+            >
+              {!connected
+                ? t('common.connectWallet')
+                : busy
+                  ? t('bet.running')
+                  : ended
+                    ? t('session.newRound')
+                    : t('session.start')}
+            </button>
+          </>
+        ) : (
+          // Aktive Session: Schritt-Controls + Cashout
+          <div className="space-y-3">
+            <p className="text-xs text-white/40">{t(sess.hint)}</p>
+            {costPerStep && (
+              // Kosten-Kopf der laufenden Runde: Preis je Spin, der GESPERRTE
+              // Einsatz als read-only Feld und der Spin-Zähler gegen den Deckel.
+              <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 p-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-semibold text-amber-200">
+                    {t('session.everySpinCostsShort')}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-amber-100/70">
+                    {t('session.spinCounter', { n: spinsUsed })}
+                    {maxSpins !== null ? `/${maxSpins}` : ''}
+                  </span>
                 </div>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-night px-2 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-white/40">{t('session.cashout')}</div>
-                <div className="text-sm font-semibold tabular-nums text-white">
-                  {toSol(view.potentialPayoutLamports)} ◎
-                </div>
-                <div className="mt-0.5 text-[10px] text-white/40">{t('session.potPlusSecured')}</div>
-              </div>
-            </div>
-          )}
-          {towerBoard}
-          {sess.step.kind === 'guess' && (
-            <>
-              {guessValue && (
-                <div className="rounded-lg border border-white/10 bg-night py-3 text-center">
-                  <div className="text-2xl font-bold tabular-nums text-white">{guessValue.value}</div>
-                  {guessValue.dice && (
-                    <div className="mt-0.5 text-[11px] text-white/40">
-                      {guessValue.dice.join(' + ')}
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" disabled={busy} onClick={() => void step({ guess: 'higher' })}
-                  className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t('session.higher')}</button>
-                <button type="button" disabled={busy} onClick={() => void step({ guess: 'lower' })}
-                  className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t('session.lower')}</button>
-              </div>
-            </>
-          )}
-          {idxStep && bounds && (
-            <div>
-              <div className="mb-1 flex items-baseline justify-between">
-                <span className="text-xs text-white/40">{idxStep.label} wählen</span>
-                {boundsAssumed && (
-                  <span className="text-[10px] text-amber-300/70">{t('session.configNotLoaded')}</span>
+                <label className="mt-2 block text-[11px] text-amber-100/70">
+                  {t('session.stakePerSpinLocked')}
+                  <input
+                    value={spinCostText ?? bet}
+                    readOnly
+                    aria-readonly
+                    aria-label={t('session.stakeLockedShort')}
+                    className="mt-1 w-full cursor-not-allowed rounded-lg border border-amber-400/30 bg-night px-3 py-2 tabular-nums text-white/70 outline-none"
+                  />
+                </label>
+                {spinCostText === null && (
+                  <p className="mt-1 text-[10px] text-amber-100/60">
+                    {t('session.stakeUnknown')}
+                  </p>
                 )}
               </div>
-              <div
-                className="grid gap-2"
-                style={{
-                  gridTemplateColumns: `repeat(${Math.min(bounds.max - bounds.min + 1, 5)}, minmax(0, 1fr))`,
-                }}
-              >
-                {Array.from({ length: bounds.max - bounds.min + 1 }, (_, i) => bounds.min + i).map((idx) => {
-                  const picked = Array.isArray(view.progress?.picks)
-                    ? (view.progress.picks as number[]).includes(idx)
-                    : false;
+            )}
+            {costPerStep && (
+              // Pot und Gesichertes bewusst als ZWEI Zahlen: der Pot ist bei
+              // einem FAIL weg, das Gesicherte nicht. Eine Summe würde genau die
+              // Entscheidung verwischen, um die es in dieser Engine geht.
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg border border-white/10 bg-night px-2 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-white/40">{t('session.pot')}</div>
+                  <div className="text-sm font-semibold tabular-nums text-white">{potText}</div>
+                  <div className="mt-0.5 text-[10px] text-red-300/60">{t('session.failTakesIt')}</div>
+                </div>
+                <div className="rounded-lg border border-accent/30 bg-night px-2 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-white/40">{t('session.secured')}</div>
+                  <div className="text-sm font-semibold tabular-nums text-accent">{securedText}</div>
+                  <div className="mt-0.5 text-[10px] text-white/40">
+                    {t('session.securedNote')}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-night px-2 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-white/40">{t('session.cashout')}</div>
+                  <div className="text-sm font-semibold tabular-nums text-white">
+                    {toSol(view.potentialPayoutLamports)} ◎
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-white/40">{t('session.potPlusSecured')}</div>
+                </div>
+              </div>
+            )}
+            {towerBoard}
+            {sess.step.kind === 'guess' && (
+              <>
+                {guessValue && (
+                  <div className="rounded-lg border border-white/10 bg-night py-3 text-center">
+                    <div className="text-2xl font-bold tabular-nums text-white">{guessValue.value}</div>
+                    {guessValue.dice && (
+                      <div className="mt-0.5 text-[11px] text-white/40">
+                        {guessValue.dice.join(' + ')}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" disabled={busy} onClick={() => void step({ guess: 'higher' })}
+                    className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t('session.higher')}</button>
+                  <button type="button" disabled={busy} onClick={() => void step({ guess: 'lower' })}
+                    className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t('session.lower')}</button>
+                </div>
+              </>
+            )}
+            {idxStep && bounds && (
+              <div>
+                <div className="mb-1 flex items-baseline justify-between">
+                  <span className="text-xs text-white/40">{t('session.pick', { what: t(idxStep.label) })}</span>
+                  {boundsAssumed && (
+                    <span className="text-[10px] text-amber-300/70">{t('session.configNotLoaded')}</span>
+                  )}
+                </div>
+                <div
+                  className="grid gap-2"
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.min(bounds.max - bounds.min + 1, 5)}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {Array.from({ length: bounds.max - bounds.min + 1 }, (_, i) => bounds.min + i).map((idx) => {
+                    const picked = Array.isArray(view.progress?.picks)
+                      ? (view.progress.picks as number[]).includes(idx)
+                      : false;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        disabled={busy || picked}
+                        onClick={() => void step({ value: idx })}
+                        className={`rounded-lg border py-2 text-sm tabular-nums transition disabled:opacity-40 ${
+                          picked
+                            ? 'border-accent/40 bg-accent/10 text-accent'
+                            : 'border-white/15 hover:border-accent/50'
+                        }`}
+                      >
+                        {idx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {steps && steps.ladderBps.length > 0 && (
+              // Stufenleiter (Design-Zone): oberste Stufe zuerst, Checkpoints
+              // mit ⚑, aktuelle Stufe hervorgehoben — die Leiter kommt 1:1 aus
+              // dem Server-Echo, hier wird nichts gerechnet.
+              <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-night p-2">
+                {steps.ladderBps.map((bps, i) => steps.ladderBps.length - i).map((rung) => {
+                  const bps = steps.ladderBps[rung - 1]!;
+                  const isCurrent = rung === steps.rung;
+                  const isCheckpoint = steps.checkpoints.includes(rung);
                   return (
-                    <button
-                      key={idx}
-                      type="button"
-                      disabled={busy || picked}
-                      onClick={() => void step({ value: idx })}
-                      className={`rounded-lg border py-2 text-sm tabular-nums transition disabled:opacity-40 ${
-                        picked
-                          ? 'border-accent/40 bg-accent/10 text-accent'
-                          : 'border-white/15 hover:border-accent/50'
+                    <div
+                      key={rung}
+                      className={`flex items-center justify-between rounded px-2 py-1 text-xs tabular-nums ${
+                        isCurrent
+                          ? 'bg-accent/15 text-accent ring-1 ring-accent/50'
+                          : rung < steps.rung
+                            ? 'text-white/50'
+                            : 'text-white/25'
                       }`}
                     >
-                      {idx + 1}
-                    </button>
+                      <span>{isCheckpoint ? '⚑ ' : ''}{t('session.rung', { n: rung })}</span>
+                      <span>{(bps / 10000).toFixed(2)}×</span>
+                    </div>
                   );
                 })}
               </div>
-            </div>
-          )}
-          {steps && steps.ladderBps.length > 0 && (
-            // Stufenleiter (Design-Zone): oberste Stufe zuerst, Checkpoints
-            // mit ⚑, aktuelle Stufe hervorgehoben — die Leiter kommt 1:1 aus
-            // dem Server-Echo, hier wird nichts gerechnet.
-            <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-night p-2">
-              {steps.ladderBps.map((bps, i) => steps.ladderBps.length - i).map((rung) => {
-                const bps = steps.ladderBps[rung - 1]!;
-                const isCurrent = rung === steps.rung;
-                const isCheckpoint = steps.checkpoints.includes(rung);
-                return (
-                  <div
-                    key={rung}
-                    className={`flex items-center justify-between rounded px-2 py-1 text-xs tabular-nums ${
-                      isCurrent
-                        ? 'bg-accent/15 text-accent ring-1 ring-accent/50'
-                        : rung < steps.rung
-                          ? 'text-white/50'
-                          : 'text-white/25'
-                    }`}
-                  >
-                    <span>{isCheckpoint ? '⚑ ' : ''}Stufe {rung}</span>
-                    <span>{(bps / 10000).toFixed(2)}×</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {sess.step.kind === 'action' && (
-            // Bei `costPerStep` steht der Preis AUF dem Knopf — die eine Stelle,
-            // an der niemand vorbeiklickt.
-            <button type="button" disabled={busy} onClick={() => void step({})}
-              className="w-full rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{sess.step.label}
-              {costPerStep ? ` — kostet ${spinCostText ?? bet} ◎` : ''}</button>
-          )}
-          <button
-            type="button"
-            onClick={() => void cashout()}
-            disabled={busy || stepsTaken < 1 || cashoutBlocked}
-            className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
-          >
-            Cashout {stepsTaken >= 1 && !cashoutBlocked ? `(${toSol(view.potentialPayoutLamports)} ◎)` : ''}
-          </button>
-        </div>
-      )}
+            )}
+            {sess.step.kind === 'action' && (
+              // Bei `costPerStep` steht der Preis AUF dem Knopf — die eine Stelle,
+              // an der niemand vorbeiklickt.
+              <button type="button" disabled={busy} onClick={() => void step({})}
+                className="w-full rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t(sess.step.label)}
+                {costPerStep ? t('session.stepCosts', { amount: spinCostText ?? bet }) : ''}</button>
+            )}
+            <button
+              type="button"
+              onClick={() => void cashout()}
+              disabled={busy || stepsTaken < 1 || cashoutBlocked}
+              className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
+            >
+              {t('session.cashoutShort')} {stepsTaken >= 1 && !cashoutBlocked ? `(${toSol(view.potentialPayoutLamports)} ◎)` : ''}
+            </button>
+          </div>
+        )}
 
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+      </div>
     </div>
   );
 }

@@ -1,0 +1,59 @@
+CHANGELOG — Coin Flip Classic (built on the Sol-Core Game Starter)
+=====================================================================
+Newest entry first. Bullet points only.
+
+2026-09-03 — Game field is square
+- The game field above the controls is now a square (aspect-square) on every
+  screen size: as tall as it is wide, mobile and desktop alike. Applies to
+  SingleBetGame, SessionGame and TournamentGame.
+- The inner play area fills the square (h-full instead of a fixed h-28 /
+  min-h-[7rem]); ResultView keeps min-h-28 as a floor, SlotGrid and the idle
+  text scroll inside the field if they ever exceed it.
+
+2026-09-03 — Game field separated from the controls
+- SingleBetGame, SessionGame and TournamentGame now render two blocks instead of
+  one card: the game field (animation and result) on top, the controls (stake,
+  engine inputs / risk tiers, play or cash-out button, error line) below it.
+  A creator can restyle or replace the field without touching the inputs.
+- Demo entry button carries its own error state (red button with !, full text
+  in title/aria-label) instead of a separate text node: at 360 px that text had
+  pushed first the game name and then the wallet button and menu out of view.
+- Header title column can no longer collapse to zero width.
+
+2026-09-03 — Header bar, game menu, sound set, max bet at the stake field
+- New HeaderBar: game name left, wallet in the middle (connect button; after connecting the
+  balance with a dropdown for deposit, withdraw and the platform history link
+  https://www.sol-win.net/profile), game menu right.
+- GameMenu: wallet row (short address, adapter icon, copy, disconnect), language switch,
+  sound toggle, recent rounds (stake · result · value · verify), seed hash button.
+- Recent rounds and the seed hash moved from below the game into the menu (rules 6 reworded:
+  provably-fair stays reachable from the menu in every mechanic).
+- Demo mode starts automatically when no wallet is connected and ends when one connects;
+  the demo balance shows as a badge in the header with an exit in its dropdown.
+- Max bet hint (BetLimitHint) now sits under the stake input next to MaxBetPick, not at the
+  balance (rule 8 reworded: a game limit, not an account limit).
+- Sound: scripts/generate-sounds.mjs writes public/sounds/{click,bet,reveal,win,lose,cashout,
+  error}.wav (synthesised, <30 KB each); src/lib/sounds.ts exposes useSound() with a toggle
+  (default off, stored in localStorage). Wired into SingleBetGame, SessionGame, TournamentGame.
+- Popover: shared dropdown primitive (outside click, Escape, ARIA) for balance and menu.
+- RoundLog carries the stake (betLamports) for the history rows.
+- check:contract: stricter hard-coded-text check — any multi-word JSX text or string literal
+  outside the catalog is reported, not only umlauts.
+- New catalog keys: menu.*, history.*, money.open, money.amount, demo.open, demo.autoNote.
+
+2026-09-03 — English-first UI, engine texts through the catalog
+- All player-visible text is English by default; de/fr/ru follow the language switch.
+- Engine descriptions, player hints, field labels and dropdown options moved from
+  src/lib/engines.ts (previously hard-coded German) into src/lib/strings.ts as
+  `engine.<key>.*` keys. engines.ts now holds catalog keys only; params names,
+  values and defaults (the server contract) are unchanged.
+- Components resolve engine texts with t(...): SingleBetGame, SessionGame,
+  TournamentGame, DemoTournamentGame, LiveGame, LiveCrashGame, EngineControls,
+  PvpGame (Hero), DemoPvpGame, DemoDiceDuelGame, DemoDiceProGame.
+- Removed the remaining hard-coded German sentences in DemoBar, SessionGame,
+  TournamentGame, DemoTournamentGame, LiveCrashGame, LiveGame, LiveResultView,
+  CrashCurveView, RouletteBoard, SlotGrid, ResultView and SingleBetGame (keno hint).
+- Header shows the configured network (Devnet/Mainnet) instead of a fixed "Devnet".
+- <html lang> is "en" (was "de"), matching the default language.
+- New catalog keys: engine.* (114), demo.*, session.*, tournament.*, live.*,
+  crash.*, roulette.*, slot.*, result.roll, app.defaultGameName — each in all four languages.

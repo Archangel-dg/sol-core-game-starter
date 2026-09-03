@@ -27,7 +27,7 @@ function accentStyle(): CSSProperties | undefined {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="de">
+    <html lang="en">
       {/* Spalte + flex-1: Ist eine Seite kürzer als der Bildschirm, steht die
           Herkunftszeile trotzdem unten und nicht mitten im Bild. */}
       <body className="flex min-h-screen flex-col font-mono antialiased" style={accentStyle()}>

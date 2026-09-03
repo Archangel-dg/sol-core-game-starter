@@ -16,6 +16,7 @@ import { toSol, solToLamports } from '@/lib/lamports';
 import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { usePlayerAuth } from '@/lib/player-auth';
 import { usePvpLang, pvpErrorText, PVP_LANGS, type TFn, type PvpLang } from '@/lib/pvp-i18n';
+import { useT } from '@/lib/i18n';
 
 /**
  * PvP-Coinflip-Frontend (docs/pvp-plan.md §7): Top-Header (Wallet-Modal mit
@@ -666,14 +667,16 @@ export function Hero({
   /** Hero-Emoji (Default 🪙 für Coin-Flip; Dice-Duel setzt 🎲). */
   icon?: string;
 }) {
+  // Engine-Texte (blurb/hint) liegen im Hauptkatalog, nicht im PvP-Katalog.
+  const ti = useT();
   return (
     <section className="mb-6 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-transparent p-6 text-center">
       <div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full border border-accent/40 bg-accent/10 text-3xl">
         {icon}
       </div>
       <h2 className="text-xl font-bold text-white">{gameName}</h2>
-      <p className="mx-auto mt-2 max-w-xs text-sm text-white/50">{engine.blurb}</p>
-      <p className="mx-auto mt-2 max-w-xs text-xs text-white/30">{engine.pvp?.hint}</p>
+      <p className="mx-auto mt-2 max-w-xs text-sm text-white/50">{ti(engine.blurb)}</p>
+      <p className="mx-auto mt-2 max-w-xs text-xs text-white/30">{engine.pvp?.hint ? ti(engine.pvp.hint) : ''}</p>
       <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
         {onDemoPlay && (
           <button

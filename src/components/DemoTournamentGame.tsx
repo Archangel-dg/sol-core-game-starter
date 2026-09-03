@@ -1,5 +1,6 @@
 'use client';
 import { useT } from '@/lib/i18n';
+import type { StringKey } from '@/lib/strings';
 
 import { useCallback, useEffect, useState } from 'react';
 import type { EngineDef } from '@/lib/engines';
@@ -13,10 +14,10 @@ import { usePlayer, useDemo } from './DemoProvider';
  * (das echte Turnier bleibt dem Echtgeld-Modus vorbehalten). Ergebnisse kommen
  * ausschließlich vom Server. UI bewusst schlicht — Design-Zone.
  */
-const RISK_LABEL: Record<string, { label: string; sub: string; cls: string }> = {
-  safe: { label: 'Safe', sub: '90% · +10', cls: 'border-accent/40 hover:bg-accent/10' },
-  medium: { label: 'Medium', sub: '60% · +15', cls: 'border-amber-300/40 hover:bg-amber-300/10' },
-  risky: { label: 'Risky', sub: '30% · +30', cls: 'border-red-400/40 hover:bg-red-400/10' },
+const RISK_LABEL: Record<string, { label: StringKey; sub: string; cls: string }> = {
+  safe: { label: 'tournament.riskSafe', sub: '90% · +10', cls: 'border-accent/40 hover:bg-accent/10' },
+  medium: { label: 'tournament.riskMedium', sub: '60% · +15', cls: 'border-amber-300/40 hover:bg-amber-300/10' },
+  risky: { label: 'tournament.riskRisky', sub: '30% · +30', cls: 'border-red-400/40 hover:bg-red-400/10' },
 };
 
 export function DemoTournamentGame({ engine }: { engine: EngineDef }) {
@@ -106,18 +107,18 @@ export function DemoTournamentGame({ engine }: { engine: EngineDef }) {
         {view ? (
           <div>
             <div className={`text-3xl font-bold tabular-nums ${view.status === 'busted' ? 'text-red-400' : 'text-accent'}`}>
-              {view.score} <span className="text-base font-semibold text-white/50">Punkte</span>
+              {view.score} <span className="text-base font-semibold text-white/50">{t('tournament.points')}</span>
             </div>
             <div className="mt-1 text-sm text-white/70">
-              {active && `Schritt ${view.steps}/${view.maxSteps}`}
-              {view.status === 'busted' && 'Bust — Lauf genullt'}
-              {view.status === 'stopped' && 'Gebankt'}
+              {active && t('tournament.stepOf', { n: view.steps, max: view.maxSteps })}
+              {view.status === 'busted' && t('tournament.bust')}
+              {view.status === 'stopped' && t('tournament.banked')}
             </div>
           </div>
         ) : (
           <div className="px-4">
-            <p className="text-white/40">{engine.blurb}</p>
-            <p className="mt-2 text-xs text-white/30">{engine.playerFacts.inputs} {engine.playerFacts.outcomes}</p>
+            <p className="text-white/40">{t(engine.blurb)}</p>
+            <p className="mt-2 text-xs text-white/30">{t(engine.playerFacts.inputs)} {t(engine.playerFacts.outcomes)}</p>
           </div>
         )}
       </div>
@@ -136,7 +137,7 @@ export function DemoTournamentGame({ engine }: { engine: EngineDef }) {
         </>
       ) : (
         <div className="space-y-3">
-          <p className="text-xs text-white/40">{trn.hint}</p>
+          <p className="text-xs text-white/40">{t(trn.hint)}</p>
           <div className="grid grid-cols-3 gap-2">
             {trn.step.tiers.map((tier) => (
               <button
@@ -146,7 +147,7 @@ export function DemoTournamentGame({ engine }: { engine: EngineDef }) {
                 onClick={() => void step(tier)}
                 className={`rounded-lg border py-2 text-sm transition disabled:opacity-40 ${RISK_LABEL[tier]!.cls}`}
               >
-                <div className="font-semibold">{RISK_LABEL[tier]!.label}</div>
+                <div className="font-semibold">{t(RISK_LABEL[tier]!.label)}</div>
                 <div className="text-[10px] text-white/50">{RISK_LABEL[tier]!.sub}</div>
               </button>
             ))}
@@ -157,7 +158,7 @@ export function DemoTournamentGame({ engine }: { engine: EngineDef }) {
             disabled={busy}
             className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
           >
-            Banken ({view.score} Punkte)
+            {t('tournament.bank', { score: view.score })}
           </button>
         </div>
       )}

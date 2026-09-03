@@ -49,13 +49,13 @@ For a real game, register at [sol-core.com](https://sol-core.com), create a game
   gets a `NEXT_PUBLIC_` prefix; the browser only calls your own `/api/*` routes.
 - **Money is lamport-strings/`bigint`** (1 SOL = 1e9), never floats — use `src/lib/lamports.ts`.
 - **Handle every `API-xxx` error** via `src/lib/errors.ts`; respect `devMock`; honor session rules;
-  never self-bet; keep provably-fair visible; be responsible by construction.
+  never self-bet; keep provably-fair reachable from the game menu; be responsible by construction.
 
 ## What you may and may not touch
 
 - **Design zone (edit freely):** `src/app/page.tsx`, `src/app/globals.css`, `tailwind.config.ts`,
   and the components `ResultView`, `SingleBetGame`, `SessionGame`, `EngineControls`,
-  `FairnessPanel`, `History`, `BalanceBar`.
+  `FairnessPanel`, `History`, `BalanceBar`, `HeaderBar`, `GameMenu`, `DemoBar`, `Popover`.
 - **System contract (do not edit):** `src/app/api/*`, `src/lib/{solcore,config,lamports,errors,engines,player-program}.ts`,
   `src/components/Providers.tsx`. These carry a do-not-edit / system-contract marker and preserve
   the contract with the server.

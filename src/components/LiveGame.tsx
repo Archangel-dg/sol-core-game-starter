@@ -232,7 +232,7 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
           <div>
             <p className="text-sm font-bold text-white">{state.stream.displayName}</p>
             <p className="text-xs text-white/40">
-              Runde #{displayRound?.roundNo ?? '—'} · {engine.live?.hint ?? ''}
+              {t('live.roundNo', { no: displayRound?.roundNo ?? '—' })} · {engine.live?.hint ? t(engine.live.hint) : ''}
             </p>
           </div>
           <span
@@ -341,7 +341,7 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
       {displayRound && (phase === 'settled' || phase === 'revealing') && (
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
           <div className="mb-1 uppercase tracking-wide text-white/50">{t('verify.title')}</div>
-          <div className="break-all text-white/60">Runde #{displayRound.roundNo}</div>
+          <div className="break-all text-white/60">{t('live.roundNo', { no: displayRound.roundNo })}</div>
           <VerifyLink verifierUrl={verifierUrl} id={displayRound.roundId} className="mt-1" />
         </div>
       )}

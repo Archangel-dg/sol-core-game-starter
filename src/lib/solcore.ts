@@ -736,6 +736,121 @@ export function liveCrashCashout(
   );
 }
 
+// ── Live-Drift-Schicht (geteilte Auf/Ab-Spur: live-drift, Etappe 1 —
+// NUR Spielgeld) ────────────────────────────────────────────────────────────
+// Aufbau exakt wie die Crash-Schicht darüber: state/round/demo-* sind
+// apiKeyAuth-only, KEIN `playerToken` (der Server verlangt hier noch keine
+// Spieler-Sitzung, Begründung im Crash-Block). Die Echtgeld-Etappe macht
+// demo-bet/-cashout zu Geld-Routen; erst dann bekommen Server-Route,
+// Client-Funktion, Proxy-Route und Browser-Aufruf die Session-Bindung.
+//
+// DER EINE UNTERSCHIED ZUM CRASH-BLOCK: `round.path`. Die Crash-Kurve ist
+// eine öffentliche Formel, die der Browser selbst rechnet — die Drift-Spur
+// steckt im Seed und wird tickweise enthüllt. Der Server liefert deshalb das
+// bereits verstrichene Präfix mit; alles danach ist bis zum Rundenende
+// geheim (`live-drift-public.ts` ist der einzige Serializer).
+
+export interface DriftRoundView {
+  roundId: string;
+  streamId: string;
+  roundNo: number;
+  status: 'betting' | 'flying' | 'ended' | 'settled' | 'void';
+  opensAt: string;
+  locksAt: string;
+  takeoffAt: string | null;
+  endedAt: string | null;
+  serverSeedHash: string;
+  clientSeed: string;
+  /**
+   * Das ENTHÜLLTE Präfix der Spur in BPS (10000 = 1.00×): im Lauf bis zum
+   * letzten voll verstrichenen Tick, ab `ended` der volle Pfad. Vor dem
+   * Start leer. Niemals ein Wert aus der Zukunft — darauf beruht die
+   * Fairness dieser Engine.
+   */
+  path: number[];
+  /** Erst ab `ended`/`settled`. */
+  serverSeed: string | null;
+  endTick: number | null;
+  endReason: 'bust' | 'timeout' | null;
+  finalValueBps: number | null;
+  peakBps: number | null;
+}
+
+export interface DriftPlayerView {
+  /** Gekürzt — die volle Wallet geht nie an fremde Spieler. */
+  wallet: string;
+  betLamports: string;
+  /** BRUTTO-Stand beim Ausstieg; gesetzt, sobald der Spieler ausgestiegen ist. */
+  cashoutValueBps: number | null;
+  status: 'placed' | 'cashed' | 'won' | 'lost';
+}
+
+export interface DriftStateView {
+  stream: { id: string; displayName: string };
+  round: DriftRoundView | null;
+  players: DriftPlayerView[];
+  /**
+   * Takt und Keep-Anteil der Engine. `keepFractionBps` ist hier NICHT
+   * dekorativ: Drift zahlt `Stand × Keep` (97 %), während Crash `Stand`
+   * zahlt — wer ihn in der Anzeige vergisst, verspricht durchgehend 3 % zu
+   * viel (siehe `driftPayoutLamports` in `lib/drift-math.ts`).
+   */
+  curve: { tickMs: number; maxTicks: number; keepFractionBps: number; startBps: number };
+  /** Deckel des Creators; `null` = unbekannt (Begründung im Crash-Block). */
+  config?: { ceilingBps: number | null };
+  /** Echtgeld-Schalter der Engine — fehlend zählt als Spielgeld (sichere Richtung). */
+  realMoney?: boolean;
+  /** Server-Uhr — Basis für Countdown und Zeitbalken. */
+  serverTime: string;
+}
+
+export interface DriftDemoBetView {
+  betId: string;
+  reservedPayoutLamports: string;
+}
+
+export interface DriftDemoCashoutView {
+  /** BRUTTO-Stand, zu dem der Server ausgestiegen ist. */
+  valueBps: number;
+  /** Bereits NETTO (Keep-Anteil abgezogen). */
+  payoutLamports: string;
+}
+
+/** Zustand des Plattform-Flugs. Ohne streamId — es gibt genau einen. */
+export function liveDriftState(): Promise<DriftStateView> {
+  return request<DriftStateView>('/api/game/live-drift/state');
+}
+
+export function liveDriftRound(roundId: string): Promise<DriftRoundView> {
+  return request<DriftRoundView>(`/api/game/live-drift/round/${roundId}`);
+}
+
+/**
+ * SPIELGELD-Einsatz (Übungsmodus). `gameId` ist ABSICHTLICH kein Feld: der
+ * Server nimmt sie aus dem API-Key-Kontext (`req.game.id`), NIE aus dem Body.
+ */
+export function liveDriftDemoBet(body: {
+  roundId: string;
+  playerWallet: string;
+  betLamports: string;
+  safetyTargetBps?: number | null;
+}): Promise<DriftDemoBetView> {
+  return request<DriftDemoBetView>('/api/game/live-drift/demo-bet', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function liveDriftDemoCashout(body: {
+  roundId: string;
+  playerWallet: string;
+}): Promise<DriftDemoCashoutView> {
+  return request<DriftDemoCashoutView>('/api/game/live-drift/demo-cashout', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 // ── PvP-Schicht (Lobby → Ready-Check → Lock-Debit → Server-Draw: pvp-coinflip) ─
 // Alle wallet-gebundenen Aktionen (create/join/leave/kick/ready/unready/stake/
 // chat) tragen ein Spieler-Token (wie /bet). WICHTIG: `pvpLobbyState` ist

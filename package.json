@@ -12,7 +12,8 @@
     "create-test-game": "node scripts/create-test-game.mjs",
     "check": "node scripts/check-contract.mjs && node scripts/check.mjs",
     "check:contract": "node scripts/check-contract.mjs",
-    "sync-error-catalog": "node scripts/sync-error-catalog.mjs"
+    "sync-error-catalog": "node scripts/sync-error-catalog.mjs",
+    "generate-sounds": "node scripts/generate-sounds.mjs"
   },
   "dependencies": {
     "@solana/wallet-adapter-base": "^0.9.23",

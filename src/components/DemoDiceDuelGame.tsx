@@ -5,6 +5,7 @@ import type { EngineDef } from '@/lib/engines';
 import type { DemoDiceDuelView } from '@/lib/solcore';
 import { toSol, solToLamports } from '@/lib/lamports';
 import { usePvpLang, pvpErrorText, PVP_LANGS } from '@/lib/pvp-i18n';
+import { useT } from '@/lib/i18n';
 import { usePlayer, useDemo } from './DemoProvider';
 // Das Board wird 1:1 aus DiceDuelGame wiederverwendet — die Demo unterscheidet
 // sich nur in der Steuerung (Sim-Balance, Server-Bot statt echter Lobby).
@@ -40,6 +41,8 @@ export function DemoDiceDuelGame({
   verifierUrl: string;
 }) {
   const { lang, setLang, t } = usePvpLang();
+  // Engine-Texte (blurb/hint) liegen im Hauptkatalog, nicht im PvP-Katalog.
+  const ti = useT();
   const { wallet, connected } = usePlayer();
   const { demoBalance, refreshDemoBalance, exitDemo } = useDemo();
 
@@ -297,7 +300,7 @@ export function DemoDiceDuelGame({
 
       <footer className="mt-6 text-center text-[11px] text-white/30">
         <a href={verifierUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white/60">
-          {engine.pvp?.hint ?? t('menu.verify')}
+          {engine.pvp?.hint ? ti(engine.pvp.hint) : t('menu.verify')}
         </a>
       </footer>
     </main>

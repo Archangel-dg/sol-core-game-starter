@@ -19,4 +19,7 @@ body {
   background-color: #9945ff !important;
   border-radius: 9999px !important;
   height: 40px !important;
+  padding: 0 16px !important;
+  font-size: 14px !important;
+  white-space: nowrap;
 }

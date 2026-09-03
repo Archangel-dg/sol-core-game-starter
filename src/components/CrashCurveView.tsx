@@ -395,7 +395,7 @@ export function CrashCurveView({
             className="pointer-events-none absolute bottom-1 right-1 text-[11px] font-bold uppercase tracking-[0.14em]"
             style={{ color: 'var(--crash-down)', opacity: phase === 'settled' ? 0.7 : 1 }}
           >
-            geplatzt bei {formatMultiplier(revealedCrashBps)}×
+            {t('crash.burstAt', { x: formatMultiplier(revealedCrashBps) })}
           </span>
         )}
       </div>

@@ -6,32 +6,25 @@ import { verifyHref } from './VerifyLink';
  * Provably-Fair-Panel: zeigt den Seed-Hash VOR der Runde und den Verify-Link
  * DANACH.
  *
- * Echt-Runden verlinken auf den Sol-Core Verifier (`verifierUrl`/verify/…) —
+ * Jede Runde verlinkt auf den Sol-Core Verifier (`verifierUrl`/en/verify/…) —
  * die menschenlesbare Seite, die die Runde IM BROWSER des Spielers nachrechnet.
- * Demo-Runden liegen in `demo_rounds` (nicht `creator_rounds`), die der Verifier
- * nicht kennt — daher bleiben sie beim rohen, öffentlichen Demo-Endpunkt.
+ * Seit dem 03.09.2026 auch Demo-Runden (Entscheidung des Betreibers: EIN Ziel
+ * für alles, was mit der Nachprüfung zu tun hat); der Verifier holt sie aus
+ * `demo_rounds` über den öffentlichen Demo-Endpunkt nach.
  */
 export function FairnessPanel({
-  apiUrl,
   verifierUrl,
   serverSeedHash,
   roundId,
-  demo = false,
 }: {
-  apiUrl: string;
   verifierUrl: string;
   serverSeedHash: string | null;
   roundId: string | null;
-  demo?: boolean;
 }) {
   const t = useT();
   // Ohne Runde gibt es nichts zu verifizieren — der Link wird unten ohnehin
   // nur mit `roundId` gerendert; der leere String haelt nur den Typ sauber.
-  const href = !roundId
-    ? ''
-    : demo
-      ? `${apiUrl}/api/game/demo/verify/${roundId}`
-      : verifyHref(verifierUrl, roundId);
+  const href = roundId ? verifyHref(verifierUrl, roundId) : '';
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
       <div className="mb-1 uppercase tracking-wide text-white/50">{t('verify.title')}</div>

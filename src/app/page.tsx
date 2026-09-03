@@ -1,11 +1,9 @@
 'use client';
-import { LangSwitch } from '@/components/LangSwitch';
 import { useT } from '@/lib/i18n';
 
-import { useEffect, useState } from 'react';
-import { WalletButton } from '@/components/WalletButton';
-import { BalanceBar } from '@/components/BalanceBar';
-import { DemoBar } from '@/components/DemoBar';
+import { useEffect, useRef, useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { HeaderBar } from '@/components/HeaderBar';
 import { DemoProvider, useDemo } from '@/components/DemoProvider';
 import { SingleBetGame, type RoundLog } from '@/components/SingleBetGame';
 import { SessionGame } from '@/components/SessionGame';
@@ -13,14 +11,13 @@ import { TournamentGame } from '@/components/TournamentGame';
 import { DemoTournamentGame } from '@/components/DemoTournamentGame';
 import { LiveGame } from '@/components/LiveGame';
 import { LiveCrashGame } from '@/components/LiveCrashGame';
+import { LiveDriftGame } from '@/components/LiveDriftGame';
 import { PvpGame } from '@/components/PvpGame';
 import { DemoPvpGame } from '@/components/DemoPvpGame';
 import { DiceDuelGame } from '@/components/DiceDuelGame';
 import { DemoDiceDuelGame } from '@/components/DemoDiceDuelGame';
 import { DiceProGame } from '@/components/DiceProGame';
 import { DemoDiceProGame } from '@/components/DemoDiceProGame';
-import { FairnessPanel } from '@/components/FairnessPanel';
-import { History } from '@/components/History';
 import { BalanceFreezeProvider } from '@/lib/balance-freeze';
 import { getEngine } from '@/lib/engines';
 import { isMainnet, networkLabel } from '@/lib/solana';
@@ -42,7 +39,6 @@ interface Meta {
 
 export default function Home() {
   const [meta, setMeta] = useState<Meta | null>(null);
-  const t = useT();
   useEffect(() => {
     fetch('/api/meta')
       .then((r) => r.json())
@@ -58,7 +54,8 @@ export default function Home() {
 
 function HomeInner({ meta }: { meta: Meta | null }) {
   const t = useT();
-  const { demo, startDemo } = useDemo();
+  const { demo, starting, error: demoError, startDemo, exitDemo } = useDemo();
+  const { connected } = useWallet();
   const [seedHash, setSeedHash] = useState<string | null>(null);
   const [roundId, setRoundId] = useState<string | null>(null);
   const [history, setHistory] = useState<RoundLog[]>([]);
@@ -69,6 +66,25 @@ function HomeInner({ meta }: { meta: Meta | null }) {
     setRoundId(r);
   };
   const onLog = (r: RoundLog) => setHistory((h) => [r, ...h].slice(0, 20));
+
+  // Demo-Modus ist die Eingangstür (Systemvertrag): Er startet von selbst,
+  // sobald das Spiel geladen ist und keine Wallet verbunden ist — einmal je
+  // Seitenaufruf, damit ein bewusstes „Exit" nicht sofort wieder übersteuert
+  // wird. Live-Runden haben keinen Demo-Modus; devMock zeigt ohnehin kein Geld.
+  const demoDoor = !!meta && !meta.error && !meta.devMock && meta.mechanic !== 'live';
+  const autoTried = useRef(false);
+  useEffect(() => {
+    if (!demoDoor || autoTried.current) return;
+    if (connected || demo || starting || demoError) return;
+    autoTried.current = true;
+    void startDemo();
+  }, [demoDoor, connected, demo, starting, demoError, startDemo]);
+
+  // Sobald eine Wallet verbindet, endet der Demo-Modus: Ab hier zählt das
+  // echte Konto, und das Demo-Abzeichen verschwindet aus der Kopfleiste.
+  useEffect(() => {
+    if (connected && demo) exitDemo();
+  }, [connected, demo, exitDemo]);
 
   // PvP bringt sein eigenes Full-Bleed-Layout mit (Header-Bar mit Wallet-Modal +
   // Menü, Lobby-Browser, Lobby-Raum, Reveal). Im Demo-Modus gegen den Server-Bot
@@ -139,38 +155,48 @@ function HomeInner({ meta }: { meta: Meta | null }) {
     );
   }
 
-  return (
-    <main className="mx-auto min-h-screen max-w-md px-4 py-8">
-      <header className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-bold text-white">{meta?.gameName ?? 'Sol-Core Game'}</h1>
-          <p className="text-xs text-white/40">
-            Devnet · {engine?.label ?? meta?.engine ?? '…'}
-            {meta?.mechanic === 'session' ? ' · Session' : ''}
-            {meta?.mechanic === 'tournament' ? ` · ${t('app.mechanic.tournament')}` : ''}
-            {meta?.mechanic === 'live' ? ' · Live' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <LangSwitch />
-          <WalletButton />
-        </div>
-      </header>
+  const subtitle = [
+    networkLabel,
+    engine?.label ?? meta?.engine ?? '…',
+    meta?.mechanic === 'session' ? t('app.mechanic.session') : null,
+    meta?.mechanic === 'tournament' ? t('app.mechanic.tournament') : null,
+    meta?.mechanic === 'live' ? t('app.mechanic.live') : null,
+  ]
+    .filter((s): s is string => !!s)
+    .join(' · ');
 
-      {meta?.error ? (
-        <div className="rounded-xl border border-red-400/30 bg-red-400/[0.06] p-4 text-sm text-red-200">
-          {meta.error.message === 'backend_unreachable'
-            ? t('app.backendUnreachable')
-            : meta.error.message}
-          <br />
-          <span className="text-xs text-red-200/70">
-            {t('app.configHint')}
-          </span>
-        </div>
-      ) : !meta || !engine ? (
-        <p className="text-white/40">{t('app.loading')}</p>
-      ) : (
-        <BalanceFreezeProvider>
+  return (
+    <BalanceFreezeProvider>
+      <div className="min-h-screen">
+        {/* Kopfleiste über JEDEM Zustand (Laden, Fehler, Spiel): Spielname,
+            Wallet/Guthaben mit Ein- und Auszahlen, Demo-Abzeichen, Menü mit
+            Sprache, Sound, letzten Runden und Seed-Hash. Die Geld-Leiste ist
+            Systemvertrag — sie steckt in der Kopfleiste (BalanceBar). */}
+        <HeaderBar
+          gameName={meta?.gameName ?? t('app.defaultGameName')}
+          subtitle={subtitle}
+          devMock={meta?.devMock ?? false}
+          showDemo={demoDoor}
+          menu={{
+            history,
+            serverSeedHash: seedHash,
+            roundId,
+            verifierUrl: meta?.verifierUrl ?? '',
+          }}
+        />
+
+      <main className="mx-auto max-w-md px-4 pb-8">
+        {meta?.error ? (
+          <div className="rounded-xl border border-red-400/30 bg-red-400/[0.06] p-4 text-sm text-red-200">
+            {meta.error.message === 'backend_unreachable'
+              ? t('app.backendUnreachable')
+              : meta.error.message}
+            <br />
+            <span className="text-xs text-red-200/70">{t('app.configHint')}</span>
+          </div>
+        ) : !meta || !engine ? (
+          <p className="text-white/40">{t('app.loading')}</p>
+        ) : (
           <div className="space-y-4">
             {meta.warning === 'engine_mismatch' && (
               <div className="rounded-xl border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-200">
@@ -182,27 +208,16 @@ function HomeInner({ meta }: { meta: Meta | null }) {
               </div>
             )}
 
-            {/* Demo-Einstieg / -Saldo. Im Demo-Modus zählt die simulierte Wallet.
-                Live-Runden laufen immer echt — dort gibt es keinen Demo-Modus. */}
-            {meta.mechanic !== 'live' && <DemoBar />}
-            {/* Geld-Leiste in JEDER Mechanik (Systemvertrag — nie entfernen).
-                Ein- und Auszahlen gehören in das Spiel, nicht nur auf die
-                Plattform: Das Guthaben ist dasselbe Konto je Wallet und gilt
-                spielübergreifend — wer hier einzahlt, kann es überall
-                einsetzen und überall wieder abheben.
-
-                Crash war bis zum 28.08.2026 die Ausnahme (reines Spielgeld,
-                deshalb ohne Leiste). Seit der Echtgeld-Pfad steht, folgt das
-                Spiel dem Schalter der Engine; die Leiste gehört damit auch
-                dort hin. Steht der Schalter auf Spielgeld, sagt das Spiel das
-                ausdrücklich dazu (Hinweis in LiveCrashGame). */}
-            {(!demo || meta.mechanic === 'live') && <BalanceBar devMock={meta.devMock} />}
-
             {meta.mechanic === 'live' ? (
               engine.key === 'live-crash' ? (
-                // Crash bringt seinen eigenen geteilten Flug mit (Etappe 2:
-                // nur Spielgeld) — Verify läuft über /api/live-crash/round/:id.
+                // Crash bringt seinen eigenen geteilten Flug mit — Verify läuft
+                // über /api/live-crash/round/:id.
                 <LiveCrashGame engine={engine} verifierUrl={meta.verifierUrl} />
+              ) : engine.key === 'live-drift' ? (
+                // Drift ist die Schwester-Engine von Crash: eigener geteilter
+                // Lauf auf einer Auf/Ab-Spur (Etappe 1: nur Spielgeld) —
+                // Verify läuft über /api/live-drift/round/:id.
+                <LiveDriftGame engine={engine} verifierUrl={meta.verifierUrl} />
               ) : (
                 // Live bringt Countdown/Runden/Ergebnis-Ticker selbst mit —
                 // Verify läuft über /api/game/live/verify/:roundId.
@@ -233,20 +248,17 @@ function HomeInner({ meta }: { meta: Meta | null }) {
               />
             )}
 
-            {meta.mechanic !== 'tournament' && meta.mechanic !== 'live' && (
-              <>
-                <FairnessPanel apiUrl={meta.apiUrl} verifierUrl={meta.verifierUrl} serverSeedHash={seedHash} roundId={roundId} demo={demo} />
-                <History rounds={history} apiUrl={meta.apiUrl} verifierUrl={meta.verifierUrl} demo={demo} />
-              </>
-            )}
+            {/* Seed-Hash und letzte Runden liegen im Spielmenü (GameMenu) —
+                erreichbar in jeder Mechanik, ohne die Spielfläche zu füllen. */}
             <p className="pt-2 text-center text-[11px] text-white/30">
               {demo && meta.mechanic !== 'live'
                 ? t('demo.note')
                 : `${t('app.serverDecides')}${isMainnet ? '' : ` ${t('app.devnetOnly')}`}`}
             </p>
           </div>
-        </BalanceFreezeProvider>
-      )}
-    </main>
+        )}
+      </main>
+      </div>
+    </BalanceFreezeProvider>
   );
 }

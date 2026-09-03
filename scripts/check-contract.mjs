@@ -289,6 +289,64 @@ pruef(
     verdaechtig.length ? verdaechtig.slice(0, 6).join(' · ') : undefined,
   );
 }
+{
+  // Schärfer (03.09.2026): NICHT nur Umlaute. Am 03.09.2026 waren rund 70
+  // deutsche Sätze durchgerutscht, weil sie in Template-Strings, Button-
+  // Beschriftungen und Ternaries standen — die Umlaut-Suche sieht nur
+  // JSX-Text. Ab hier gilt: Sichtbarer Text mit mehreren Wörtern gehört in
+  // den Katalog, in welcher Sprache auch immer. Gesucht wird in JSX-Text
+  // (>= 2 Wörter) und in String-/Template-Literalen (>= 3 Wörter).
+  //
+  // Erlaubt bleiben Eigennamen und Symbole (Sol-Core, Devnet, SOL, WILD …),
+  // Tailwind-Klassenlisten (Tokens mit -, /, :, [) und alles, was nicht
+  // gerendert wird (Fehler für die Konsole, Importe, Schlüssel).
+  const WORT = /[A-Za-zÀ-ÿА-я]{3,}/g;
+  // Die Seitenbeschreibung in layout.tsx ist die dokumentierte Ausnahme:
+  // Metadaten rendert der Server, bevor die Sprache des Besuchers feststeht.
+  const EIGENNAMEN =
+    /^(Sol-Core( Engine)?|Devnet|Mainnet|SOL|Demo|Provably Fair|WILD|SCATTER|Free Spins|Seed|Roll|Spin|A Sol-Core game \(\)\.)$/i;
+  const funde = [];
+  const istKlassenliste = (text) => {
+    const tokens = text.trim().split(/\s+/);
+    return tokens.filter((tk) => /[-/:\[\]]/.test(tk)).length >= tokens.length / 2;
+  };
+  const woerter = (text) => (text.match(WORT) ?? []).length;
+  for (const [p, t] of INHALT) {
+    if (!/components[\/]|app[\/]/.test(p)) continue;
+    if (/strings\.ts$|i18n\.tsx$|pvp-i18n\.ts$|[\/]api[\/]/.test(p)) continue;
+    const quelle = t
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/className=(\{`[\s\S]*?`\}|\{[^}]*\}|"[^"]*"|'[^']*')/g, 'className=""')
+      .replace(/^.*\b(console\.|throw new Error|import |from '|export const \w+_KEY)\b.*$/gm, '');
+    // JSX-Textknoten: >Text< mit mindestens zwei Wörtern.
+    for (const m of quelle.matchAll(/>\s*([^<>{}\n][^<>{}]{2,160})\s*</g)) {
+      const text = m[1].trim();
+      // Generics wie `useState<string | null>(null)` sehen aus wie JSX-Text —
+      // Code erkennt man an Semikolon, Zuweisung oder Schlüsselwort.
+      if (/[;=]|\|\||&&|[?:]\s*\(|\w\(|\b(const|let|return|import)\b/.test(text)) continue;
+      if (woerter(text) >= 2 && !EIGENNAMEN.test(text)) funde.push(`${kurz(p)}: ${text.slice(0, 40)}`);
+    }
+    // String-/Template-Literale mit mindestens drei Wörtern.
+    for (const m of quelle.matchAll(/(['"`])((?:(?!\1)[^\\\n]|\\.){6,240}?)\1/g)) {
+      // Platzhalter raus, bevor gezählt wird: `${t('app.x')}` ist kein Satz.
+      // Schlüssel (kein Leerzeichen), SVG-Pfade und CSS-Werte sind auch keine.
+      const text = m[2].replace(/\$\{[^}]*\}/g, '');
+      if (!/\s/.test(text.trim())) continue;
+      if (/\bvar\(--|\d+px\b|^[MLHVCSQTAZ]-?\d/.test(text)) continue;
+      // Ein Literal, das Code enthält (Aufruf, Klammern, Operatoren), ist ein
+      // Fehlgriff der Regex zwischen zwei fremden Anführungszeichen.
+      if (/\w\(|[{}]|\|\||&&|=>/.test(text)) continue;
+      if (woerter(text) < 3 || istKlassenliste(text) || EIGENNAMEN.test(text.trim())) continue;
+      funde.push(`${kurz(p)}: ${text.slice(0, 40)}`);
+    }
+  }
+  pruef(
+    funde.length === 0,
+    'Kein sichtbarer Satz am Katalog vorbei (JSX-Text, Literale)',
+    funde.length ? funde.slice(0, 8).join(' · ') : undefined,
+  );
+}
 
 // ── 6. Nachprüfbarkeit ──────────────────────────────────────────────────────
 console.log('\n6) Verify — Direktlink in den Sol-Core Scanner');
@@ -315,6 +373,7 @@ pruef(gibt(/verifyHref\(|<VerifyLink\b/), 'Verify-Link wird benutzt');
     ['Runden-Verlauf', 'src/components/History.tsx'],
     ['Live (Quoten)', 'src/components/LiveGame.tsx'],
     ['Live (Crash)', 'src/components/LiveCrashGame.tsx'],
+    ['Live (Drift)', 'src/components/LiveDriftGame.tsx'],
     ['Turnier', 'src/components/TournamentGame.tsx'],
     ['PvP', 'src/components/PvpGame.tsx'],
   ];

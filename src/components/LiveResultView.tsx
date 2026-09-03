@@ -101,7 +101,7 @@ export function LiveResultView({
       )}
       {winnerKnown && resultIndex !== null && (
         <p className="mt-3 text-center text-sm font-semibold text-accent">
-          #{resultIndex + 1} {outcomes[resultIndex]?.label ?? ''} gewinnt!
+          {tr('live.wins', { no: resultIndex + 1, label: outcomes[resultIndex]?.label ?? '' })}
         </p>
       )}
     </div>

@@ -1,5 +1,7 @@
 'use client';
 import { useT } from '@/lib/i18n';
+import { useSound } from '@/lib/sounds';
+import type { StringKey } from '@/lib/strings';
 import { VerifyLink } from './VerifyLink';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -17,13 +19,14 @@ import { usePlayerAuth } from '@/lib/player-auth';
  * bewusst schlicht — Design-Zone. Reconnect nach Reload über localStorage.
  */
 
-const RISK_LABEL: Record<string, { label: string; sub: string; cls: string }> = {
-  safe: { label: 'Safe', sub: '90% · +10', cls: 'border-accent/40 hover:bg-accent/10' },
-  medium: { label: 'Medium', sub: '60% · +15', cls: 'border-amber-300/40 hover:bg-amber-300/10' },
-  risky: { label: 'Risky', sub: '30% · +30', cls: 'border-red-400/40 hover:bg-red-400/10' },
+const RISK_LABEL: Record<string, { label: StringKey; sub: string; cls: string }> = {
+  safe: { label: 'tournament.riskSafe', sub: '90% · +10', cls: 'border-accent/40 hover:bg-accent/10' },
+  medium: { label: 'tournament.riskMedium', sub: '60% · +15', cls: 'border-amber-300/40 hover:bg-amber-300/10' },
+  risky: { label: 'tournament.riskRisky', sub: '30% · +30', cls: 'border-red-400/40 hover:bg-red-400/10' },
 };
 
 function useCountdown(endsAt: string | undefined): string {
+  const t = useT();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1_000);
@@ -31,7 +34,7 @@ function useCountdown(endsAt: string | undefined): string {
   }, []);
   if (!endsAt) return '—';
   const ms = new Date(endsAt).getTime() - now;
-  if (ms <= 0) return 'Zyklus endet…';
+  if (ms <= 0) return t('tournament.cycleEnds');
   const s = Math.floor(ms / 1000);
   const d = Math.floor(s / 86_400);
   const h = Math.floor((s % 86_400) / 3_600);
@@ -44,6 +47,7 @@ function useCountdown(endsAt: string | undefined): string {
 export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; verifierUrl: string }) {
   const { publicKey, connected } = useWallet();
   const t = useT();
+  const { play } = useSound();
   // Geld-Routen laufen ausschließlich über moneyFetch (hängt das Spieler-Token an).
   const { moneyFetch } = usePlayerAuth();
   const wallet = publicKey?.toBase58() ?? null;
@@ -105,11 +109,13 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
         const reason = typeof details?.reason === 'string' ? details.reason : (r.error.reason as string | undefined);
         const ui = toUiError(r.error.code, r.error.message, reason, details);
         setError(`${ui.code}: ${ui.message}`);
+        play('error');
         return null;
       }
       return r as TournamentRunView;
     } catch (e) {
       setError((e as Error).message);
+      play('error');
       return null;
     } finally {
       setBusy(false);
@@ -118,6 +124,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
 
   const enter = async () => {
     if (!wallet) return;
+    play('bet');
     const v = await call('/api/tournament/enter', { playerWallet: wallet });
     if (v) {
       localStorage.setItem(storeKey, v.runId);
@@ -134,8 +141,10 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
 
   const step = async (risk: 'safe' | 'medium' | 'risky') => {
     if (!view) return;
+    play('click');
     const v = await call(`/api/tournament/run/${view.runId}/step`, trn.buildStep({ risk }));
     if (v) {
+      if (v.status === 'busted') play('lose');
       setView(v);
       finishIfEnded(v);
     }
@@ -145,6 +154,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
     if (!view) return;
     const v = await call(`/api/tournament/run/${view.runId}/stop`);
     if (v) {
+      play('cashout');
       setView(v);
       finishIfEnded(v);
     }
@@ -175,40 +185,45 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
         </div>
       </div>
 
-      {/* Spielfläche */}
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <div className="mb-4 grid min-h-[7rem] place-items-center rounded-xl bg-night px-2 py-3 text-center">
+      {/* Spielfeld — nur Animation und Ergebnis. Die Bedienelemente stehen
+          bewusst im eigenen Block darunter: So kann ein Creator das Spielfeld
+          frei gestalten oder ersetzen, ohne die Eingaben mit umzubauen.
+          Quadratisch (aspect-square): so hoch wie breit, auf jedem Gerät. */}
+      <div className="grid aspect-square rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <div className="grid h-full place-items-center overflow-auto rounded-xl bg-night px-2 py-3 text-center">
           {view ? (
             <div>
               <div className={`text-3xl font-bold tabular-nums ${view.status === 'busted' ? 'text-red-400' : 'text-accent'}`}>
                 {view.score} <span className="text-base font-semibold text-white/50">{t('tournament.points')}</span>
               </div>
               <div className="mt-1 text-sm text-white/70">
-                {active && `Schritt ${view.steps}/${view.maxSteps}`}
+                {active && t('tournament.stepOf', { n: view.steps, max: view.maxSteps })}
                 {view.status === 'busted' && t('tournament.bust')}
                 {(view.status === 'stopped' || view.status === 'expired') &&
-                  `Gebankt${view.bestScore !== undefined ? ` · Bester Score: ${view.bestScore}` : ''}`}
+                  (view.bestScore !== undefined ? t('tournament.bankedBest', { score: view.bestScore }) : t('tournament.banked'))}
               </div>
             </div>
           ) : (
             <div className="px-4">
-              <p className="text-white/40">{engine.blurb}</p>
+              <p className="text-white/40">{t(engine.blurb)}</p>
               <p className="mt-2 text-xs text-white/30">
-                {engine.playerFacts.inputs} {engine.playerFacts.outcomes}
+                {t(engine.playerFacts.inputs)} {t(engine.playerFacts.outcomes)}
               </p>
             </div>
           )}
         </div>
+      </div>
 
+      {/* Bedienfeld — Einsatz, Auswahl, Spielen. Getrennt vom Spielfeld. */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         {!view || ended ? (
           <>
             {cycle && (
               <p className="mb-3 text-center text-xs text-white/40">
-                Einsatz {toSol(cycle.entryFeeLamports)} ◎ · du zahlst{' '}
-                {toSol(cycle.totalChargeLamports)} ◎ (inkl. Fees)
+                {t('tournament.entryInfo', { fee: toSol(cycle.entryFeeLamports), total: toSol(cycle.totalChargeLamports) })}
                 {cycle.maxAttemptsPerCycle !== null &&
                   me &&
-                  ` · Versuche ${me.attempts}/${cycle.maxAttemptsPerCycle}`}
+                  t('tournament.attempts', { n: me.attempts, max: cycle.maxAttemptsPerCycle })}
               </p>
             )}
             <button
@@ -228,7 +243,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
           </>
         ) : (
           <div className="space-y-3">
-            <p className="text-xs text-white/40">{trn.hint}</p>
+            <p className="text-xs text-white/40">{t(trn.hint)}</p>
             <div className="grid grid-cols-3 gap-2">
               {trn.step.tiers.map((tier) => (
                 <button
@@ -238,7 +253,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
                   onClick={() => void step(tier)}
                   className={`rounded-lg border py-2 text-sm transition disabled:opacity-40 ${RISK_LABEL[tier]!.cls}`}
                 >
-                  <div className="font-semibold">{RISK_LABEL[tier]!.label}</div>
+                  <div className="font-semibold">{t(RISK_LABEL[tier]!.label)}</div>
                   <div className="text-[10px] text-white/50">{RISK_LABEL[tier]!.sub}</div>
                 </button>
               ))}
@@ -249,7 +264,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
               disabled={busy}
               className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
             >
-              Banken ({view.score} Punkte)
+              {t('tournament.bank', { score: view.score })}
             </button>
           </div>
         )}
@@ -265,7 +280,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
             <span className="font-semibold text-white">{me.bestScore}</span>
             {me.rank !== null && (
               <>
-                {' '}· Platz <span className="font-semibold text-accent">#{me.rank}</span>
+                {' '}{t('tournament.rank')} <span className="font-semibold text-accent">#{me.rank}</span>
               </>
             )}
           </p>
@@ -293,8 +308,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
         )}
         {cycle && (
           <p className="pt-2 text-[11px] text-white/30">
-            Ausschüttung: {cycle.payoutSplitBps.map((b, i) => `#${i + 1} ${b / 100}%`).join(' · ')} — der
-            Pot geht zu 100% an die Gewinner.
+            {t('tournament.payoutSplit', { split: cycle.payoutSplitBps.map((b, i) => `#${i + 1} ${b / 100}%`).join(' · ') })}
           </p>
         )}
       </div>
@@ -305,9 +319,9 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
           Spieler seinem Ergebnis nur glauben konnte. */}
       {view?.runId && (
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-xs">
-          <div className="mb-1 uppercase tracking-wide text-white/50">Provably Fair</div>
-          <div className="break-all text-white/60">Lauf {view.runId}</div>
-          <VerifyLink verifierUrl={verifierUrl} id={view.runId} label="Lauf verifizieren →" className="mt-1" />
+          <div className="mb-1 uppercase tracking-wide text-white/50">{t('verify.title')}</div>
+          <div className="break-all text-white/60">{t('verify.runId', { id: view.runId })}</div>
+          <VerifyLink verifierUrl={verifierUrl} id={view.runId} label={t('verify.run')} className="mt-1" />
         </div>
       )}
     </div>

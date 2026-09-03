@@ -470,10 +470,7 @@ export function LiveCrashGame({
             color: 'var(--crash-muted)',
           }}
         >
-          <strong style={{ color: 'var(--crash-text)' }}>{t('crash.practiceTitle')}</strong> Dieses Spiel
-          bewegt gerade ein Übungs-Guthaben auf dem Server — dein Wallet-Guthaben bleibt
-          unangetastet. Ein- und Auszahlen oben funktioniert trotzdem: das Guthaben gilt für
-          alle Spiele der Plattform.
+          <strong style={{ color: 'var(--crash-text)' }}>{t('crash.practiceTitle')}</strong> {t('crash.practiceBody')}
         </p>
       )}
 
@@ -531,16 +528,16 @@ export function LiveCrashGame({
               </label>
               <label className="flex-1 basis-28">
                 <span className="mb-1 block text-[11px] uppercase tracking-wide" style={{ color: 'var(--crash-muted)' }}>
-                  Auto-Ausstieg (×)
+                  {t('crash.autoCashout')}
                   {ceilingBps !== null && (
-                    <span className="normal-case tracking-normal"> · max {formatMultiplier(ceilingBps)}×</span>
+                    <span className="normal-case tracking-normal">{t('crash.autoMax', { max: formatMultiplier(ceilingBps) })}</span>
                   )}
                 </span>
                 <input
                   value={safety}
                   onChange={(e) => setSafety(e.target.value)}
                   inputMode="decimal"
-                  placeholder={ceilingBps !== null ? `bis ${formatMultiplier(ceilingBps)}` : 'optional'}
+                  placeholder={ceilingBps !== null ? t('crash.upTo', { max: formatMultiplier(ceilingBps) }) : t('crash.optional')}
                   aria-label={
                     ceilingBps !== null
                       ? t('crash.autoAria', { max: formatMultiplier(ceilingBps) })
@@ -580,7 +577,7 @@ export function LiveCrashGame({
               {t('crash.aboard')}
             </p>
             <p className="mt-1 text-xs" style={{ color: 'var(--crash-muted)' }}>
-              Abflug in {Math.max(0, Math.ceil(lockInMs / 1000))}s — dann steigt die Kurve.
+              {t('crash.takeoffIn', { s: Math.max(0, Math.ceil(lockInMs / 1000)) })}
             </p>
           </div>
         )}
@@ -605,17 +602,17 @@ export function LiveCrashGame({
             >
               {canCashout
                 ? clickBps !== null
-                  ? `Aussteigen · ${formatMultiplier(clickBps)}×`
-                  : 'Aussteigen'
+                  ? t('crash.cashOutAt', { x: formatMultiplier(clickBps) })
+                  : t('crash.cashOut')
                 : myCashoutBps !== null
-                  ? `Raus bei ${formatMultiplier(myCashoutBps)}×`
+                  ? t('crash.outAt', { x: formatMultiplier(myCashoutBps) })
                   : t('crash.oneMoment')}
             </button>
             {canCashout && clickBps === null && (
               <p className="text-center text-xs leading-relaxed" style={{ color: 'var(--crash-muted)' }}>
                 {!targetKnown
-                  ? 'Diese Wette wurde in einer anderen Sitzung gesetzt — ob sie ein Sicherheitsziel trägt, weiß dieser Tab nicht. Deshalb steht hier keine Zahl; den Multiplikator bestimmt beim Klick der Server.'
-                  : 'Den Auszahlungs-Deckel dieses Spiels hat der Server nicht mitgeliefert. Deshalb steht hier keine Zahl; den Multiplikator bestimmt beim Klick der Server.'}
+                  ? t('crash.noTargetOtherSession')
+                  : t('crash.noCapKnown')}
               </p>
             )}
             {canCashout && betThisRound && clickBps !== null && (
@@ -623,15 +620,17 @@ export function LiveCrashGame({
                 {/* Reine Anzeige aus demselben Minimum, das der Server zahlt —
                     gutgeschrieben wird ausschließlich, was er beim Klick
                     errechnet. */}
-                Einsatz {toSol(betThisRound.betLamports)} ◎ · gerade{' '}
-                {toSol((BigInt(betThisRound.betLamports) * BigInt(clickBps)) / 10_000n)} ◎ wert
+                {t('crash.stakeWorth', {
+                  stake: toSol(betThisRound.betLamports),
+                  value: toSol((BigInt(betThisRound.betLamports) * BigInt(clickBps)) / 10_000n),
+                })}
               </p>
             )}
             {canCashout && myEffectiveTargetBps !== null && (
               <p className="text-center text-xs tabular-nums" style={{ color: 'var(--crash-mark)' }}>
                 {myTargetBps !== null
-                  ? `Auto-Ausstieg bei ${formatMultiplier(myEffectiveTargetBps)}× — den zahlt der Server auch ohne Klick, sobald die Kurve ihn erreicht.`
-                  : `Ohne eigenes Ziel steigt der Deckel dieses Spiels für dich aus: ${formatMultiplier(myEffectiveTargetBps)}× — mehr zahlt eine Wette hier nicht, auch wenn die Kurve weiterfliegt.`}
+                  ? t('crash.autoAt', { x: formatMultiplier(myEffectiveTargetBps) })
+                  : t('crash.capExits', { x: formatMultiplier(myEffectiveTargetBps) })}
               </p>
             )}
           </div>
@@ -642,7 +641,7 @@ export function LiveCrashGame({
             {mine?.status === 'won' || mine?.status === 'cashed' || cashoutThisRound ? (
               <p className="text-sm font-bold" style={{ color: 'var(--crash-up)' }}>
                 {t('crash.outInTime')}
-                {myCashoutBps !== null ? ` bei ${formatMultiplier(myCashoutBps)}×` : ''}
+                {myCashoutBps !== null ? t('crash.atMultiplier', { x: formatMultiplier(myCashoutBps) }) : ''}
                 {cashoutThisRound ? ` · ${toSol(cashoutThisRound.payoutLamports)} ◎` : ''}
               </p>
             ) : mine?.status === 'lost' ? (
@@ -684,7 +683,7 @@ export function LiveCrashGame({
       >
         <div className="mb-2 flex items-baseline justify-between">
           <p className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--crash-muted)' }}>
-            Mit im Flug
+            {t('crash.withInFlight')}
           </p>
           <p className="text-[11px] tabular-nums" style={{ color: 'var(--crash-muted)' }}>
             {players.length}
@@ -706,7 +705,7 @@ export function LiveCrashGame({
                   style={{ background: isMe ? 'var(--crash-mine)' : 'transparent' }}
                 >
                   <span className="min-w-0 flex-1 truncate" style={{ color: 'var(--crash-text)' }}>
-                    {isMe ? 'Du' : p.wallet}
+                    {isMe ? t('crash.you') : p.wallet}
                   </span>
                   <span className="shrink-0 tabular-nums" style={{ color: 'var(--crash-muted)' }}>
                     {toSol(p.betLamports)} ◎
@@ -732,7 +731,7 @@ export function LiveCrashGame({
             })}
             {players.length > 12 && (
               <li className="pt-1 text-center text-[11px]" style={{ color: 'var(--crash-muted)' }}>
-                … und {players.length - 12} weitere
+                {t('crash.andMore', { n: players.length - 12 })}
               </li>
             )}
           </ul>
@@ -749,23 +748,22 @@ export function LiveCrashGame({
           color: 'var(--crash-muted)',
         }}
       >
-        <p>{engine.live?.hint ?? t('crash.hint')}</p>
+        <p>{engine.live?.hint ? t(engine.live.hint) : t('crash.hint')}</p>
         {round && (
           <p className="mt-2 break-all">
-            <span className="uppercase tracking-wide">Seed-Hash</span> {round.serverSeedHash}
+            <span className="uppercase tracking-wide">{t('crash.seedHash')}</span> {round.serverSeedHash}
             {/* Der Seed kommt erst mit dem Crash — vorher gibt es hier nichts
                 zu zeigen, und genau das ist der Punkt. */}
             {round.serverSeed && (
               <>
                 <br />
-                <span className="uppercase tracking-wide">Seed</span> {round.serverSeed}
+                <span className="uppercase tracking-wide">{t('crash.seed')}</span> {round.serverSeed}
               </>
             )}
           </p>
         )}
         <p className="mt-2">
-          Der Crash-Punkt steht vor dem Wettfenster fest und gilt für alle gleich. Ergebnisse kommen
-          ausschließlich vom Sol-Core-Server.
+          {t('crash.fairNote')}
         </p>
         {/* Nachprüfbarkeit (Systemvertrag — nie entfernen): Erst mit dem Crash
             gibt der Server den Seed heraus; vorher wäre ein Link eine leere

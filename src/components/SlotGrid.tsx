@@ -68,7 +68,7 @@ export function SlotGrid({
   // Idle: Paytable-Vorschau aus dem renderSpec (degradiert leer, wenn absent).
   if (!details) {
     return (
-      <div className="rounded-xl bg-night p-4">
+      <div className="h-full overflow-auto rounded-xl bg-night p-4">
         <p className="mb-2 text-center text-sm text-white/50">{t('slot.paylines')}</p>
         {symbols.length > 0 && (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
@@ -78,7 +78,7 @@ export function SlotGrid({
                 <div key={s.id} className="rounded-lg bg-white/[0.04] p-2 text-center">
                   <div className="text-2xl" style={{ color: art.tint }}>{art.glyph}</div>
                   <div className="mt-1 text-[10px] text-white/40">
-                    {s.wild ? 'WILD' : s.scatter ? 'SCATTER' : (s.paysBps ?? []).map((p) => `${p / 10000}×`).join(' / ')}
+                    {s.wild ? t('slot.wild') : s.scatter ? t('slot.scatter') : (s.paysBps ?? []).map((p) => `${p / 10000}×`).join(' / ')}
                   </div>
                 </div>
               );
@@ -87,8 +87,11 @@ export function SlotGrid({
         )}
         {freeSpins && (
           <p className="mt-2 text-center text-[11px] text-white/40">
-            Free Spins: {freeSpins.triggerScatterCount}+ Scatter → bis zu {freeSpins.maxTotalSpins} Spins ×
-            {freeSpins.multiplierBps / 10000}
+            {t('slot.freeSpinsInfo', {
+              n: freeSpins.triggerScatterCount,
+              max: freeSpins.maxTotalSpins,
+              mult: freeSpins.multiplierBps / 10000,
+            })}
           </p>
         )}
       </div>
@@ -115,7 +118,7 @@ export function SlotGrid({
   const scatterIds = new Set(symbols.filter((s) => s.scatter).map((s) => s.id));
 
   return (
-    <div className="rounded-xl bg-night p-4">
+    <div className="h-full overflow-auto rounded-xl bg-night p-4">
       <div className="mx-auto grid max-w-sm grid-cols-5 gap-1.5">
         {[0, 1, 2].map((row) =>
           [0, 1, 2, 3, 4].map((reel) => {
@@ -148,8 +151,8 @@ export function SlotGrid({
         </div>
         {(lineWins.length > 0 || scatterPayBps > 0) && (
           <div className="mt-1 text-xs text-white/40">
-            {lineWins.map((w) => `Linie ${w.line + 1}: ${w.count}× ${w.symbol} (${(w.payBps / 10000).toFixed(2)}×)`).join(' · ')}
-            {scatterPayBps > 0 ? `${lineWins.length ? ' · ' : ''}${scatterCount} Scatter (${(scatterPayBps / 10000).toFixed(2)}×)` : ''}
+            {lineWins.map((w) => t('slot.lineWin', { line: w.line + 1, count: w.count, symbol: w.symbol, pay: (w.payBps / 10000).toFixed(2) })).join(' · ')}
+            {scatterPayBps > 0 ? `${lineWins.length ? ' · ' : ''}${t('slot.scatterWin', { count: scatterCount, pay: (scatterPayBps / 10000).toFixed(2) })}` : ''}
           </div>
         )}
         {(() => {
@@ -159,7 +162,7 @@ export function SlotGrid({
           const totalWinBps = typeof fs.totalWinBps === 'number' ? fs.totalWinBps : 0;
           return (
             <div className="mt-1 text-xs text-purple-300">
-              🎁 {totalSpins} Free Spins · +{(totalWinBps / 10000).toFixed(2)}×
+              {t('slot.freeSpinsResult', { spins: totalSpins, win: (totalWinBps / 10000).toFixed(2) })}
             </div>
           );
         })()}

@@ -37,7 +37,7 @@ export function EngineControls({
     <div className="grid gap-3">
       {controls.map((c) => (
         <label key={c.name} className="text-xs text-white/50">
-          {c.label}
+          {t(c.label)}
           {c.kind === 'intlist' ? ` (${listBounds(c).min}–${listBounds(c).max})` : ''}
           {c.kind === 'select' ? (
             <select
@@ -47,7 +47,7 @@ export function EngineControls({
             >
               {c.options.map((o) => (
                 <option key={o.value} value={o.value}>
-                  {o.label}
+                  {t(o.label)}
                 </option>
               ))}
             </select>
@@ -67,10 +67,10 @@ export function EngineControls({
               <input
                 value={values[c.name] ?? ''}
                 onChange={(e) => onChange(c.name, e.target.value)}
-                placeholder={c.hint}
+                placeholder={c.hint ? t(c.hint) : undefined}
                 className="mt-1 w-full rounded-lg border border-white/10 bg-night px-3 py-2 tabular-nums text-white outline-none focus:border-accent/50"
               />
-              {c.hint && <span className="mt-0.5 block text-[11px] text-white/30">{c.hint}</span>}
+              {c.hint && <span className="mt-0.5 block text-[11px] text-white/30">{t(c.hint)}</span>}
             </>
           )}
         </label>

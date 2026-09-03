@@ -1827,6 +1827,12 @@ export const STRINGS = {
   'menu.noRounds': { en: 'No rounds yet.', de: 'Noch keine Runden.', fr: 'Pas encore de manche.', ru: 'Раундов пока нет.' },
   'menu.seedHash': { en: 'Seed hash', de: 'Seed-Hash', fr: 'Hash du seed', ru: 'Хеш сида' },
   'menu.history': { en: 'History', de: 'Historie', fr: 'Historique', ru: 'История' },
+  'menu.moreGames': {
+    en: 'Explore more games',
+    de: 'Mehr Spiele entdecken',
+    fr: 'Découvrir plus de jeux',
+    ru: 'Больше игр',
+  },
   'history.stake': { en: 'Stake', de: 'Einsatz', fr: 'Mise', ru: 'Ставка' },
   'history.result': { en: 'Result', de: 'Ergebnis', fr: 'Résultat', ru: 'Результат' },
   'history.value': { en: 'Value', de: 'Wert', fr: 'Valeur', ru: 'Сумма' },

@@ -181,9 +181,7 @@ function HomeInner({ meta }: { meta: Meta | null }) {
             history,
             serverSeedHash: seedHash,
             roundId,
-            apiUrl: meta?.apiUrl ?? '',
             verifierUrl: meta?.verifierUrl ?? '',
-            demo,
           }}
         />
 

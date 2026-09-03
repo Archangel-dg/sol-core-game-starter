@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useT } from '@/lib/i18n';
 import { useSound } from '@/lib/sounds';
+import { PLATFORM_URL } from '@/lib/links';
 import { LangSwitch } from './LangSwitch';
 import { Popover } from './Popover';
 import { History } from './History';
@@ -14,9 +15,7 @@ export interface GameMenuProps {
   history: RoundLog[];
   serverSeedHash: string | null;
   roundId: string | null;
-  apiUrl: string;
   verifierUrl: string;
-  demo: boolean;
 }
 
 /**
@@ -28,7 +27,7 @@ export interface GameMenuProps {
  * unter dem Spiel sichtbar — das Menü ist die eine Stelle, an der ein Spieler
  * nachsieht. Die Bausteine selbst (History, FairnessPanel) sind unverändert.
  */
-export function GameMenu({ history, serverSeedHash, roundId, apiUrl, verifierUrl, demo }: GameMenuProps) {
+export function GameMenu({ history, serverSeedHash, roundId, verifierUrl }: GameMenuProps) {
   const t = useT();
   const { wallet, publicKey, connected, disconnect } = useWallet();
   const { enabled: soundOn, setEnabled: setSoundOn, play } = useSound();
@@ -157,7 +156,7 @@ export function GameMenu({ history, serverSeedHash, roundId, apiUrl, verifierUrl
             {history.length === 0 ? (
               <p className="text-xs text-white/40">{t('menu.noRounds')}</p>
             ) : (
-              <History rounds={history} apiUrl={apiUrl} verifierUrl={verifierUrl} demo={demo} />
+              <History rounds={history} verifierUrl={verifierUrl} />
             )}
           </div>
 
@@ -175,15 +174,22 @@ export function GameMenu({ history, serverSeedHash, roundId, apiUrl, verifierUrl
             </button>
             {seedOpen && (
               <div className="mt-2">
-                <FairnessPanel
-                  apiUrl={apiUrl}
-                  verifierUrl={verifierUrl}
-                  serverSeedHash={serverSeedHash}
-                  roundId={roundId}
-                  demo={demo}
-                />
+                <FairnessPanel verifierUrl={verifierUrl} serverSeedHash={serverSeedHash} roundId={roundId} />
               </div>
             )}
+          </div>
+
+          {/* Zur Plattform — alle Spiele, ein Konto je Wallet. */}
+          <div className={sectionCls}>
+            <a
+              href={PLATFORM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent hover:bg-accent/15"
+            >
+              <span>{t('menu.moreGames')}</span>
+              <span aria-hidden>↗</span>
+            </a>
           </div>
         </div>
       )}

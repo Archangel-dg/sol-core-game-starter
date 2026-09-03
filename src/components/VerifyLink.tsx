@@ -4,7 +4,7 @@ import { useT } from '@/lib/i18n';
 /**
  * Der Verify-Link — EINE Stelle für alle Mechaniken.
  *
- * WOHIN ER ZEIGT: `<verifierUrl>/verify/<id>` — der Sol-Core Verifizierer.
+ * WOHIN ER ZEIGT: `<verifierUrl>/en/verify/<id>` — der Sol-Core Verifizierer.
  * Der rechnet die Runde IM BROWSER des Spielers nach: Seed-Commitment prüfen,
  * Wurf aus HMAC ableiten, Ergebnis vergleichen. Kein Server-Urteil wird
  * geglaubt, auch keines von Sol-Core.
@@ -27,8 +27,16 @@ import { useT } from '@/lib/i18n';
 
 /** Baut das Ziel. Eine ID reicht — der Verifizierer erkennt selbst, ob es eine
  * Solo-Runde, ein PvP-Match, ein Turnier-Lauf oder eine Live-/Crash-Runde ist. */
+/**
+ * Ziel jedes Verify-Links: die englische Verify-Seite des Sol-Core Scanners,
+ * die die Runde lädt und im Browser des Spielers nachrechnet. Fest `/en/` —
+ * Entscheidung des Betreibers vom 03.09.2026: ein Ziel für alle Spiele und
+ * Sprachen, damit jeder Link, der irgendwo zitiert wird, dasselbe zeigt.
+ */
+export const VERIFY_LOCALE = 'en';
+
 export function verifyHref(verifierUrl: string, id: string): string {
-  return `${verifierUrl.replace(/\/+$/, '')}/verify/${encodeURIComponent(id)}`;
+  return `${verifierUrl.replace(/\/+$/, '')}/${VERIFY_LOCALE}/verify/${encodeURIComponent(id)}`;
 }
 
 export function VerifyLink({

@@ -29,7 +29,7 @@ Standalone, the rules you must keep are:
   `t(...)` (`src/lib/i18n.tsx`); the catalog `src/lib/strings.ts` carries all four languages per
   key. Keep `LangSwitch` reachable. Never hard-code a sentence into a component.
 - **Every finished round links into the Sol-Core Scanner** via `VerifyLink`/`verifyHref`
-  (`<verifierUrl>/verify/<id>`) — for every mechanic, and never at a raw `/api/.../verify/...`
+  (`<verifierUrl>/en/verify/<id>`) — for every mechanic, and never at a raw `/api/.../verify/...`
   JSON endpoint.
 - **Every page carries its origin.** `PoweredBy` renders `Powered by Sol-Core Engine` at the foot
   of the page, the name linking to <https://sol-core.com>. It lives in `app/layout.tsx`, above all

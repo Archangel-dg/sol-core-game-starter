@@ -10,21 +10,16 @@ import { toSol } from '@/lib/lamports';
  * Spielmenü der Kopfleiste (GameMenu), nicht mehr unter dem Spiel.
  *
  * Je Runde: Einsatz · Ergebnis (Multiplikator) · Wert (Auszahlung) · Verify.
- * Echt-Runden verlinken auf den Sol-Core Verifier (Browser-Nachrechnung);
- * Demo-Runden auf den rohen Demo-Endpunkt (der Verifier kennt nur
- * creator_rounds, keine demo_rounds).
+ * Jede Runde verlinkt auf den Sol-Core Verifier (Browser-Nachrechnung) —
+ * seit dem 03.09.2026 auch Demo-Runden, ein Ziel für alle Verify-Links.
  */
 export function History({
   rounds,
-  apiUrl,
   verifierUrl,
-  demo = false,
   max = 8,
 }: {
   rounds: RoundLog[];
-  apiUrl: string;
   verifierUrl: string;
-  demo?: boolean;
   max?: number;
 }) {
   const t = useT();
@@ -48,7 +43,7 @@ export function History({
               {r.win ? `+${toSol(r.payoutLamports)} ◎` : t('verify.lost')}
             </span>
             <a
-              href={demo ? `${apiUrl}/api/game/demo/verify/${r.roundId}` : verifyHref(verifierUrl, r.roundId)}
+              href={verifyHref(verifierUrl, r.roundId)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-white/30 underline underline-offset-2 hover:text-white/60"

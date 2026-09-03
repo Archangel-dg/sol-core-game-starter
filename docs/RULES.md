@@ -30,7 +30,7 @@ payout-ready game — automatically.
    the game menu (`GameMenu`), one tap away in every mechanic. Seed hash before the round, and after it
    a DIRECT link into the Sol-Core Scanner for EVERY mechanic (single, session, tournament, live,
    crash, PvP). Always build it with `components/VerifyLink.tsx` (`<VerifyLink>` / `verifyHref`),
-   which points at `<verifierUrl>/verify/<id>` — the page that recomputes the round in the
+   which points at `<verifierUrl>/en/verify/<id>` — the page that recomputes the round in the
    player's own browser. Never link to `/api/.../verify/...`: that is raw JSON, a wall of braces
    instead of a proof. On 2026-08-28 seven of the nine listed games linked exactly there, and two
    mechanics had no link at all.

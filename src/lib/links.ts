@@ -6,3 +6,6 @@
  * Liste. Die Adresse ist für jedes Creator-Spiel dieselbe.
  */
 export const PLAYER_PROFILE_URL = 'https://www.sol-win.net/profile';
+
+/** Die Plattform selbst — Einstieg zu allen Spielen ("Explore more games" im Menü). */
+export const PLATFORM_URL = 'https://www.sol-win.net/';

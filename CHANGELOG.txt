@@ -2,6 +2,16 @@ CHANGELOG — Coin Flip Classic (built on the Sol-Core Game Starter)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-03 — Every verify link goes to the English verify page
+- verifyHref now builds <verifierUrl>/en/verify/<id> (VERIFY_LOCALE = en): one fixed target
+  for everything that has to do with verification, in every mechanic.
+- Demo rounds link there as well (they used to open the raw JSON demo endpoint);
+  FairnessPanel/History/GameMenu drop the apiUrl and demo props they no longer need.
+
+2026-09-03 — "Explore more games" in the game menu
+- New link at the foot of the game menu to the platform (https://www.sol-win.net/),
+  key menu.moreGames in four languages; PLATFORM_URL in src/lib/links.ts.
+
 2026-09-03 — Game field is square
 - The game field above the controls is now a square (aspect-square) on every
   screen size: as tall as it is wide, mobile and desktop alike. Applies to

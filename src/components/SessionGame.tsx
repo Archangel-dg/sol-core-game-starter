@@ -9,6 +9,7 @@ import { toUiError } from '@/lib/errors';
 import { usePlayerAuth } from '@/lib/player-auth';
 import type { RoundLog } from './SingleBetGame';
 import { MaxBetPick } from './BetLimitHint';
+import { FiatHint } from './FiatHint';
 import { useSound } from '@/lib/sounds';
 import { useT, type TFn } from '@/lib/i18n';
 
@@ -560,7 +561,11 @@ export function SessionGame({
             <label className="block text-xs text-white/50">
               {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen). */}
               <span className="flex items-baseline justify-between gap-2">
-                <span>{t(costPerStep ? 'session.stakePerSpin' : 'bet.stake')}</span>
+                {/* Der Einsatz in Landeswaehrung NEBEN dem Label — eine
+                    Randnotiz, die das Feld nicht auseinanderzieht. */}
+                <span className="min-w-0 truncate">
+                  {t(costPerStep ? 'session.stakePerSpin' : 'bet.stake')} <FiatHint sol={bet} />
+                </span>
                 {!stakeLocked && <MaxBetPick onPick={setBet} />}
               </span>
               <input

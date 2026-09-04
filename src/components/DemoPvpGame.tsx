@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { EngineDef } from '@/lib/engines';
 import type { DemoPvpView } from '@/lib/solcore';
 import { toSol, solToLamports } from '@/lib/lamports';
+import { Amount } from './Amount';
 import { usePvpLang, pvpErrorText, PVP_LANGS } from '@/lib/pvp-i18n';
 import { useT } from '@/lib/i18n';
 import { usePlayer, useDemo } from './DemoProvider';
@@ -169,7 +170,7 @@ export function DemoPvpGame({
               {win ? t('demo.won') : t('demo.lost')}
             </p>
             <p className="mt-1 text-sm text-white/50">
-              {t('reveal.pot')}: {toSol(result!.potLamports)} ◎
+              {t('reveal.pot')}: <Amount lamports={result!.potLamports} layout="inline" />
             </p>
             <button
               type="button"

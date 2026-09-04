@@ -11,6 +11,7 @@ import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { usePlayerAuth } from '@/lib/player-auth';
 import { LiveResultView } from './LiveResultView';
 import { MaxBetPick } from './BetLimitHint';
+import { FiatHint } from './FiatHint';
 import { VerifyLink } from './VerifyLink';
 
 /**
@@ -272,7 +273,9 @@ export function LiveGame({ engine, verifierUrl }: { engine: EngineDef; verifierU
               inputMode="decimal"
               className="w-24 rounded-lg border border-white/10 bg-night px-3 py-2 text-sm tabular-nums outline-none focus:border-accent/50"
             />
-            <span className="text-xs text-white/50">{t('live.stakeSol')}</span>
+            <span className="min-w-0 truncate text-xs text-white/50">
+              {t('live.stakeSol')} <FiatHint sol={amount} />
+            </span>
             {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen): Bei Live
                 laeuft die Uhr; eine Ablehnung kostet die ganze Runde. */}
             <MaxBetPick onPick={setAmount} className="ml-auto" />

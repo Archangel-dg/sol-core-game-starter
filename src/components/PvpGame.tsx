@@ -1,6 +1,7 @@
 'use client';
 import { verifyHref } from './VerifyLink';
 import { MaxBetPick } from './BetLimitHint';
+import { FiatHint } from './FiatHint';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
@@ -936,7 +937,9 @@ export function LobbyRoom({
               placeholder={`${toSol(minStake)}–${toSol(maxStake)}`}
               className="w-28 rounded-lg border border-white/10 bg-night px-3 py-2 text-sm tabular-nums outline-none focus:border-accent/50"
             />
-            <span className="text-xs text-white/50">{t('common.sol')}</span>
+            <span className="min-w-0 truncate text-xs text-white/50">
+              {t('common.sol')} <FiatHint sol={stakeSol} />
+            </span>
             <button
               type="button"
               disabled={busy}
@@ -1161,7 +1164,9 @@ export function WalletModal({
                 inputMode="decimal"
                 className="w-24 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm tabular-nums outline-none focus:border-accent/50"
               />
-              <span className="text-xs text-white/50">{t('common.sol')}</span>
+              <span className="min-w-0 truncate text-xs text-white/50">
+                {t('common.sol')} <FiatHint sol={amount} />
+              </span>
               <button
                 type="button"
                 disabled={busy !== null}
@@ -1394,7 +1399,12 @@ export function CreateLobbyDialog({
               {/* Hoechsteinsatz des MOMENTS — der Regler kennt nur die
                   Engine-Spanne. Klick zieht ihn auf die erlaubte Obergrenze. */}
               <MaxBetPick onPick={(sol) => setStakeSol(Math.min(Number(sol), maxSol))} />
-              <span className="text-sm font-bold tabular-nums text-accent">{stakeSol.toFixed(3)} ◎</span>
+              <span className="text-sm font-bold tabular-nums text-accent">
+                {stakeSol.toFixed(3)} ◎{' '}
+                {/* Der Regler bewegt echtes Geld — die Naeherung wandert mit,
+                    damit man beim Ziehen sieht, worauf man sich einlaesst. */}
+                <FiatHint sol={String(stakeSol)} className="text-xs" />
+              </span>
             </span>
           </div>
           <input

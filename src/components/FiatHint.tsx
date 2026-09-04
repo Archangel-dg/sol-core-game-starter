@@ -18,5 +18,9 @@ export function FiatHint({ sol, className = '' }: { sol: string; className?: str
   const { formatSol } = useFiat();
   const text = formatSol(sol);
   if (!text) return null;
-  return <span className={`font-normal text-white/35 ${className}`}>{text}</span>;
+  // Erbt die Farbe des Labels und nimmt sich zurueck. Bewusst KEIN fester
+  // Weisston: Die Live-Oberflaechen (Crash, Drift) faerben ihre Beschriftung
+  // ueber eigene CSS-Variablen, und ein hart gesetztes Weiss saehe dort wie
+  // ein Fremdkoerper aus.
+  return <span className={`font-normal opacity-70 ${className}`}>{text}</span>;
 }

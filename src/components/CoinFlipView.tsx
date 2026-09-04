@@ -55,6 +55,14 @@ export interface CoinFlipViewProps {
   } | null;
   /** Zeile unter der ruhenden Münze (Engine-Kurzbeschreibung). */
   hint?: string;
+  /**
+   * Wird EINMAL je Runde gerufen, sobald die Münze liegt und das Ergebnis
+   * sichtbar ist. Daran hängt der Aufrufer alles, was den Ausgang verrät:
+   * Saldo auftauen, Gewinn-Ton, Verlaufseintrag. Wer diese Komponente
+   * ersetzt, muss es genauso melden — sonst steht das Ergebnis in der
+   * Kopfleiste, bevor die Animation es zeigt.
+   */
+  onRevealed?: () => void;
 }
 
 /** Nur 'heads' und 'tails' gelten — alles andere ist unbekannt und wird nicht
@@ -63,7 +71,7 @@ function readSide(v: unknown): Side | null {
   return v === 'heads' || v === 'tails' ? v : null;
 }
 
-export function CoinFlipView({ result, hint }: CoinFlipViewProps) {
+export function CoinFlipView({ result, hint, onRevealed }: CoinFlipViewProps) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const coinRef = useRef<HTMLDivElement>(null);
@@ -74,6 +82,10 @@ export function CoinFlipView({ result, hint }: CoinFlipViewProps) {
   const angleRef = useRef(0);
   const rafRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Der Melder in einem Ref: So hängt der Flug-Effekt nicht an der Identität
+   *  der Rückruffunktion und startet nicht neu, wenn der Aufrufer neu rendert. */
+  const revealedRef = useRef(onRevealed);
+  revealedRef.current = onRevealed;
   /** Erst `true`, wenn die Münze liegt — vorher steht kein Ergebnis im DOM. */
   const [landed, setLanded] = useState(false);
 
@@ -136,6 +148,7 @@ export function CoinFlipView({ result, hint }: CoinFlipViewProps) {
       angleRef.current = target;
       apply(target, 0);
       setLanded(true);
+      revealedRef.current?.();
     };
 
     const reduced =

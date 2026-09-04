@@ -222,6 +222,14 @@ export const STRINGS = {
   'result.lost': { en: 'Lost', de: 'Verloren', fr: 'Perdu', ru: 'Проигрыш' },
 
   // ── Coin-Flip-Reveal (CoinFlipView) ──────────────────────────────────────
+  // ── Gewinnmeldung in der Kopfleiste (WinToast) ───────────────────────────
+  'win.toast': {
+    en: 'Won +{amount} ◎',
+    de: 'Gewonnen +{amount} ◎',
+    fr: 'Gagné +{amount} ◎',
+    ru: 'Выигрыш +{amount} ◎',
+  },
+
   'coinflip.you': { en: 'You:', de: 'Du:', fr: 'Vous :', ru: 'Ваш выбор:' },
   'coinflip.roll': { en: 'Roll {roll}', de: 'Wurf {roll}', fr: 'Tirage {roll}', ru: 'Бросок {roll}' },
   'coinflip.idle': {

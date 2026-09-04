@@ -2,6 +2,30 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-04 — The reveal decides what the header may show
+- The balance no longer moves before the animation shows the result. It used to drop
+  ~2 s early — while the coin was still flying, the header already said whether you won.
+- BalanceFreezeProvider moved ABOVE DemoProvider in app/page.tsx, so the DEMO balance
+  can honour the freeze too. It could not see it before (wrong side of the tree), which
+  is why the demo leaked the result even after the real balance stopped doing it.
+- SingleBetGame freezes the display the moment the server answers and releases it when
+  the view reports the reveal (CoinFlipView.onRevealed). Backstop 3 s + 5 s, so a
+  background tab or a broken animation can never freeze the balance for good.
+- The win/lose sound and the round-history entry moved to the same moment. Both fired
+  on the server answer, so a player with sound on heard the outcome before seeing it.
+- ANIMATED_REVEALS in SingleBetGame lists the engines that report their own reveal.
+  Every new animation adds its key there, otherwise the balance thaws too early.
+- Header: the wallet group (demo badge / connect button / balance) sits on the right,
+  next to the menu, instead of centred. Balance and menu belong together, and the
+  centred version jumped sideways on connect because badge and balance differ in width.
+- New WinToast (design zone): a short win notice under the balance with the amount,
+  fades in and leaves by itself. It is a worked EXAMPLE for creators — colour, shape,
+  duration and motion are free. Two things are not: it appears only after the reveal
+  (never on the server answer), and only on a win — never as an "almost" notice.
+- New catalog key in all four languages: win.toast.
+- Fed by onLog, which single-bet and session rounds call; live and tournament do not
+  log rounds that way and therefore show no notice yet.
+
 2026-09-04 — Coin Flip has its own reveal animation
 - New CoinFlipView (design zone) replaces the plain ResultView for the coin-flip engine:
   a coin tosses, flips in 3D and comes to rest on the side the server rolled; the chosen

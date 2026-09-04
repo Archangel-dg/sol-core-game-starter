@@ -1,12 +1,13 @@
 'use client';
 import { useT } from '@/lib/i18n';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayer, useDemo } from './DemoProvider';
 import type { Control, EngineDef } from '@/lib/engines';
 import { solToLamports } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
 import { usePlayerAuth } from '@/lib/player-auth';
+import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { EngineControls } from './EngineControls';
 import { ResultView } from './ResultView';
 import { SlotGrid } from './SlotGrid';
@@ -53,6 +54,21 @@ function plinkoControls(engine: EngineDef, engineConfig?: Record<string, number>
 }
 
 /**
+ * Engines, deren Ergebnis eine eigene Animation ausspielt und deshalb SELBST
+ * meldet, wann es sichtbar feststeht (`onRevealed`). Alle anderen zeigen das
+ * Ergebnis sofort mit dem Render.
+ *
+ * Wer eine neue Reveal-Animation baut, trägt ihren Engine-Schlüssel hier ein —
+ * sonst taut der Saldo auf, während die Animation noch läuft, und verrät den
+ * Ausgang vor der Ziellinie.
+ */
+const ANIMATED_REVEALS = new Set<string>(['coin-flip']);
+
+/** Sicherheitsnetz: Sollte eine Animation nie melden (Tab im Hintergrund,
+ *  Fehler), taut der Saldo trotzdem auf. freezeUntil legt 5 s obendrauf. */
+const REVEAL_BACKSTOP_MS = 3_000;
+
+/**
  * Generischer Einzel-Bet-Flow (funktioniert für JEDE single-Engine). Die
  * Ergebnis-Darstellung ist bewusst schlicht — hier ist die Design-Zone.
  */
@@ -76,6 +92,10 @@ export function SingleBetGame({
   // kein Solana-Wallet, das signieren könnte — er bleibt bewusst tokenlos.
   const { moneyFetch } = usePlayerAuth();
   const { play: sfx } = useSound();
+  // Reveal-Freeze: Der Server bucht sofort, die Animation braucht ihre Zeit.
+  // Zwischen beidem bleibt JEDE Saldo-Anzeige stehen (echt wie Demo), sonst
+  // steht das Ergebnis in der Kopfleiste, bevor die Animation es zeigt.
+  const { freezeUntil, release } = useBalanceFreeze();
   const [bet, setBet] = useState('0.01');
   const [values, setValues] = useState<Record<string, string>>({});
   /** Roulette: gewählte Wettfelder (Easy = genau eins, Pro = mehrere Chips). */
@@ -89,6 +109,9 @@ export function SingleBetGame({
     roll: number | null;
     details: Record<string, unknown> | null;
   } | null>(null);
+  /** Was erst mit der Landung sichtbar werden darf: Ton, Verlaufseintrag,
+   *  Saldo. Bis dahin liegt es hier und NICHT in der Oberfläche. */
+  const pendingReveal = useRef<{ win: boolean; log: RoundLog } | null>(null);
 
   // Render-Grenzen aus der Server-Config — ändert NICHT die params-Struktur
   // (buildSingleParams bleibt unverändert), nur die angezeigten Controls.
@@ -187,7 +210,20 @@ export function SingleBetGame({
         sfx('error');
         return;
       }
-      sfx(r.result.win ? 'win' : 'lose');
+      // Ab hier ist das Ergebnis da — sichtbar werden darf es erst, wenn die
+      // Animation es zeigt. Der Saldo friert sofort ein (Backstop 8 s, siehe
+      // freezeUntil), Ton und Verlaufseintrag warten in pendingReveal.
+      freezeUntil(Date.now() + REVEAL_BACKSTOP_MS);
+      pendingReveal.current = {
+        win: r.result.win,
+        log: {
+          betLamports: betLamports.toString(),
+          win: r.result.win,
+          multiplierBps: r.result.multiplierBps,
+          payoutLamports: r.result.payoutLamports,
+          roundId: r.roundId,
+        },
+      };
       setResult({
         win: r.result.win,
         multiplierBps: r.result.multiplierBps,
@@ -195,15 +231,9 @@ export function SingleBetGame({
         roll: r.result.roll,
         details: r.result.details ?? null,
       });
+      // Der Seed-Hash gehört zur Runde, nicht zum Ausgang — er verrät nichts
+      // und bleibt deshalb sofort erreichbar (Nachprüfbarkeit, Regel 6).
       onRound(r.proof.serverSeedHash, r.roundId);
-      onLog({
-        betLamports: betLamports.toString(),
-        win: r.result.win,
-        multiplierBps: r.result.multiplierBps,
-        payoutLamports: r.result.payoutLamports,
-        roundId: r.roundId,
-      });
-      if (demo) void refreshDemoBalance();
     } catch (e) {
       setError((e as Error).message);
       sfx('error');
@@ -211,6 +241,23 @@ export function SingleBetGame({
       setBusy(false);
     }
   };
+
+  // Die Animation meldet die Landung; erst jetzt darf das Ergebnis nach außen.
+  const onRevealed = useCallback(() => {
+    const p = pendingReveal.current;
+    pendingReveal.current = null;
+    release();
+    if (!p) return;
+    sfx(p.win ? 'win' : 'lose');
+    onLog(p.log);
+    if (demo) void refreshDemoBalance();
+  }, [release, sfx, onLog, demo, refreshDemoBalance]);
+
+  // Engines ohne eigene Animation zeigen das Ergebnis mit dem Render — für sie
+  // ist die Landung genau dieser Moment.
+  useEffect(() => {
+    if (result && !ANIMATED_REVEALS.has(engine.key)) onRevealed();
+  }, [result, engine.key, onRevealed]);
 
   return (
     <div className="space-y-4">
@@ -243,7 +290,7 @@ export function SingleBetGame({
             // Eigene Reveal-Animation statt der schlichten ResultView: dieselben
             // Zahlen, von einer Münze ausgespielt. Sie zeigt auch den Leerlauf,
             // deshalb steht sie vor der result-Verzweigung (Design-Zone).
-            return <CoinFlipView result={result} hint={t(engine.blurb)} />;
+            return <CoinFlipView result={result} hint={t(engine.blurb)} onRevealed={onRevealed} />;
           }
           return result ? (
             <ResultView {...result} />

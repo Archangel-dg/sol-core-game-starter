@@ -2,6 +2,7 @@
 import { useT } from '@/lib/i18n';
 
 import { toSol } from '@/lib/lamports';
+import { useFiat } from '@/lib/fiat';
 
 /**
  * Ergebnis-Anzeige (Design-Zone: Animation/Layout frei). Zeigt das serverseitig
@@ -21,6 +22,7 @@ export function ResultView({
   detail?: string;
 }) {
   const t = useT();
+  const { format } = useFiat();
   return (
     <div className="grid h-full min-h-28 place-items-center rounded-xl bg-night text-center">
       <div>
@@ -31,6 +33,9 @@ export function ResultView({
           {win ? t('result.won', { amount: toSol(payoutLamports) }) : t('result.lost')}
           {roll != null && <span className="text-white/40"> {t('result.roll', { roll })}</span>}
         </div>
+        {win && format(payoutLamports) && (
+          <div className="mt-0.5 text-xs text-white/40">{format(payoutLamports)}</div>
+        )}
         {detail && <div className="mt-0.5 text-xs text-white/40">{detail}</div>}
       </div>
     </div>

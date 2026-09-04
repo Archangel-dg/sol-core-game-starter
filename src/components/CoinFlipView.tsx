@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n';
 import { toSol } from '@/lib/lamports';
+import { useFiat } from '@/lib/fiat';
 
 /**
  * ██ GESTALTUNGSZONE ██ — die Ergebnis-Animation der Coin-Flip-Engine.
@@ -73,6 +74,7 @@ function readSide(v: unknown): Side | null {
 
 export function CoinFlipView({ result, hint, onRevealed }: CoinFlipViewProps) {
   const t = useT();
+  const { format } = useFiat();
   const rootRef = useRef<HTMLDivElement>(null);
   const coinRef = useRef<HTMLDivElement>(null);
   const shadowRef = useRef<HTMLDivElement>(null);
@@ -273,6 +275,14 @@ export function CoinFlipView({ result, hint, onRevealed }: CoinFlipViewProps) {
               style={{ fontSize: 'calc(var(--u) * 4.4)', marginTop: 'calc(var(--u) * 1.2)', lineHeight: 1.2 }}
             >
               {result!.win ? t('result.won', { amount: toSol(result!.payoutLamports) }) : t('result.lost')}
+              {result!.win && format(result!.payoutLamports) && (
+                <span
+                  className="block font-normal text-white/40"
+                  style={{ fontSize: 'calc(var(--u) * 3.3)', marginTop: 'calc(var(--u) * 0.8)' }}
+                >
+                  {format(result!.payoutLamports)}
+                </span>
+              )}
             </div>
             {result!.roll != null && (
               <div

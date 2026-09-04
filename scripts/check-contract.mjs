@@ -150,10 +150,6 @@ pruef(
 console.log('\n3) Höchsteinsatz — dezent, aber immer sichtbar');
 pruef(dateiDa('src/app/api/limits/route.ts'), 'Grenzen-Route vorhanden (/api/limits)');
 pruef(gibt(/useBetLimits\(/), 'Grenzen werden geholt und aufgefrischt (useBetLimits)');
-pruef(
-  gibt(/<BetLimitHint\b/),
-  'Grenze steht an der Geld-Leiste (BetLimitHint)',
-);
 {
   // Jede Datei mit einem Einsatzfeld muss die Zahl auch zeigen. Erkannt am
   // Paar aus Betragsfeld und Einsatz-Beschriftung — grob, aber es findet
@@ -163,10 +159,20 @@ pruef(
   // `EngineControls` an, das generische Zahlenfelder rendert und mit dem
   // Einsatz nichts zu tun hat.
   const SETZT_EINSATZ = /set(Bet|Amount|StakeSol|Stake)\b|onBet\(/;
+  // Das Geld-Menue ist KEIN Einsatzfeld: Sein Betrag geht auf das Konto (ein-
+  // und auszahlen), nicht in eine Runde. Der Hoechsteinsatz haette dort nichts
+  // zu suchen — er ist eine Spielgrenze, und die Grenzen fuers Konto meldet der
+  // Server als Fehler (Regel 8). Erkannt an den Geld-Aufrufen, nicht am Namen.
+  //
+  // Bis zum 04.09.2026 fiel BalanceBar nur deshalb nicht auf, weil das Wort
+  // „BetLimitHint" in einem KOMMENTAR der Datei stand und der Filter darauf
+  // ansprang. Eine Pruefung, die ein Kommentar besteht, prueft nichts.
+  const GELD_MENUE = /\/api\/withdraw|buildDepositTx/;
   const mitEinsatzfeld = [...INHALT]
     .filter(([p]) => /components[\\/]/.test(p))
     .filter(([, t]) => /inputMode="decimal"/.test(t) && SETZT_EINSATZ.test(t))
-    .filter(([, t]) => !/MaxBetPick|BetLimitHint/.test(t))
+    .filter(([, t]) => !GELD_MENUE.test(t))
+    .filter(([, t]) => !/MaxBetPick/.test(t))
     .map(([p]) => kurz(p));
   pruef(
     mitEinsatzfeld.length === 0,

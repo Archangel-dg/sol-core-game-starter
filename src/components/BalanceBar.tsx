@@ -10,6 +10,9 @@ import { usePlayerAuth } from '@/lib/player-auth';
 import { txFehlerText } from '@/lib/tx-fehler';
 import { PLAYER_PROFILE_URL } from '@/lib/links';
 import { Popover } from './Popover';
+import { useFiat } from '@/lib/fiat';
+import { FiatSwitch } from './FiatSwitch';
+import { FiatHint } from './FiatHint';
 
 /**
  * Guthaben in der Kopfleiste: der Saldo als Auslöser, darunter ein Feld mit
@@ -20,7 +23,7 @@ import { Popover } from './Popover';
  * Darstellung: vorher eine Karte unter dem Kopf, jetzt ein Aufklappfeld am
  * Saldo. Ein- UND Auszahlen liegen im selben Feld, gleich weit weg.
  *
- * Der Höchsteinsatz (BetLimitHint) steht seit demselben Tag am Einsatzfeld
+ * Der Höchsteinsatz (MaxBetPick) steht seit demselben Tag am Einsatzfeld
  * (SingleBetGame/SessionGame), nicht mehr hier: Er ist eine Spielgrenze, keine
  * Kontogrenze. Grenzen für Ein- und Auszahlung meldet der Server als Fehler.
  */
@@ -32,6 +35,7 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
   // sonst verrät der Saldo den Gewinner vor der Animation (Systemvertrag).
   const { frozen } = useBalanceFreeze();
   const { moneyFetch } = usePlayerAuth();
+  const { format } = useFiat();
   const frozenRef = useRef(frozen);
   frozenRef.current = frozen;
   const [balance, setBalance] = useState<string | null>(null);
@@ -136,12 +140,20 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
       <div className="space-y-3">
         <div className="flex items-baseline justify-between">
           <span className="text-xs uppercase tracking-wide text-white/50">{t('money.balance')}</span>
-          <span className="font-bold tabular-nums text-accent">
+          <span className="text-right font-bold tabular-nums text-accent">
             {balance === null ? '—' : `${toSol(balance)} ◎`}
+            {balance !== null && format(balance) && (
+              <span className="block text-[11px] font-normal text-white/40">{format(balance)}</span>
+            )}
           </span>
         </div>
+
+        {/* Währungs-Näherung. Sie steht hier und nicht im Menü, weil man sie
+            genau dann sucht, wenn man auf sein Guthaben schaut. */}
+        <FiatSwitch />
+
         <label className="block text-xs text-white/50">
-          {t('money.amount')}
+          {t('money.amount')} <FiatHint sol={amount} />
           <input
             value={amount}
             onChange={(e) => setAmount(e.target.value)}

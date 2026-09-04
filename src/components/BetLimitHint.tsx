@@ -1,7 +1,6 @@
 'use client';
 import { useT } from '@/lib/i18n';
 
-import { useState } from 'react';
 import { useBetLimits } from '@/lib/bet-limits';
 
 /**
@@ -16,11 +15,20 @@ import { useBetLimits } from '@/lib/bet-limits';
  * (Am 28.08.2026 nachgemessen: Spiel- und Level-Grenze je 50 SOL, tatsächlich
  * erlaubt 0,0365 SOL.)
  *
- * ZWEI DARSTELLUNGEN, EINE QUELLE:
- * - `BetLimitHint` — die Zeile im Geld-Balken, mit „warum?"-Aufklappen.
- * - `MaxBetPick`   — die knappe Zahl AM Einsatzfeld (Vorbild OrbitX). Klick
- *                    übernimmt sie ins Feld.
- * Beide hängen am selben Hook; sie können also nicht auseinanderlaufen.
+ * EINE DARSTELLUNG: `MaxBetPick` — die Zahl AM Einsatzfeld. Klick übernimmt sie
+ * ins Feld, die Begründung des Servers steht im `title`.
+ *
+ * Geschichte, damit niemand versehentlich zurückbaut (04.09.2026): Darunter
+ * stand eine zweite Zeile (`BetLimitHint`) mit DERSELBEN Zahl und einem
+ * aufklappbaren „warum?". Die doppelte Zahl war der Fehler — im gesperrten
+ * Zustand stand sogar zweimal „not playable right now". Erst fiel die Zahl aus
+ * der unteren Zeile, dann auf Entscheidung des Betreibers die ganze Zeile.
+ *
+ * Was das kostet, offen gesagt: Die Begründung („warum ist das Maximum gerade
+ * 2,76 und nicht 50?") steckt jetzt nur noch im `title`. Ein `title` ist ein
+ * Hover-Tooltip; auf dem Telefon gibt es kein Hover. Wer sie dort wieder
+ * erreichbar machen will, haengt sie an eine eigene Flaeche — aber ohne die
+ * Zahl ein zweites Mal zu drucken.
  */
 
 /** Auf 4 Nachkommastellen ABGERUNDET.
@@ -30,64 +38,6 @@ import { useBetLimits } from '@/lib/bet-limits';
  * verhindern soll. */
 export function maxBetText(maxSol: number): string {
   return (Math.floor(maxSol * 1e4) / 1e4).toFixed(4);
-}
-
-export function BetLimitHint({
-  onPick,
-  className = '',
-}: {
-  onPick?: (sol: string) => void;
-  className?: string;
-}) {
-  const { daten, maxSol } = useBetLimits();
-  const t = useT();
-  const [offen, setOffen] = useState(false);
-
-  if (!daten || maxSol === null) return null;
-
-  const maxAnzeige = maxBetText(maxSol);
-  const gesperrt = !daten.playable || maxSol <= 0;
-  // Bei rundenabhaengigen Engines (Live, Crash) haengt der genaue Deckel an
-  // einer Entscheidung, die erst beim Setzen faellt. Dann ist die Zahl eine
-  // Obergrenze — und das muss dastehen, sonst ist sie wieder ein Versprechen.
-  const obergrenze = daten.roundDependent === true;
-
-  return (
-    <div className={`text-xs ${className}`}>
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-white/50">{t(obergrenze ? 'limit.upTo' : 'limit.now')}</span>
-        {gesperrt ? (
-          <span className="font-semibold text-rose-300">{t('limit.locked')}</span>
-        ) : onPick ? (
-          <button
-            type="button"
-            onClick={() => onPick(maxAnzeige)}
-            title={t('limit.take')}
-            className="rounded border border-accent/40 bg-accent/10 px-1.5 py-0.5 font-semibold tabular-nums text-accent transition-colors hover:border-accent/70"
-          >
-            ◎ {maxAnzeige}
-          </button>
-        ) : (
-          <span className="font-semibold tabular-nums text-accent">◎ {maxAnzeige}</span>
-        )}
-        <button
-          type="button"
-          onClick={() => setOffen((o) => !o)}
-          aria-expanded={offen}
-          className="text-white/40 underline decoration-dotted underline-offset-2 hover:text-white/70"
-        >
-          {t(offen ? 'limit.less' : 'limit.why')}
-        </button>
-      </div>
-      {offen && (
-        <p className="mt-1 leading-relaxed text-white/50">
-          {/* Der Satz kommt fertig vom Server — die Oberfläche übersetzt die
-              Grenzen nicht selbst, sonst driften Backend und Anzeige. */}
-          {daten.text}
-        </p>
-      )}
-    </div>
-  );
 }
 
 /**

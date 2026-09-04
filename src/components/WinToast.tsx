@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n';
 import { toSol } from '@/lib/lamports';
+import { useFiat } from '@/lib/fiat';
 
 /**
  * ██ GESTALTUNGSZONE ██ — die Gewinnmeldung unter der Saldo-Anzeige.
@@ -39,6 +40,7 @@ export interface WinToastProps {
 
 export function WinToast({ win }: WinToastProps) {
   const t = useT();
+  const { format } = useFiat();
   const [shown, setShown] = useState<{ payoutLamports: string; key: number } | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -70,6 +72,11 @@ export function WinToast({ win }: WinToastProps) {
       }`}
     >
       {t('win.toast', { amount: toSol(shown.payoutLamports) })}
+      {/* Näherung in Landeswährung, falls eingeschaltet und der Kurs frisch
+          ist — sonst ersatzlos weg (lib/fiat.tsx). */}
+      {format(shown.payoutLamports) && (
+        <span className="ml-1.5 font-normal opacity-70">{format(shown.payoutLamports)}</span>
+      )}
     </div>
   );
 }

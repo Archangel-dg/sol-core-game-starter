@@ -13,7 +13,8 @@ import { ResultView } from './ResultView';
 import { SlotGrid } from './SlotGrid';
 import { CoinFlipView } from './CoinFlipView';
 import { RouletteBoard, spotKey, type RouletteSpot } from './RouletteBoard';
-import { BetLimitHint, MaxBetPick } from './BetLimitHint';
+import { MaxBetPick } from './BetLimitHint';
+import { FiatHint } from './FiatHint';
 import { useSound } from '@/lib/sounds';
 
 export interface RoundLog {
@@ -316,7 +317,11 @@ export function SingleBetGame({
               Einsatz ist das Minimum aus Spiel-, Level-, Solvenz- und Tagesdeckel
               und bewegt sich im Betrieb. Ohne diese Zahl tippt der Spieler blind. */}
           <span className="flex items-baseline justify-between gap-2">
-            <span>{t('bet.stake')}</span>
+            {/* Der Einsatz in Landeswährung steht NEBEN dem Label, nicht unter
+                dem Feld: eine Randnotiz, die das Feld nicht auseinanderzieht. */}
+            <span className="min-w-0 truncate">
+              {t('bet.stake')} <FiatHint sol={bet} />
+            </span>
             <MaxBetPick onPick={setBet} />
           </span>
           <input
@@ -325,11 +330,6 @@ export function SingleBetGame({
             inputMode="decimal"
             className="mt-1 w-full rounded-lg border border-white/10 bg-night px-3 py-2 tabular-nums text-white outline-none focus:border-accent/50"
           />
-          {/* Was JETZT hoechstens gesetzt werden darf, direkt unter dem Feld:
-              die engste Grenze ist meist die Pool-Groesse, und die bewegt sich
-              im Betrieb. Steht seit dem 03.09.2026 hier statt am Guthaben —
-              es ist eine Spielgrenze, keine Kontogrenze. */}
-          <BetLimitHint className="mt-1" />
         </label>
 
         <div className="mt-3">

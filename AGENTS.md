@@ -19,9 +19,10 @@ Standalone, the rules you must keep are:
 - **Deposit and withdraw stay reachable in every mechanic.** One balance per wallet, valid across
   all games on the platform. `/api/rpc` must exist — without it every deposit on a creator domain
   fails with 403.
-- **Show the maximum bet, quietly but always, at the stake field:** `MaxBetPick` at the label and
-  `BetLimitHint` under the input of every bet field. It is the minimum of several caps and moves
-  during operation.
+- **Show the maximum bet, quietly but always, at the stake field:** `MaxBetPick` at the label of
+  every bet field, stated once. It is the minimum of several caps and moves during operation. The
+  server's reason rides in the `title`; the separate line that spelled it out was removed on
+  04.09.2026. Putting it back means a surface of its own, never the number a second time.
 - **The demo mode stays.** `/api/demo/*` plus `DemoProvider`/`DemoBar` let a visitor try the game
   on a simulated balance before depositing. Every demo spin is server-decided and verifiable like a
   real one. Restyle it freely, but never remove it and keep the entry point reachable.
@@ -34,6 +35,11 @@ Standalone, the rules you must keep are:
 - **Every page carries its origin.** `PoweredBy` renders `Powered by Sol-Core Engine` at the foot
   of the page, the name linking to <https://sol-core.com>. It lives in `app/layout.tsx`, above all
   render paths — never move it into a game component, where the next re-skin loses it.
+- **The currency approximation is display only.** `≈ 17,40 €` may stand NEXT TO a SOL amount
+  (`lib/fiat.tsx`, `Amount`, `FiatHint`, `FiatSwitch`), never in its place — the server settles in
+  lamports and the Scanner shows SOL. The float rate never enters a money path. Missing,
+  implausible or older than 15 minutes ⇒ the line is dropped entirely, no placeholder. The rate
+  comes from the platform (`/api/price` → `/api/public/sol-price`), never per game.
 - **Responsible by construction:** no near-miss, no loss-as-win, withdrawal as easy as deposit.
 - **Every money call needs a player token** (wallet signature → `POST /api/game/authorize`, 15 min,
   bound to wallet + game). In the browser always `usePlayerAuth().moneyFetch(…)`; the route handlers

@@ -50,10 +50,14 @@ them only if the user explicitly asks and you are certain the contract with the 
    construction.
 7. Deposit and withdraw stay reachable in EVERY mechanic — the balance is one account per wallet
    and works across all games. `/api/rpc` must exist or every deposit on a creator domain hits 403.
-8. The maximum bet is shown quietly but always, AT THE STAKE FIELD: `MaxBetPick` at the label and
-   `BetLimitHint` under the input of every bet field. It is a game limit, not an account limit —
-   deposit and withdraw limits come back from the server as errors. It is the minimum of several
-   caps and moves during operation.
+8. The maximum bet is shown quietly but always, AT THE STAKE FIELD: `MaxBetPick` at the label of
+   every bet field, stated ONCE — a figure printed twice is read once and the page looks careless.
+   It is a game limit, not an account limit — deposit and withdraw limits come back from the server
+   as errors, and the money menu therefore shows no max bet at all. It is the minimum of several
+   caps and moves during operation. The server's reason for the current cap rides in `MaxBetPick`'s
+   `title`; the operator removed the second line that used to spell it out (04.09.2026), so on a
+   phone — where there is no hover — the number now stands without its explanation. Anyone putting
+   the reason back gives it its own surface and does NOT print the number a second time.
 9. Every finished round links into the Sol-Core Scanner via `VerifyLink`/`verifyHref` — never to a
    raw `/api/.../verify/...` JSON endpoint.
 10. The demo mode stays. `/api/demo/*` + `DemoProvider`/`DemoBar` let a visitor try the game with a
@@ -67,6 +71,12 @@ them only if the user explicitly asks and you are certain the contract with the 
     to `https://sol-core.com`. `PoweredBy` is rendered in `app/layout.tsx` — above all seven render
     paths, so no re-skin of a single screen can drop it. Only "Powered by" goes through the
     catalog; the name is not translated.
+
+13. The currency approximation (`lib/fiat.tsx`, `Amount`, `FiatHint`, `FiatSwitch`) is DISPLAY
+    ONLY: `≈ 17,40 €` stands NEXT TO the SOL figure, never in its place, and the float rate never
+    enters a money path. Without a usable rate — missing, implausible or older than 15 minutes —
+    the line is dropped entirely; no placeholder, no last known value. The rate comes from the
+    platform (`/api/price` → `/api/public/sol-price`), never from a per-game source.
 
 ## Tasks that are safe
 

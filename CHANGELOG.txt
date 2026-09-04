@@ -2,6 +2,60 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-04 — SOL amounts carry a currency approximation
+- Next to every SOL figure the template can now show "≈ 17,40 €" / "≈ $18.90": the
+  balance (wallet and demo), the stake label while you type, the result payout and the
+  win toast. For a player who has never held crypto, "0.196 ◎" says nothing.
+- SOL stays THE number, the approximation stands beside it — settlement is in lamports,
+  the Scanner shows SOL, the max bet is in SOL. Replacing the figure would leave a player
+  unable to reconcile a round with the verify page.
+- The rate never enters a money path: src/lib/fiat.tsx converts for the screen and returns
+  a string. Every input stays in SOL. Rule 3 untouched.
+- No rate, an implausible one, or one older than 15 minutes ⇒ the line is DROPPED. No
+  placeholder, no last known value.
+- The rate comes from the platform: /api/price proxies the Gaming API's new
+  /api/public/sol-price (Jupiter → CoinGecko → Binance for USD, ECB reference rate for
+  EUR, cached 60 s). One request a minute for the whole platform instead of one per
+  creator server, and two games can never show two different rates at once.
+- Switch (Off / USD / EUR) in the balance panel — in the demo badge as well as the wallet
+  balance, because the demo mode starts on its own and for most visitors that IS the
+  balance display. Only currencies that have a rate are offered.
+- Preselection follows the device language and, being a guess, steps aside when it has no
+  rate and the other currency does. A chosen currency never does; "Off" is absolute.
+- New in the design zone: Amount.tsx (SOL + approximation), FiatHint.tsx (next to an
+  input label), FiatSwitch.tsx (the toggle). Restyle them freely — the two things you may
+  not change are in docs/RULES.md rule 15.
+- Still SOL-only: the stake fields of session, live, crash, drift and PvP. Own layouts,
+  own passes.
+- docs/RULES.md: new rule 15, and rule 14 no longer stands in the file twice.
+- New catalog keys in all four languages: fiat.show, fiat.off, fiat.note.
+
+2026-09-04 — A comma is a decimal point too
+- On a phone whose language uses the comma as decimal separator (most of Europe), a
+  fractional stake could not be entered at all: the money fields carry inputMode="decimal"
+  and the keyboard offers the DEVICE's separator, with no dot key. "0,5" came back as an
+  invalid SOL amount.
+- solToLamports accepts a comma now — fixed there, not at the nine input fields, because
+  every bet, deposit, withdrawal and PvP stake in every engine goes through that one
+  function.
+- Thousands grouping is NOT guessed: "1.234,56" and "1,234,567" are rejected rather than
+  interpreted. A clear rejection beats a silent factor of 1000 on a money amount.
+- Every previously valid input parses to exactly the same lamports as before. The thrown
+  message is English now — callers show it straight to the player.
+
+2026-09-04 — The max bet is stated once, and the "Why this limit?" line is gone
+- The stake block is now "Bet (SOL) / Max ◎ 2.7611 / [0.01]" — the figure once, nothing
+  under the input. BetLimitHint the component is deleted; the file keeps maxBetText and
+  MaxBetPick.
+- What it costs, stated plainly: the server's reason for the current cap now lives only in
+  MaxBetPick's title, and a phone has no hover. Rule 8 says so, and says that bringing the
+  explanation back means a surface of its own, never the number twice.
+- check:contract follows: MaxBetPick carries the requirement. Found while doing it —
+  BalanceBar had been passing the "every stake field shows the max bet" check only because
+  the word "BetLimitHint" appeared in one of its comments. It is the money menu and must
+  show no max bet at all; it is now excluded on purpose, matched on the deposit/withdraw
+  calls rather than on a word in a comment.
+
 2026-09-04 — The header holds its own edge
 - The balance dropdown ran off the right of the screen once the balance moved to the
   right of the header (reported on a phone; reproduced at 360 and 390 px).

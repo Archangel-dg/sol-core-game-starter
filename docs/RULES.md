@@ -115,7 +115,10 @@ payout-ready game — automatically.
     wait for that frame: HUD, sound, history, balance and win toast follow `onRevealed`. A result
     that leaks mid-animation — a highlighted tile, a settled balance, a multiplier in the DOM —
     is the same lie as a near-miss: it tells the player the animation was theatre. Every label in
-    a module goes through `ctx.text(...)` (rule 12 holds inside the square too). `npm run
+    a module goes through `ctx.text(...)` (rule 12 holds inside the square too). And the board
+    never snaps: a round starts from the picture on screen — the reels turn out of the position
+    the last result left them in, never from a reset idle board — and a module that pre-rolls
+    while the outcome is on its way (`arm`/`disarm`) shows nothing it does not know. `npm run
     check:contract` checks the static half (section 9); the kit's browser check plays every module
     against fixtures and reads the DOM mid-flight.
 

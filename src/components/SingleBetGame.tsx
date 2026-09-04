@@ -10,6 +10,7 @@ import { usePlayerAuth } from '@/lib/player-auth';
 import { EngineControls } from './EngineControls';
 import { ResultView } from './ResultView';
 import { SlotGrid } from './SlotGrid';
+import { CoinFlipView } from './CoinFlipView';
 import { RouletteBoard, spotKey, type RouletteSpot } from './RouletteBoard';
 import { BetLimitHint, MaxBetPick } from './BetLimitHint';
 import { useSound } from '@/lib/sounds';
@@ -237,6 +238,12 @@ export function SingleBetGame({
                 payoutLamports={result!.payoutLamports}
               />
             );
+          }
+          if (engine.key === 'coin-flip') {
+            // Eigene Reveal-Animation statt der schlichten ResultView: dieselben
+            // Zahlen, von einer Münze ausgespielt. Sie zeigt auch den Leerlauf,
+            // deshalb steht sie vor der result-Verzweigung (Design-Zone).
+            return <CoinFlipView result={result} hint={t(engine.blurb)} />;
           }
           return result ? (
             <ResultView {...result} />

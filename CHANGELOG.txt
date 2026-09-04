@@ -2,6 +2,27 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-04 — Coin Flip has its own reveal animation
+- New CoinFlipView (design zone) replaces the plain ResultView for the coin-flip engine:
+  a coin tosses, flips in 3D and comes to rest on the side the server rolled; the chosen
+  side stands above it as a chip, the multiplier / win / roll below.
+- Idle frame shows the resting coin plus the engine blurb instead of a bare text block.
+- Fairness, the four binding rules (docs/CUSTOMIZE.md):
+  * pure function of the outcome — no Math.random, fixed 5 turns plus the half turn that
+    leads to details.landed, constant angular speed so the duration never hints at a side;
+  * the result nodes stay EMPTY until the coin lands — DevTools, innerText and a screen
+    reader learn nothing early;
+  * one monotone deceleration that does not know the result — no braking near a winning
+    side, no near-miss;
+  * win / multiplier / payout are read from the server result, never derived from the roll.
+- Geometry and motion live in globals.css ("Coin-Flip-Reveal"); colours come from the theme,
+  so NEXT_PUBLIC_ACCENT_COLOR recolours the coin as well.
+- prefers-reduced-motion jumps straight to the landed frame.
+- New catalog keys (all four languages): coinflip.you, coinflip.idle, coinflip.roll.
+  The face letters come from the translated side names, so the coin reads K/Z in German,
+  F/P in French and О/Р in Russian.
+- This is the first of the engine reveals; the others follow one engine at a time.
+
 2026-09-03 — Every verify link goes to the English verify page
 - verifyHref now builds <verifierUrl>/en/verify/<id> (VERIFY_LOCALE = en): one fixed target
   for everything that has to do with verification, in every mechanic.

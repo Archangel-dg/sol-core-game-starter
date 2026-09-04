@@ -221,6 +221,16 @@ export const STRINGS = {
   },
   'result.lost': { en: 'Lost', de: 'Verloren', fr: 'Perdu', ru: 'Проигрыш' },
 
+  // ── Coin-Flip-Reveal (CoinFlipView) ──────────────────────────────────────
+  'coinflip.you': { en: 'You:', de: 'Du:', fr: 'Vous :', ru: 'Ваш выбор:' },
+  'coinflip.roll': { en: 'Roll {roll}', de: 'Wurf {roll}', fr: 'Tirage {roll}', ru: 'Бросок {roll}' },
+  'coinflip.idle': {
+    en: 'Heads or Tails',
+    de: 'Kopf oder Zahl',
+    fr: 'Face ou Pile',
+    ru: 'Орёл или решка',
+  },
+
   // ── Einzelwette ──────────────────────────────────────────────────────────
   'bet.stake': {
     en: 'Bet (SOL)',

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayer, useDemo } from './DemoProvider';
-import type { EngineDef } from '@/lib/engines';
+import type { EngineDef, GuessOption } from '@/lib/engines';
 import { SPIN_TOWER_PROTOCOL, type SessionView } from '@/lib/solcore';
 import { solToLamports, toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
@@ -40,18 +40,95 @@ function formatTowersBombs(bombColumns: unknown, t: TFn): string {
  * dice-ladder hängt die Gewinnchance sogar direkt am aktuellen Wert (eine 4
  * ist etwas völlig anderes als eine 10). Rein defensiv aus dem
  * `Record<string, unknown>`-Fortschritt gelesen; liefert null, wenn die
- * Engine keinen solchen Wert führt. */
-function currentGuessValue(progress: unknown): { value: number; dice?: number[] } | null {
+ * Engine keinen solchen Wert führt.
+ *
+ * `min`/`max` sind die Enden der Werteskala aus der Server-Config — nur dafür
+ * da, einen Tipp zu sperren, den der Server ohnehin ablehnt (`higher` auf dem
+ * höchsten Wert, `lower` auf dem niedrigsten). Bewusst am FORTSCHRITT
+ * unterschieden (`currentCard` vs. `currentSum`) und nicht am Engine-Namen —
+ * dieselbe Herleitung wie beim Wert selbst. Ohne Config bleiben die
+ * Engine-Defaults (13 Karten bzw. 2W6), nie ein geratenes Maximum. */
+function currentGuessValue(
+  progress: unknown,
+  cfg: Record<string, unknown> | null,
+): { value: number; dice?: number[]; min: number; max: number } | null {
   if (!progress || typeof progress !== 'object') return null;
   const p = progress as Record<string, unknown>;
-  const raw = typeof p.currentSum === 'number' ? p.currentSum
-    : typeof p.currentCard === 'number' ? p.currentCard
-      : null;
+  const c = cfg ?? {};
+  const zahl = (v: unknown, fallback: number): number =>
+    typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : fallback;
+  const summe = typeof p.currentSum === 'number' ? p.currentSum : null;
+  const karte = typeof p.currentCard === 'number' ? p.currentCard : null;
+  const raw = summe ?? karte;
   if (raw === null || !Number.isFinite(raw)) return null;
+  // Augensumme: kleinster Wurf = `dice` (jeder Würfel 1), größter = dice·faces.
+  // Karte: 1 … `cards`.
+  const [min, max] =
+    summe !== null
+      ? [zahl(c.dice, 2), zahl(c.dice, 2) * zahl(c.faces, 6)]
+      : [1, zahl(c.cards, 13)];
   const history = p.diceHistory;
   const last = Array.isArray(history) ? history[history.length - 1] : undefined;
   const dice = Array.isArray(last) ? last.filter((n): n is number => typeof n === 'number') : undefined;
-  return dice && dice.length > 0 ? { value: raw, dice } : { value: raw };
+  return dice && dice.length > 0 ? { value: raw, dice, min, max } : { value: raw, min, max };
+}
+
+/** Ein Tipp-Knopf: was er sagt, ob er geht, und warum nicht. */
+interface GuessButton {
+  guess: GuessOption;
+  label: 'session.higher' | 'session.lower' | 'session.equal';
+  /** null = spielbar; sonst der Katalogschlüssel des Grundes. */
+  locked: 'session.guessImpossible' | 'session.guessCapped' | null;
+}
+
+/**
+ * Welche Tipps stehen zur Wahl — und welche davon würde der Server ablehnen?
+ *
+ * Zwei Sperren, aus zwei Quellen, bewusst getrennt:
+ *
+ * 1. UNMÖGLICH (rechenbar): „höher" auf dem höchsten Wert bzw. „tiefer" auf dem
+ *    niedrigsten hat Chance 0 — außer das Spiel wertet den Gleichstand als
+ *    Gewinn (`tieRule: 'win'`), dann ist auch das spielbar. Beides steht im
+ *    öffentlichen Config-Echo, hier wird nichts geschätzt.
+ * 2. ÜBER DER KETTEN-OBERGRENZE (NICHT rechenbar): Ob ein Tipp `maxWinBps`
+ *    reißt, hängt am House-Edge — und den veröffentlicht der Server bewusst
+ *    nicht. Statt ihn zu raten (ein falscher Wert würde einen erlaubten Tipp
+ *    sperren) übernimmt die Oberfläche die Liste, die der Server seiner
+ *    Ablehnung beilegt: `details.allowedGuesses`. Damit ist die Sperre immer
+ *    genau die des Servers — nie eine zweite Meinung darüber.
+ *
+ * 'equal' erscheint NUR, wenn das Spiel es erlaubt (`allowEqual: 1` im
+ * Config-Echo). Ohne die 1 bleibt es bei zwei Knöpfen wie bisher.
+ */
+function guessButtons(
+  cfg: Record<string, unknown> | null,
+  wert: { value: number; min: number; max: number },
+  cap: { at: number; allowed: string[] } | null,
+): GuessButton[] {
+  const c = cfg ?? {};
+  // Der Server schickt `allowEqual` als 0/1 (PublicEngineConfig kennt keinen
+  // boolean) — ein echtes `true` wird trotzdem akzeptiert.
+  const equalAn = c.allowEqual === 1 || c.allowEqual === true;
+  // Gleichstand gewinnt ⇒ kein Tipp ist mehr unmöglich (die Randtipps
+  // gewinnen dann genau über den Gleichstand).
+  const gleichstandGewinnt = c.tieRule === 'win';
+  const kandidaten: { guess: GuessOption; label: GuessButton['label']; unmoeglich: boolean }[] = [
+    { guess: 'higher', label: 'session.higher', unmoeglich: !gleichstandGewinnt && wert.value >= wert.max },
+    { guess: 'lower', label: 'session.lower', unmoeglich: !gleichstandGewinnt && wert.value <= wert.min },
+    ...(equalAn ? [{ guess: 'equal' as const, label: 'session.equal' as const, unmoeglich: false }] : []),
+  ];
+  // Die Cap-Liste gilt nur für den Wert, zu dem der Server sie geschickt hat —
+  // nach dem nächsten Schritt steht eine andere Karte da und sie ist hinfällig.
+  const capGilt = cap && cap.at === wert.value;
+  return kandidaten.map(({ guess, label, unmoeglich }) => ({
+    guess,
+    label,
+    locked: unmoeglich
+      ? 'session.guessImpossible'
+      : capGilt && !cap.allowed.includes(guess)
+        ? 'session.guessCapped'
+        : null,
+  }));
 }
 
 /** steps: Stufen-Fortschritt + Leiter defensiv aus Fortschritt und
@@ -203,6 +280,10 @@ export function SessionGame({
   const [view, setView] = useState<SessionView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Die Tipps, die der Server bei DIESEM Wert noch zulässt — gesetzt aus
+   * seiner eigenen Ablehnung (`guess_exceeds_max_win`), nie selbst gerechnet.
+   * Siehe `guessButtons`. */
+  const [capLock, setCapLock] = useState<{ at: number; allowed: string[] } | null>(null);
   const { play } = useSound();
   const storeKey = `sc_session_${gameId}${demo ? '_demo' : ''}`;
   const sess = engine.session!;
@@ -331,11 +412,34 @@ export function SessionGame({
       if (r.error) {
         const details = r.error.details as Record<string, unknown> | undefined;
         const reason = typeof details?.reason === 'string' ? details.reason : undefined;
+        // Der Server sagt in dieser einen Ablehnung, was JETZT noch geht.
+        // Übernehmen statt nachrechnen: der House-Edge, aus dem sich die
+        // Grenze ergibt, ist nicht öffentlich (siehe `guessButtons`).
+        const bezug = typeof details?.card === 'number' ? details.card
+          : typeof details?.sum === 'number' ? details.sum
+            : null;
+        const alsSperre =
+          reason === 'guess_exceeds_max_win' &&
+          Array.isArray(details?.allowedGuesses) &&
+          bezug !== null;
+        if (alsSperre) {
+          setCapLock({
+            at: bezug,
+            allowed: (details!.allowedGuesses as unknown[]).filter(
+              (g): g is string => typeof g === 'string',
+            ),
+          });
+        }
+        // Wird die Ablehnung zur Sperre, steht ihr Grund schon am Knopf. Die
+        // rote Zeile zusätzlich wäre dieselbe Auskunft ein zweites Mal.
         const ui = toUiError(r.error.code, r.error.message, reason, details);
-        setError(`${ui.code}: ${ui.message}`);
+        setError(alsSperre ? null : `${ui.code}: ${ui.message}`);
         play('error');
         return null;
       }
+      // Jede angenommene Antwort hebt eine alte Ablehnung auf: Nach einem
+      // Schritt steht ein anderer Wert da, nach einem Start eine andere Runde.
+      setCapLock(null);
       return r as SessionView;
     } catch (e) {
       setError((e as Error).message);
@@ -364,7 +468,7 @@ export function SessionGame({
     }
   };
 
-  const step = async (arg: { value?: number; guess?: 'higher' | 'lower' }) => {
+  const step = async (arg: { value?: number; guess?: GuessOption }) => {
     if (!view) return;
     play('click');
     const v = await call(`${apiBase}/session/${view.sessionId}/step`, sess.buildStep(arg));
@@ -381,7 +485,20 @@ export function SessionGame({
   const ended = view && view.status !== 'active';
   const towersBombText =
     view && view.status === 'busted' && engine.key === 'towers' ? formatTowersBombs(view.reveal?.bombColumns, t) : '';
-  const guessValue = sess.step.kind === 'guess' ? currentGuessValue(view?.progress) : null;
+  const guessValue =
+    sess.step.kind === 'guess'
+      ? currentGuessValue(view?.progress, cfg as Record<string, unknown> | null)
+      : null;
+  const guessChoices = guessValue
+    ? guessButtons(cfg as Record<string, unknown> | null, guessValue, capLock)
+    : [];
+  // Ein grauer Knopf ohne Grund ist ein kaputter Knopf: Steht mindestens einer
+  // still, sagt eine Zeile darunter warum. Die Ketten-Obergrenze zuerst — sie
+  // ist der Grund, den niemand von selbst errät.
+  const guessLockNote =
+    guessChoices.find((b) => b.locked === 'session.guessCapped')?.locked ??
+    guessChoices.find((b) => b.locked === 'session.guessImpossible')?.locked ??
+    null;
   const steps = engine.key === 'steps' && view ? stepsInfo(view.progress, cfg) : null;
   // steps: Cashout erst ab Stufe 1 sinnvoll (der Server lehnt am Boden ohnehin
   // ab — nach einem Fall wäre `view.steps ≥ 1`, aber die Auszahlung 0).
@@ -587,15 +704,20 @@ export function SessionGame({
   ) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="sc-shell flex flex-col gap-4">
       {/* Spielfeld — nur Animation und Ergebnis. Die Bedienelemente stehen
           bewusst im eigenen Block darunter: So kann ein Creator das Spielfeld
           frei gestalten oder ersetzen, ohne die Eingaben mit umzubauen.
           Min-Höhe statt fixer Höhe: die Engine-Erklärtexte (playerFacts, z. B.
           steps' Leben/Safe-Point-Regeln) sind unterschiedlich lang und liefen
           bei h-28 sichtbar über das Feld hinaus. Quadratisch (aspect-square):
-          so hoch wie breit, auf jedem Gerät. */}
-      <div className="grid aspect-square rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          so hoch wie breit, auf jedem Gerät.
+
+          `sc-board` (globals.css) deckelt die Kantenlänge zusätzlich auf einen
+          Teil der Bildschirmhöhe. Ohne diesen Deckel ist das Feld auf einem
+          Telefon so hoch wie breit — und schiebt Tipp-Knöpfe und Cashout unter
+          die Falz, wo sie mitten in der Runde niemand mehr sieht. */}
+      <div className="sc-board mx-auto grid aspect-square w-full rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <div className={animated ? 'h-full w-full overflow-hidden rounded-xl bg-night' : 'grid h-full place-items-center overflow-auto rounded-xl bg-night px-2 py-3 text-center'}>
           {animated ? (
             // Das Reveal-Modul der Engine (src/reveals/<engine>.js): Leerlauf aus der
@@ -630,8 +752,44 @@ export function SessionGame({
         </div>
       </div>
 
-      {/* Bedienfeld — Einsatz, Auswahl, Spielen. Getrennt vom Spielfeld. */}
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+      {/* Bedienfeld — Einsatz, Auswahl, Spielen. Getrennt vom Spielfeld.
+          `sc-controls` (globals.css) hält es auf schmalen Schirmen am unteren
+          Rand: Der Deckel auf dem Spielfeld sorgt dafür, dass beides
+          zusammen auf einen Bildschirm passt; klebt der Block zusätzlich
+          unten, bleiben Tipp und Cashout auch dann sichtbar, wenn eine
+          Fehlermeldung oder ein langer Hinweis die Seite länger macht.
+          Deckende Fläche statt der durchscheinenden von früher — sonst läuft
+          beim Kleben der Text des Spielfelds durch. */}
+      <div className={`sc-controls relative rounded-2xl border border-white/10 bg-night p-5 ${guessValue ? 'pt-9' : ''}`}>
+        {/* Der aktuelle Wert als rundes Feld auf der Oberkante — EINMAL. Er
+            stand früher zusätzlich als Kasten mitten im Bedienfeld; dieselbe
+            Zahl zweimal kostet genau die Höhe, die den Cashout-Knopf vom
+            Schirm geschoben hat.
+
+            Bewusst am BEDIENFELD und nicht am Spielfeld: Klebt der Block auf
+            einem schmalen Schirm am unteren Rand, wandert das runde Feld mit
+            ihm. Hinge es am Spielfeld, stünde es beim Kleben mitten im Text.
+
+            `pointer-events-none`: Es ragt über den Rand hinaus und darf nichts
+            abfangen, was darunter liegt. Es zeigt den Wert, der schon auf dem
+            Brett steht (`view` wird erst nach `onRevealed` gesetzt) — verrät
+            also nichts vor der Animation. */}
+        {guessValue && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex -translate-y-1/2 justify-center">
+            <div className="grid h-16 w-16 place-items-center rounded-full border border-white/15 bg-night text-center ring-4 ring-night">
+              <div>
+                <div className="text-2xl font-bold leading-none tabular-nums text-white">
+                  {guessValue.value}
+                </div>
+                {guessValue.dice && (
+                  <div className="mt-0.5 text-[9px] leading-none text-white/40">
+                    {guessValue.dice.join(' + ')}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {animated && statusLine && (
           <div className="mb-3 text-center text-sm text-white/70">{statusLine}</div>
         )}
@@ -758,23 +916,32 @@ export function SessionGame({
             )}
             {towerBoard}
             {sess.step.kind === 'guess' && (
+              // Der Bezugswert steht als rundes Feld auf der Kante zum
+              // Spielfeld (oben) — hier stehen nur noch die Tipps.
+              // Zwei Knöpfe wie bisher; drei, sobald das Spiel den
+              // Gleichstand-Tipp erlaubt (`allowEqual` aus der Server-Config).
+              // Ein Tipp, den der Server ablehnen würde, ist gesperrt statt
+              // klickbar — mit dem Grund am Knopf und darunter.
               <>
-                {guessValue && (
-                  <div className="rounded-lg border border-white/10 bg-night py-3 text-center">
-                    <div className="text-2xl font-bold tabular-nums text-white">{guessValue.value}</div>
-                    {guessValue.dice && (
-                      <div className="mt-0.5 text-[11px] text-white/40">
-                        {guessValue.dice.join(' + ')}
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" disabled={busy || revealing} onClick={() => void step({ guess: 'higher' })}
-                    className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t('session.higher')}</button>
-                  <button type="button" disabled={busy || revealing} onClick={() => void step({ guess: 'lower' })}
-                    className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t('session.lower')}</button>
+                <div className={`grid gap-2 ${guessChoices.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                  {guessChoices.map((b) => (
+                    <button
+                      key={b.guess}
+                      type="button"
+                      disabled={busy || revealing || b.locked !== null}
+                      title={b.locked ? t(b.locked) : undefined}
+                      onClick={() => void step({ guess: b.guess })}
+                      className={`rounded-lg border py-2 text-sm transition disabled:opacity-40 ${
+                        b.locked ? 'border-white/10' : 'border-white/15 hover:border-accent/50'
+                      }`}
+                    >
+                      {t(b.label)}
+                    </button>
+                  ))}
                 </div>
+                {guessLockNote && (
+                  <p className="text-[11px] leading-snug text-amber-300/80">{t(guessLockNote)}</p>
+                )}
               </>
             )}
             {idxStep && bounds && (

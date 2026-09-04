@@ -9,7 +9,7 @@
 import type { ErrorCatalog } from './errors';
 
 export const CATALOG_SNAPSHOT: ErrorCatalog = {
-  "version": "a3564ef3ce45",
+  "version": "889ca1c74b07",
   "langs": [
     "en",
     "de",
@@ -68,6 +68,22 @@ export const CATALOG_SNAPSHOT: ErrorCatalog = {
             "de": "Ungültige Auswahl — außerhalb des Spielfelds.",
             "fr": "Choix invalide — hors du terrain de jeu.",
             "ru": "Неверный выбор — за пределами игрового поля."
+          }
+        },
+        "impossible_guess": {
+          "text": {
+            "en": "Not possible on this value — nothing can beat it in that direction.",
+            "de": "Bei diesem Wert nicht möglich — in diese Richtung geht nichts mehr.",
+            "fr": "Impossible sur cette valeur — rien ne va plus dans cette direction.",
+            "ru": "Невозможно при этом значении — в эту сторону ничего нет."
+          }
+        },
+        "guess_exceeds_max_win": {
+          "text": {
+            "en": "Not playable — this guess would exceed the chain limit. Cash out or pick a likelier guess.",
+            "de": "Nicht spielbar — dieser Tipp würde die Ketten-Obergrenze reißen. Cashout oder wahrscheinlicheren Tipp wählen.",
+            "fr": "Injouable — ce pari dépasserait la limite de la chaîne. Encaissez ou choisissez un pari plus probable.",
+            "ru": "Недоступно — эта догадка превысит предел цепочки. Заберите выигрыш или выберите более вероятный вариант."
           }
         },
         "protocol_handshake_required": {
@@ -223,6 +239,33 @@ export const CATALOG_SNAPSHOT: ErrorCatalog = {
         "de": "Betrag unter dem Mindest-Auszahlbetrag — das ganze Guthaben darfst du immer abheben.",
         "fr": "Montant inférieur au retrait minimum — vous pouvez toujours retirer la totalité.",
         "ru": "Сумма меньше минимальной для вывода — весь баланс вывести можно всегда."
+      }
+    },
+    "API-312": {
+      "action": "info",
+      "text": {
+        "en": "Your win is still being settled on-chain — please try the withdrawal again in a few minutes. Nothing was deducted.",
+        "de": "Dein Gewinn wird gerade on-chain verbucht — bitte in ein paar Minuten erneut auszahlen. Es wurde nichts abgebucht.",
+        "fr": "Votre gain est en cours de règlement on-chain — réessayez le retrait dans quelques minutes. Rien n’a été débité.",
+        "ru": "Ваш выигрыш ещё зачисляется on-chain — попробуйте вывести через несколько минут. Ничего не списано."
+      }
+    },
+    "API-313": {
+      "action": "info",
+      "text": {
+        "en": "Maintenance in progress — real-money play and withdrawals are briefly paused for the safety of our players. Open games finish normally, demo mode stays available. We will be back shortly!",
+        "de": "Wartung läuft — Echtgeld-Spiel und Auszahlungen sind zur Sicherheit unserer Spieler kurz pausiert. Offene Spiele laufen normal zu Ende, der Demo-Modus bleibt verfügbar. Wir sind in Kürze wieder da!",
+        "fr": "Maintenance en cours — le jeu en argent réel et les retraits sont brièvement suspendus pour la sécurité de nos joueurs. Les parties en cours se terminent normalement, le mode démo reste disponible. Nous revenons très vite !",
+        "ru": "Идут технические работы — игра на реальные деньги и выводы ненадолго приостановлены ради безопасности игроков. Открытые игры завершаются как обычно, демо-режим доступен. Мы скоро вернёмся!"
+      }
+    },
+    "API-314": {
+      "action": "info",
+      "text": {
+        "en": "Liquidity & Builder phase: everything is live and open, we are still gathering pool capital for the best possible play. Real-money bets unlock with phase 2 — demo mode is fully playable everywhere until then.",
+        "de": "Liquidity- & Builder-Phase: Alles läuft und ist offen, wir sammeln gerade noch Pool-Kapital für das beste Spielerlebnis. Echtgeld-Wetten schalten mit Phase 2 frei — bis dahin ist der Demo-Modus überall voll spielbar.",
+        "fr": "Phase Liquidity & Builder : tout est en ligne et ouvert, nous réunissons encore le capital du pool pour la meilleure expérience de jeu. Les mises en argent réel s’activeront avec la phase 2 — d’ici là, le mode démo est entièrement jouable.",
+        "ru": "Фаза Liquidity & Builder: всё работает и открыто, мы ещё собираем капитал пула для лучшего игрового опыта. Ставки на реальные деньги откроются со второй фазой — до этого демо-режим полностью доступен."
       }
     },
     "API-402": {

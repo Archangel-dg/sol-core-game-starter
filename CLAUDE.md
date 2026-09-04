@@ -82,7 +82,10 @@ them only if the user explicitly asks and you are certain the contract with the 
     is a pure function of the outcome (no `Math.random`, no near-miss), its readout nodes stay
     empty until the final frame, and the flows (`SingleBetGame`, `SessionGame`,
     `TournamentGame`, the PvP dice boards) wait for `onRevealed` before HUD, sound, history,
-    balance and toast move. `check:contract` section 9 checks the static half.
+    balance and toast move. A round starts from the picture on screen — never a snap back to
+    idle between rounds; the optional `arm()`/`disarm()` pre-roll while the outcome is on its way
+    (`pending` on `RevealHost`) knows no result and shows none. `check:contract` section 9 checks
+    the static half.
 
 ## Tasks that are safe
 

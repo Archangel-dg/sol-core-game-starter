@@ -2,6 +2,28 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-04 — The reels turn out of the position they stand in
+- Slot reels (slots-3x3, slots-modular) no longer jump before a spin. Before, every
+  Play click nulled the result, the host reset the module to idle, and the strips were
+  rebuilt on fixed idle positions — the symbols changed abruptly and only then began to
+  roll. Now the flow keeps the last result standing, `reset()` keeps every reel on the
+  symbol it stands on, and `play()` plans each reel from its current position: one
+  constant cruise speed for every reel and outcome, one fixed ease-out, and the first stop
+  time at or after the reel's minimum where the run lands exactly on the server's symbol
+  (left to right, ≥ 350 ms / ≥ 250 ms apart). Only the travelled distance differs, in laps.
+- Pre-roll: the reels start turning the moment Play is pressed, not when the server has
+  answered. New optional `arm({ reducedMotion })` / `disarm()` on the module contract
+  (src/lib/reveal.ts) and a `pending` prop on RevealHost: SingleBetGame passes `busy`, the
+  module empties its readout and rolls from its position; the outcome's `play()` continues
+  that motion without a cut; a failed request settles the reels on the next whole symbol
+  without a result. The pre-roll knows no outcome and shows none (rule 16).
+- slots-modular reels are now endless virtual strips (cells painted only around the
+  window); the server grid is placed at least four cells ahead of every window, so it can
+  never appear early. The kit's browser check (scripts/check-reveals.mjs) now also plays
+  arm → play, arm → disarm and the reduced-motion pre-roll for every module that has arm().
+- Applies to every engine: the last frame stays until the next outcome; no module is reset
+  to idle by the flow between rounds. Docs: rule 16 addendum, CUSTOMIZE.md reveal rule 7.
+
 2026-09-04 — Reveal animations for every engine, and nothing shows before they end
 - Every engine that plays a round now has a reveal module under src/reveals/<engine>.js:
   coin-flip, dice, limbo, plinko, wheel, keno, scratch, roulette, slots-3x3, slots-modular

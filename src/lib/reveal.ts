@@ -76,10 +76,36 @@ export interface RevealPlayOptions {
   from?: number;
 }
 
+export interface RevealArmOptions {
+  /** Betriebssystem oder Spieler wollen keine Bewegung: kein Vorlauf, nur leeren. */
+  reducedMotion: boolean;
+}
+
 export interface RevealController {
-  /** Animiert vom aktuellen Bild zum Endbild; löst auf, sobald es steht. */
+  /**
+   * Animiert VOM AKTUELLEN BILD zum Endbild; löst auf, sobald es steht. Das
+   * aktuelle Bild ist der Leerlauf, das Endbild der Vorrunde oder ein laufender
+   * Vorlauf (`arm`) — nie springt das Brett vorher in den Leerlauf zurück: Eine
+   * Walze dreht aus der Stellung heraus, in der sie steht.
+   */
   play(outcome: unknown, opts: RevealPlayOptions): Promise<void>;
-  /** Zurück zum Leerlauf — synchron. */
+  /**
+   * Optional — VORLAUF. Die Runde ist abgeschickt, das Ergebnis noch unterwegs.
+   * Das Modul leert seine Ergebnis-Knoten, setzt `data-state="playing"` und
+   * bewegt sich schon aus dem aktuellen Bild heraus (Walzen rollen); das
+   * folgende `play()` schließt ohne Schnitt daran an. Kennt kein Ergebnis —
+   * darf also auch keines andeuten. Module ohne `arm` lassen das letzte Bild
+   * stehen, bis `play()` kommt.
+   */
+  arm?(opts: RevealArmOptions): void;
+  /**
+   * Optional — Vorlauf OHNE Ergebnis beenden (die Runde kam nicht zustande):
+   * auf dem aktuellen Bild zur Ruhe kommen, `data-state` zurück auf `idle`.
+   * Ohne laufenden Vorlauf ein No-op.
+   */
+  disarm?(): void;
+  /** Zurück zum Leerlauf — synchron. Stellung der Walzen/Figuren bleibt, nur
+   *  Ergebnis, Markierungen und ein laufender Vorlauf gehen. */
   reset(): void;
   /** Timer, rAF und Beobachter aufräumen. Der Host leert den Knoten selbst. */
   destroy(): void;

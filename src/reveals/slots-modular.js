@@ -1,10 +1,19 @@
 // Sol-Core reveal — slots-modular (single, Slot).
 //
-// One motion idea: five reel strips scroll downward and stop left to right, 250 ms
+// One motion idea: five reel strips scroll downward and stop left to right, ≥ 250 ms
 // apart, on the server's `details.grid`. Only then is each winning payline traced
 // through its cells and the readout appears. Every frame is a pure function of
 // (outcome, elapsed ms) — no randomness, and nothing is drawn, slowed or highlighted
 // before its reel has stopped.
+//
+// The reels never snap. Each reel is an endless virtual strip (cell index k, the top
+// row shows cell k0; rolling means k0 falls) painted only around the window. A round
+// starts FROM THE POSITION the reels are in — idle, the previous grid, or the pre-roll
+// (`arm()`: the round is submitted, the outcome still on its way, the strips roll at
+// cruise speed). `play()` places the server's grid at least four cells ahead of every
+// window, at the first stop time at or after the reel's minimum, and the constant run
+// plus one fixed ease-out lands exactly on it. `idle()` keeps every reel where it is;
+// `disarm()` (the round failed) settles each reel on the next whole cell, no result.
 //
 // The render spec (symbols, paylines, line count) is the game's config echo — idle
 // and per round. Without an echo a six-rank default deck stands in.
@@ -57,9 +66,11 @@ export const reveal = {
       sym('wild', 1, 0, [0, 0, 0]), sym('scatter', 0, 1, [0, 0, 0]),
     ];
     const GX0 = 7, GY0 = 12, CELL = 16, PITCH = 17.5, HALF = CELL / 2;
-    const STOP = [800, 1050, 1300, 1550, 1800];
-    const FILL = [9, 13, 17, 22, 26];
-    const LINE0 = 2000, LINE_GAP = 250, LINE_DRAW = 320, LIFT_MS = 200, PULSE_MS = 600, HOLD = 350;
+    // Motion: cruise VNOM cells/ms (one constant), ACCEL ms linear ramp from rest, DECEL ms
+    // cubic ease-out onto the grid. Reel r stops no earlier than BASE[r] ms after the roll
+    // began and ≥ GAP ms after its left neighbour; the grid sits ≥ AHEAD cells ahead.
+    const VNOM = 0.014, ACCEL = 160, DECEL = 400, BASE = [500, 750, 1000, 1250, 1500], GAP = 250, AHEAD = 4;
+    const LINE_WAIT = 200, LINE_GAP = 250, LINE_DRAW = 320, LIFT_MS = 200, PULSE_MS = 600, HOLD = 350, SETTLE = 260;
     const MAXC = 38;
 
     const C = 'sca-slots-modular';           // class prefix — every rule is scoped with it
@@ -142,47 +153,35 @@ export const reveal = {
       };
     };
     const filler = (symbols, r, j) => { const n = symbols.length; return symbols[(((j * 3 + r * 5) % n) + n) % n].id; };
-    const reelPos = (t, T, dist) => {
-      if (t <= 0) return 0; if (t >= T) return dist;
-      const A = Math.min(200, T * 0.3), D = Math.min(350, T * 0.4), Cc = T - A - D;
-      const v = dist / (A / 2 + Cc + D / 2);
-      if (t < A) return v * t * t / (2 * A);
-      if (t < A + Cc) return v * A / 2 + v * (t - A);
-      const u = t - A - Cc;
-      return v * A / 2 + v * Cc + v * (u - u * u / (2 * D));
-    };
     const easeOut = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
     const clear = (n) => { while (n.firstChild) n.removeChild(n.firstChild); };
 
-    let cells = [];
+    // ── reels: endless virtual strips. Cell content is the placed grid where a round
+    //    put one, else the filler sequence; only cells around the window exist in the DOM.
+    const reel = strips.map((g) => ({ g, k0: 0, cells: new Map(), placed: new Map() }));
+    let spec = readSpec(null);
+    const contentOf = (R, r, k) => (R.placed.has(k) ? R.placed.get(k) : filler(spec.symbols, r, k));
     const makeCell = (parent, id, x, y) => {
       const art = symbolArt(id);
-      const g = el('g', { class: 'sca-slots-modular-cell', transform: 'translate(' + x + ' ' + y + ')' }, parent);
+      const g = el('g', { class: 'sca-slots-modular-cell', transform: 'translate(' + x + ' ' + y.toFixed(3) + ')' }, parent);
       el('rect', { x: -HALF, y: -HALF, width: CELL, height: CELL, rx: 1.6 }, g);
       const t = el('text', { x: 0, y: 0.3, class: 'sca-slots-modular-glyph', style: 'fill:' + art.tint, 'font-size': glyphSize(art.glyph) }, g);
       t.textContent = art.glyph;
       return g;
     };
-    const buildStrips = (spec, grid) => {
-      cells = [];
-      for (let r = 0; r < 5; r++) {
-        clear(strips[r]);
-        const col = [];
-        const n = grid ? FILL[r] + 3 : 3;
-        for (let k = 0; k < n; k++) {
-          const id = grid ? (k < 3 ? ((grid[r] && grid[r][k] != null) ? grid[r][k] : '?') : filler(spec.symbols, r, k - FILL[r]))
-            : filler(spec.symbols, r, k);
-          const g = makeCell(strips[r], id, cx(r), cy(k));
-          if (k < 3) col.push({ g, cx: cx(r), cy: cy(k) });
-        }
-        cells.push(col);
-        strips[r].setAttribute('transform', 'translate(0 ' + (grid ? -FILL[r] * PITCH : 0) + ')');
-      }
-    };
     const setCell = (c, hot, lift, scale) => {
       if (hot) c.g.setAttribute('data-hot', hot); else c.g.removeAttribute('data-hot');
       c.g.setAttribute('transform', 'translate(' + c.cx + ' ' + (c.cy - lift).toFixed(3) + ') scale(' + scale.toFixed(4) + ')');
     };
+    // Put reel r at k0: paint the cells around the window, drop the ones out of reach.
+    const setK = (R, r, k0) => {
+      R.k0 = k0;
+      const lo = Math.floor(k0) - 1, hi = Math.floor(k0) + 3;
+      for (const k of Array.from(R.cells.keys())) if (k < lo || k > hi) { R.g.removeChild(R.cells.get(k).g); R.cells.delete(k); }
+      for (let k = lo; k <= hi; k++) if (!R.cells.has(k)) R.cells.set(k, { g: makeCell(R.g, contentOf(R, r, k), cx(r), cy(k)), cx: cx(r), cy: cy(k) });
+      R.g.setAttribute('transform', 'translate(0 ' + (-k0 * PITCH).toFixed(3) + ')');
+    };
+    const calmCells = (R) => { for (const c of R.cells.values()) setCell(c, null, 0, 1); };
     const packDetail = (entries) => {
       const lines = []; let cur = ''; let i = 0;
       for (; i < entries.length; i++) {
@@ -195,20 +194,20 @@ export const reveal = {
       lines.push(cur);
       return lines;
     };
-    const showIdleText = (spec) => {
+    const showIdleText = (sp) => {
       readG.setAttribute('visibility', 'hidden'); idleG.removeAttribute('visibility');
       box.removeAttribute('data-tone');
       // the readout nodes are EMPTIED, not just hidden — a previous round's figures must
       // not sit in the DOM while the reels spin (docs/RULES.md, rule 16)
       mult.textContent = ''; out.textContent = ''; fiat.textContent = ''; det1.textContent = ''; det2.textContent = '';
-      const pay = spec.symbols.filter((s) => !s.wild && !s.scatter && Array.isArray(s.paysBps))
+      const pay = sp.symbols.filter((s) => !s.wild && !s.scatter && Array.isArray(s.paysBps))
         .map((s) => ({ id: s.id, top: Number(s.paysBps[2] || 0) })).sort((a, b) => b.top - a.top);
       const fmt = (s) => s.id + ' ' + fmtPay(s.top);
       idle1.textContent = ctx.text('reveal.slotsm.paytable');
       idle2.textContent = pay.slice(0, 3).map(fmt).join(' · ') || '—';
       idle3.textContent = pay.slice(3, 6).map(fmt).join(' · ');
-      const hasWild = spec.symbols.some((s) => s.wild), hasSc = spec.symbols.some((s) => s.scatter);
-      const bits = [ctx.text('reveal.slotsm.lines', { n: spec.lineCount })];
+      const hasWild = sp.symbols.some((s) => s.wild), hasSc = sp.symbols.some((s) => s.scatter);
+      const bits = [ctx.text('reveal.slotsm.lines', { n: sp.lineCount })];
       if (hasWild) bits.push(ctx.text('reveal.slotsm.wilds'));
       if (hasSc) bits.push(ctx.text('reveal.slotsm.scatters'));
       idle4.textContent = bits.join(' · ');
@@ -225,29 +224,50 @@ export const reveal = {
       const lines = entries.length ? packDetail(entries) : [win ? '' : ctx.text('reveal.slotsm.noLine')];
       det1.textContent = lines[0] || ''; det2.textContent = lines[1] || '';
     };
-    const setHeader = (spec, o) => {
-      headL.textContent = '5×3 · ' + ctx.text('reveal.slotsm.lines', { n: spec.lineCount });
+    const setHeader = (sp, o) => {
+      headL.textContent = '5×3 · ' + ctx.text('reveal.slotsm.lines', { n: sp.lineCount });
       headR.textContent = o && o.betLamports != null ? ctx.text('reveal.bet', { amount: ctx.fmt.sol(o.betLamports) }) : ctx.text('reveal.slotsm.spin');
     };
 
-    const idle = () => { const spec = readSpec(null); clear(linesG); setHeader(spec, null); buildStrips(spec, null); showIdleText(spec); };
-    idle();
+    // Idle keeps every reel on the cell it stands on (rounded after an interrupted run).
+    const idle = () => {
+      spec = readSpec(null);
+      clear(linesG);
+      setHeader(spec, null);
+      reel.forEach((R, r) => { calmCells(R); setK(R, r, Math.round(R.k0)); });
+      showIdleText(spec);
+    };
 
-    let raf = 0, pending = null;
+    // ── motion ──────────────────────────────────────────────────────────
+    // A run from rest ramps linearly over ACCEL ms to VNOM; a run that continues a
+    // pre-roll has `ramp` ms of that ramp left. `off` is the time a ramped run lags
+    // behind a constant one — it makes the stop-time equation exact either way.
+    const runOf = (ramp) => {
+      const v0 = VNOM * (1 - ramp / ACCEL), acc = ramp > 0 ? (VNOM - v0) / ramp : 0;
+      return {
+        off: ramp * ramp / (2 * ACCEL),
+        dist: (t) => (t <= 0 ? 0 : t < ramp ? v0 * t + acc * t * t / 2 : v0 * ramp + acc * ramp * ramp / 2 + VNOM * (t - ramp)),
+      };
+    };
+    const REST = runOf(ACCEL);
+    let raf = 0, pending = null, armed = null;
     const cancel = () => {
       if (raf) cancelAnimationFrame(raf); raf = 0;
       if (pending) { const p = pending; pending = null; p(); }
     };
-
+    const rolledK = (a, r, rolled) => (a.reduced ? a.k[r] : a.k[r] - REST.dist(rolled));
     idle();
     root.dataset.state = 'idle';
 
     return {
       play(o, opts) {
         cancel();
+        const a = armed; armed = null;
+        const now = performance.now();
+        const rolled = a ? now - a.t0 : 0;
         root.dataset.state = 'playing';
         o = o || {};
-        const spec = readSpec(o);
+        spec = readSpec(o);
         const dd = o.details || {};
         const grid = Array.isArray(dd.grid) ? dd.grid : [];
         const d = {
@@ -256,10 +276,35 @@ export const reveal = {
           scatterPayBps: typeof dd.scatterPayBps === 'number' ? dd.scatterPayBps : 0,
         };
         setHeader(spec, o);
-        buildStrips(spec, grid);
         clear(linesG);
         showIdleText(spec); idleG.setAttribute('visibility', 'hidden');
 
+        // Per reel: where it is, where the grid goes, when it stops.
+        let prevTs = -Infinity;
+        const plan = reel.map((R, r) => {
+          calmCells(R);
+          const k0 = a ? rolledK(a, r, rolled) : R.k0;
+          const ramp = a && !a.reduced ? Math.max(0, ACCEL - rolled) : ACCEL;
+          const run = runOf(ramp);
+          const minTs = Math.max(BASE[r] - rolled, ramp, prevTs + GAP);
+          // the grid lands ≥ AHEAD cells ahead — never inside the painted window
+          const dMin = Math.max(AHEAD, VNOM * (minTs - run.off + DECEL / 3));
+          const kG = Math.floor(k0 - dMin);
+          const ts = (k0 - kG) / VNOM + run.off - DECEL / 3;
+          prevTs = ts;
+          for (let row = 0; row < 3; row++) R.placed.set(kG + row, grid[r] && grid[r][row] != null ? grid[r][row] : '?');
+          return { k0, kG, ts, run };
+        });
+        const T = Math.max.apply(null, plan.map((p) => p.ts + DECEL));
+        const kAt = (p, t) => {
+          if (t >= p.ts + DECEL) return p.kG;
+          if (t < p.ts) return p.k0 - p.run.dist(t);
+          const u = (t - p.ts) / DECEL;
+          return p.k0 - (p.run.dist(p.ts) + VNOM * DECEL / 3 * (1 - Math.pow(1 - u, 3)));
+        };
+        const gridCell = (r, row) => reel[r].cells.get(plan[r].kG + row);
+
+        const LINE0 = T + LINE_WAIT;
         const lines = [];
         const liftAt = new Map();
         d.lineWins.forEach((w, i) => {
@@ -282,25 +327,24 @@ export const reveal = {
           lines.push({ pl, len, t0 });
         });
         const scatterIds = new Set(spec.symbols.filter((s) => s.scatter).map((s) => s.id));
-        const scatterCells = [];
+        const scatterAt = [];
         if (d.scatterCount >= 3) for (let r = 0; r < 5; r++) for (let row = 0; row < 3; row++) {
-          if (scatterIds.has(grid[r] && grid[r][row]) && !liftAt.has(r + ':' + row)) scatterCells.push(cells[r][row]);
+          if (scatterIds.has(grid[r] && grid[r][row]) && !liftAt.has(r + ':' + row)) scatterAt.push([r, row]);
         }
         const nLines = lines.length;
-        let R0 = STOP[4] + 300;
+        let R0 = T + 300;
         if (nLines) R0 = Math.max(R0, LINE0 + nLines * LINE_GAP + 80);
-        if (scatterCells.length) R0 = Math.max(R0, LINE0 + PULSE_MS + 80);
+        if (scatterAt.length) R0 = Math.max(R0, LINE0 + PULSE_MS + 80);
         const END = R0 + HOLD;
 
         const frame = (t) => {
-          for (let r = 0; r < 5; r++) {
-            const dist = FILL[r] * PITCH;
-            strips[r].setAttribute('transform', 'translate(0 ' + (reelPos(t, STOP[r], dist) - dist).toFixed(3) + ')');
-          }
+          plan.forEach((p, r) => setK(reel[r], r, kAt(p, t)));
           for (const [key, t0] of liftAt) {
             const [r, row] = key.split(':').map(Number);
+            const c = gridCell(r, row);
+            if (!c) continue;
             const p = easeOut((t - t0) / LIFT_MS);
-            setCell(cells[r][row], p > 0 ? 'line' : null, 0.7 * p, 1 + 0.06 * p);
+            setCell(c, p > 0 ? 'line' : null, 0.7 * p, 1 + 0.06 * p);
           }
           for (const l of lines) {
             const p = easeOut((t - l.t0) / LINE_DRAW);
@@ -308,10 +352,10 @@ export const reveal = {
             l.pl.removeAttribute('visibility');
             l.pl.setAttribute('stroke-dashoffset', (l.len * (1 - p)).toFixed(3));
           }
-          if (scatterCells.length) {
+          if (scatterAt.length) {
             const u = (t - LINE0) / PULSE_MS;
             const s = u <= 0 || u >= 1 ? 1 : 1 + 0.08 * Math.pow(Math.sin(2 * Math.PI * u), 2);
-            for (const c of scatterCells) setCell(c, u > 0 ? 'scatter' : null, 0, s);
+            for (const [r, row] of scatterAt) { const c = gridCell(r, row); if (c) setCell(c, u > 0 ? 'scatter' : null, 0, s); }
           }
           if (t >= R0) { showReadout(o, d); readG.setAttribute('opacity', easeOut((t - R0) / 250).toFixed(3)); }
         };
@@ -321,9 +365,8 @@ export const reveal = {
           const done = () => { frame(END); root.dataset.state = 'done'; pending = null; resolve(); };
           if (opts && opts.reducedMotion) { done(); return; }
           frame(0);
-          const t0 = performance.now();
-          const step = (now) => {
-            const t = now - t0;
+          const step = (nowF) => {
+            const t = nowF - now;
             if (t >= END) { raf = 0; done(); return; }
             frame(t);
             raf = requestAnimationFrame(step);
@@ -331,8 +374,49 @@ export const reveal = {
           raf = requestAnimationFrame(step);
         });
       },
-      reset() { cancel(); idle(); root.dataset.state = 'idle'; },
-      destroy() { cancel(); },
+      // Pre-roll: the round is submitted, the outcome still on its way. Nothing here
+      // knows the result — the reels just leave their position at cruise speed.
+      arm(opts) {
+        cancel();
+        const a = { t0: performance.now(), k: reel.map((R) => R.k0), reduced: !!(opts && opts.reducedMotion) };
+        armed = a;
+        root.dataset.state = 'playing';
+        clear(linesG);
+        reel.forEach((R) => calmCells(R));
+        showIdleText(spec); idleG.setAttribute('visibility', 'hidden');
+        if (a.reduced) return;
+        const roll = (nowF) => {
+          const t = nowF - a.t0;
+          reel.forEach((R, r) => setK(R, r, a.k[r] - REST.dist(t)));
+          raf = requestAnimationFrame(roll);
+        };
+        raf = requestAnimationFrame(roll);
+      },
+      // The round did not happen: settle every reel on the next whole cell, no result.
+      disarm() {
+        const a = armed;
+        if (!a) return;
+        armed = null;
+        cancel();
+        if (a.reduced) { idleG.removeAttribute('visibility'); root.dataset.state = 'idle'; return; }
+        const t0 = performance.now();
+        const rolled = t0 - a.t0;
+        const stops = reel.map((R, r) => {
+          const k = rolledK(a, r, rolled);
+          let end = Math.floor(k);
+          if (k - end < 0.15) end -= 1;                  // always some travel — no dead stop
+          return { k, end };
+        });
+        const settle = (nowF) => {
+          const u = Math.min(1, (nowF - t0) / SETTLE), e = 1 - Math.pow(1 - u, 3);
+          stops.forEach((st, r) => setK(reel[r], r, st.k - (st.k - st.end) * e));
+          if (u >= 1) { raf = 0; idleG.removeAttribute('visibility'); root.dataset.state = 'idle'; return; }
+          raf = requestAnimationFrame(settle);
+        };
+        raf = requestAnimationFrame(settle);
+      },
+      reset() { cancel(); armed = null; idle(); root.dataset.state = 'idle'; },
+      destroy() { cancel(); armed = null; },
     };
   },
 };

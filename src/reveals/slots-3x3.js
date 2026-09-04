@@ -1,10 +1,19 @@
 // Sol-Core reveal — slots-3x3 (single, Slot).
 //
 // One motion idea: three symbol strips scroll downward behind a 3×3 window, opacity-
-// blurred by speed, and stop left → right ~350 ms apart with one fixed ease-out each,
+// blurred by speed, and stop left → right ≥ 350 ms apart with one fixed ease-out each,
 // exactly on the server's centre-line symbols (`details.line`). Rows above/below are
 // the strip's fixed neighbours. A triple lights all three centre cells, a pair the two
 // matching ones; then the readout appears.
+//
+// The reels never snap. Every round starts FROM THE POSITION the reels are in — the
+// idle board, the previous result, or the pre-roll: `arm()` (the round is submitted,
+// the outcome still on its way) lets the strips roll at cruise speed; `play()` picks,
+// per reel, the first stop time at or after its minimum where the constant run plus the
+// fixed ease-out lands exactly on the target symbol. Speed is one constant for every
+// reel and every outcome; only the travelled distance differs, in whole laps.
+// `idle()` keeps every reel on the symbol it stands on; `disarm()` (the round failed)
+// settles each reel on the next whole symbol without a result.
 //
 // The symbol set and the paytable preview come from the game's config echo
 // (`engineConfig.symbolTable`) — a game with its own symbols shows them, idle and in
@@ -35,7 +44,11 @@ export const reveal = {
     const DEFAULT_TABLE = [['cherry', 20000], ['lemon', 40000], ['bell', 100000], ['seven', 250000], ['diamond', 1000000]];
     const IDLE_POS = [0, 4, 8];
     const RX = [8, 37, 66], RW = 26, WY = 13, CH = 19, WH = 57, MID = WY + CH;
-    const STOP = [1200, 1550, 1900], DECEL = 450, VNOM = 0.02, SHOW = 100, TAIL = 350;
+    // Motion: cruise VNOM symbols/ms (one constant), ACCEL ms linear ramp from rest,
+    // DECEL ms cubic ease-out onto the target. Reel r stops no earlier than BASE[r] ms
+    // after the roll began and ≥ GAP ms after its left neighbour.
+    const VNOM = 0.02, ACCEL = 160, DECEL = 450, BASE = [750, 1100, 1450], GAP = 350;
+    const SHOW = 100, TAIL = 350, SETTLE = 260;
 
     const C = K;                         // class prefix — every rule is scoped with it
     const CSS = `
@@ -165,6 +178,7 @@ export const reveal = {
       const hi = el('rect', { x: x + .4, y: MID + .4, width: RW - .8, height: CH - .8, rx: 1.2, 'class': K + '-hi' });
       return { x, strip, hi, cycle: null, pos: 0 };
     });
+    const sameCycle = (a, b) => !!a && !!b && a.length === b.length && a.every((id, i) => id === b[i]);
     const buildStrip = (reel, cycle) => {
       reel.cycle = cycle;
       while (reel.strip.firstChild) reel.strip.removeChild(reel.strip.firstChild);
@@ -207,13 +221,20 @@ export const reveal = {
     };
 
     let table = tableOf(), base = stripOf(table);
+    const clearReadout = () => { kind.textContent = ''; mult.textContent = ''; out.textContent = ''; fiat.textContent = ''; };
     const idle = () => {
       table = tableOf(); base = stripOf(table);
       delete box.dataset.tone;
       sub.textContent = ctx.text('reveal.slots3.centre');
       buildTable(table);
-      reels.forEach((reel, r) => { buildStrip(reel, base); setPos(reel, IDLE_POS[r] % base.length, 0); reel.hi.classList.remove(K + '-on'); });
-      kind.textContent = ''; mult.textContent = ''; out.textContent = ''; fiat.textContent = '';
+      reels.forEach((reel, r) => {
+        // the strip is rebuilt only when the symbol set changed (mount, new config);
+        // otherwise a reel keeps the symbol it stands on — no snap between rounds
+        if (!sameCycle(reel.cycle, base)) { buildStrip(reel, base); setPos(reel, IDLE_POS[r] % base.length, 0); }
+        else setPos(reel, Math.round(reel.pos), 0);
+        reel.hi.classList.remove(K + '-on');
+      });
+      clearReadout();
     };
     const finish = (o, line) => {
       const k = o.details && o.details.outcome;
@@ -231,17 +252,35 @@ export const reveal = {
       box.dataset.tone = o.win ? 'win' : 'loss';
     };
 
-    let raf = 0, pending = null;
+    // ── motion ──────────────────────────────────────────────────────────
+    // A run from rest ramps linearly over ACCEL ms to VNOM; a run that continues a
+    // pre-roll has `ramp` ms of that ramp left. `off` is the time a ramped run lags
+    // behind a constant one — it makes the stop-time equation exact either way.
+    const runOf = (ramp) => {
+      const v0 = VNOM * (1 - ramp / ACCEL), acc = ramp > 0 ? (VNOM - v0) / ramp : 0;
+      return {
+        off: ramp * ramp / (2 * ACCEL),
+        dist: (t) => (t <= 0 ? 0 : t < ramp ? v0 * t + acc * t * t / 2 : v0 * ramp + acc * ramp * ramp / 2 + VNOM * (t - ramp)),
+        speed: (t) => (t <= 0 ? 0 : t < ramp ? v0 + acc * t : VNOM),
+      };
+    };
+    const REST = runOf(ACCEL);
+    let raf = 0, pending = null, armed = null;
     const cancel = () => {
       if (raf) cancelAnimationFrame(raf); raf = 0;
       if (pending) { const p = pending; pending = null; p(); }
     };
+    // Where the pre-roll has taken reel r after `rolled` ms.
+    const rolledPos = (a, r, rolled) => (a.reduced ? a.p[r] : a.p[r] - REST.dist(rolled));
     idle();
     root.dataset.state = 'idle';
 
     return {
       play(o, opts) {
         cancel();
+        const a = armed; armed = null;
+        const now = performance.now();
+        const rolled = a ? now - a.t0 : 0;
         o = o || {};
         const line = lineOf(o, base[0]);
         const cycle = cycleFor(base, line);
@@ -250,43 +289,90 @@ export const reveal = {
         delete box.dataset.tone;
         // empty the readout and drop the last round's highlight BEFORE the reels move —
         // a previous result must not sit in the DOM during the spin (docs/RULES.md, rule 16)
-        kind.textContent = ''; mult.textContent = ''; out.textContent = ''; fiat.textContent = '';
+        clearReadout();
         reels.forEach((reel) => reel.hi.classList.remove(K + '-on'));
+        let prevTs = -Infinity;
         const plan = reels.map((reel, r) => {
-          buildStrip(reel, cycle);
+          // the strip changes only in the fallback case (a line symbol outside the table)
+          if (!sameCycle(reel.cycle, cycle)) buildStrip(reel, cycle);
           const L = cycle.length;
-          const p0 = reel.pos;
+          const p0 = a ? rolledPos(a, r, rolled) : reel.pos;
           const tgt = targetPos(cycle, line[r], r, seed);
-          const ts = STOP[r] - DECEL;
-          const need = (((p0 - tgt) % L) + L) % L;
-          const span = ts + DECEL / 3;
-          const n = Math.max(1, Math.round((VNOM * span - need) / L));
-          const v = (need + n * L) / span;
-          return { p0, tgt, ts, v, S: v * DECEL / 3 };
+          const need = (((p0 - tgt) % L) + L) % L;           // symbols down to the target
+          const ramp = a && !a.reduced ? Math.max(0, ACCEL - rolled) : ACCEL;
+          const run = runOf(ramp);
+          const minTs = Math.max(BASE[r] - rolled, ramp, prevTs + GAP);
+          // first stop at/after the minimum that lands exactly: run + ease-out = need + n laps
+          let n = 0, ts;
+          for (;;) { ts = (need + n * L) / VNOM + run.off - DECEL / 3; if (ts >= minTs) break; n++; }
+          prevTs = ts;
+          return { p0, tgt, ts, run };
         });
+        const T = Math.max.apply(null, plan.map((p) => p.ts + DECEL));
+        const at = (p, t) => {
+          if (t >= p.ts + DECEL) return { pos: p.tgt, v: 0 };
+          if (t < p.ts) return { pos: p.p0 - p.run.dist(t), v: p.run.speed(t) };
+          const u = (t - p.ts) / DECEL;
+          return { pos: p.p0 - (p.run.dist(p.ts) + VNOM * DECEL / 3 * (1 - Math.pow(1 - u, 3))), v: VNOM * (1 - u) * (1 - u) };
+        };
         return new Promise((resolve) => {
           pending = resolve;
           const done = () => { finish(o, line); root.dataset.state = 'done'; pending = null; resolve(); };
           if (opts && opts.reducedMotion) { plan.forEach((p, r) => setPos(reels[r], p.tgt, 0)); done(); return; }
-          const t0 = performance.now();
           let shown = false;
-          const frame = (now) => {
-            const t = now - t0;
-            plan.forEach((p, r) => {
-              const reel = reels[r];
-              if (t < p.ts) setPos(reel, p.p0 - p.v * t, p.v);
-              else if (t < STOP[r]) { const u = (t - p.ts) / DECEL, e = 1 - Math.pow(1 - u, 3); setPos(reel, p.p0 - (p.v * p.ts + p.S * e), p.v * (1 - u) * (1 - u)); }
-              else setPos(reel, p.tgt, 0);
-            });
-            if (!shown && t >= STOP[2] + SHOW) { shown = true; finish(o, line); }
-            if (t >= STOP[2] + TAIL) { raf = 0; done(); return; }
+          const frame = (nowF) => {
+            const t = nowF - now;
+            plan.forEach((p, r) => { const s = at(p, t); setPos(reels[r], s.pos, s.v); });
+            if (!shown && t >= T + SHOW) { shown = true; finish(o, line); }
+            if (t >= T + TAIL) { raf = 0; done(); return; }
             raf = requestAnimationFrame(frame);
           };
           raf = requestAnimationFrame(frame);
         });
       },
-      reset() { cancel(); idle(); root.dataset.state = 'idle'; },
-      destroy() { cancel(); },
+      // Pre-roll: the round is submitted, the outcome still on its way. Nothing here
+      // knows the result — the reels just leave their position at cruise speed.
+      arm(opts) {
+        cancel();
+        const a = { t0: performance.now(), p: reels.map((reel) => reel.pos), reduced: !!(opts && opts.reducedMotion) };
+        armed = a;
+        root.dataset.state = 'playing';
+        delete box.dataset.tone;
+        clearReadout();
+        reels.forEach((reel) => reel.hi.classList.remove(K + '-on'));
+        if (a.reduced) return;
+        const roll = (nowF) => {
+          const t = nowF - a.t0;
+          reels.forEach((reel, r) => setPos(reel, a.p[r] - REST.dist(t), REST.speed(t)));
+          raf = requestAnimationFrame(roll);
+        };
+        raf = requestAnimationFrame(roll);
+      },
+      // The round did not happen: settle every reel on the next whole symbol, no result.
+      disarm() {
+        const a = armed;
+        if (!a) return;
+        armed = null;
+        cancel();
+        if (a.reduced) { root.dataset.state = 'idle'; return; }
+        const t0 = performance.now();
+        const rolled = t0 - a.t0;
+        const stops = reels.map((reel, r) => {
+          const p = rolledPos(a, r, rolled);
+          let end = Math.floor(p);
+          if (p - end < 0.15) end -= 1;                  // always some travel — no dead stop
+          return { p, end };
+        });
+        const settle = (nowF) => {
+          const u = Math.min(1, (nowF - t0) / SETTLE), e = 1 - Math.pow(1 - u, 3);
+          stops.forEach((st, r) => setPos(reels[r], st.p - (st.p - st.end) * e, 3 * (st.p - st.end) * (1 - u) * (1 - u) / SETTLE));
+          if (u >= 1) { raf = 0; root.dataset.state = 'idle'; return; }
+          raf = requestAnimationFrame(settle);
+        };
+        raf = requestAnimationFrame(settle);
+      },
+      reset() { cancel(); armed = null; idle(); root.dataset.state = 'idle'; },
+      destroy() { cancel(); armed = null; },
     };
   },
 };

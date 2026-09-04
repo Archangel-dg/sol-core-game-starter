@@ -55,7 +55,8 @@ result away moves before the animation has ended.
 
 Want the coin to be a card, the plinko board to be a rocket track? Replace the module file. The
 contract is in `src/lib/reveal.ts` (`RevealModule`) and it is small: `mount(root, ctx)` returns
-`{ play(outcome, { reducedMotion, from }), reset(), destroy() }`. `ctx.engineConfig` carries the
+`{ play(outcome, { reducedMotion, from }), reset(), destroy() }` plus, optionally,
+`arm({ reducedMotion })` / `disarm()`. `ctx.engineConfig` carries the
 game's real dimensions (rows, grid size, pockets, ladder …) — draw the idle board from it; the
 outcome carries the round's own details. `ctx.text(key)` reads the catalog (four languages),
 `ctx.fmt` formats money exactly like the rest of the interface. Fixtures with the exact server
@@ -75,6 +76,14 @@ Binding rules (rule 16 in `docs/RULES.md`):
    recomputed from a roll.
 6. **No hard-coded text.** Every label goes through `ctx.text(...)`; the keys the module reads
    are listed in its `strings` array so the contract check can find them.
+7. **A round starts from the picture on screen.** The board never snaps back to idle between
+   rounds: `play()` moves from where the previous result left the reels, the coin, the ball;
+   `reset()` keeps that position too and only drops result and highlights. A module may
+   implement `arm()` — the flow calls it the moment the round is submitted (`pending` on
+   `RevealHost`), the reels roll from their position at cruise speed, and `play()` continues
+   that motion without a cut; `disarm()` settles them without a result when the round failed.
+   The pre-roll knows no outcome, so it can show none. The two slot modules do this; a module
+   without `arm()` simply keeps its last frame until the outcome arrives.
 
 Session engines play their transcript STEP BY STEP: `play(o, { from })` says how many steps
 already stand on the board; the module sets those instantly and animates only the new step.

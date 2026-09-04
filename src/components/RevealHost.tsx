@@ -15,7 +15,9 @@ import { loadReveal, type RevealContext, type RevealController, type RevealModul
  *  1. lädt das Modul der Engine (`lib/reveal.ts`) und zeichnet den Leerlauf
  *     aus `engineConfig`;
  *  2. spielt jedes neue `outcome` ab (Objekt-Identität — jede Runde ist ein
- *     neues Objekt) und setzt bei `null` auf den Leerlauf zurück;
+ *     neues Objekt) und setzt bei `null` auf den Leerlauf zurück; solange eine
+ *     Runde unterwegs ist (`pending`), lässt er das Modul vorlaufen (`arm`),
+ *     damit z. B. Walzen schon rollen und nie aus dem Leerlauf springen;
  *  3. meldet `onRevealed(outcome)` EINMAL, sobald das Endbild steht — daran
  *     hängt der Aufrufer alles, was den Ausgang verrät;
  *  4. reicht Sprache, Formatierer und den Animations-Schalter hinein.
@@ -34,6 +36,13 @@ export interface RevealHostProps {
   outcome: unknown | null;
   /** Session/Turnier: Schritte, die schon stehen (siehe RevealPlayOptions). */
   from?: number;
+  /**
+   * Die Runde ist abgeschickt, ihr Ergebnis noch nicht da. Module mit `arm()`
+   * bewegen sich ab jetzt aus dem aktuellen Bild heraus; kommt kein Ergebnis
+   * (Fehler), kommen sie mit `disarm()` zur Ruhe. Für alle anderen bleibt das
+   * letzte Bild stehen, bis `outcome` wechselt.
+   */
+  pending?: boolean;
   /** Einmal je Ergebnis, sobald das Endbild steht. */
   onRevealed?: (outcome: unknown) => void;
   /** Übersetzte Kurzbeschreibung der Engine für den Leerlauf (siehe RevealContext.hint). */
@@ -41,7 +50,7 @@ export interface RevealHostProps {
   className?: string;
 }
 
-export function RevealHost({ engineKey, engineConfig, outcome, from, onRevealed, hint = null, className = '' }: RevealHostProps) {
+export function RevealHost({ engineKey, engineConfig, outcome, from, pending = false, onRevealed, hint = null, className = '' }: RevealHostProps) {
   const t = useT();
   const { format } = useFiat();
   const { enabled: motionOn } = useMotion();
@@ -134,6 +143,16 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, onRevealed,
     // liest isReducedMotion() beim Start ohnehin frisch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outcome, from, mounted]);
+
+  // 3b. Vorlauf. Läuft NACH dem Abspiel-Effekt: Kommen Ergebnis und Ende der
+  //     Anfrage im selben Render, hat `play()` den Vorlauf schon übernommen und
+  //     `disarm()` ist im Modul ein No-op.
+  useEffect(() => {
+    const ctl = ctlRef.current;
+    if (!ctl) return;
+    if (pending) ctl.arm?.({ reducedMotion: isReducedMotion() });
+    else ctl.disarm?.();
+  }, [pending, mounted]);
 
   // 4. Sprachwechsel im Leerlauf: Beschriftungen neu zeichnen. Während einer
   //    Runde nicht — ein Neustart mitten im Flug wäre schlimmer als ein

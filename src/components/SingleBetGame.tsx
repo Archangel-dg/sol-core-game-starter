@@ -153,7 +153,10 @@ export function SingleBetGame({
     if (!wallet) return;
     setBusy(true);
     setError(null);
-    setResult(null);
+    // Das letzte Ergebnis bleibt bewusst stehen: Das Reveal-Modul startet aus
+    // seinem aktuellen Bild (eine Walze dreht aus ihrer Stellung heraus) und
+    // leert die Ergebnis-Knoten selbst; `pending` am Host lässt es vorlaufen.
+    // Ein `setResult(null)` hier hieße Sprung in den Leerlauf vor jeder Runde.
     sfx('bet');
     try {
       const betLamports = solToLamports(bet);
@@ -290,6 +293,7 @@ export function SingleBetGame({
             engineKey={engine.key}
             engineConfig={engineConfig ?? null}
             outcome={result}
+            pending={busy}
             onRevealed={onRevealed}
             hint={t(engine.blurb)}
           />

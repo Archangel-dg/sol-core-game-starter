@@ -7,6 +7,24 @@
   /* Sol-Grün #14f195 / #39d98a — überschrieben von NEXT_PUBLIC_ACCENT_COLOR (layout.tsx). */
   --accent-rgb: 20 241 149;
   --accent-soft-rgb: 57 217 138;
+
+  /* ── Theme-Tokens für die Reveal-Module (src/reveals/*.js) ────────────────
+     Die Module färben AUSSCHLIESSLICH über diese Variablen — so folgt jede
+     Animation dem Theme, und ein NEXT_PUBLIC_ACCENT_COLOR färbt Münze, Rad
+     und Kugel mit. Dieselben Werte wie tailwind.config.ts. */
+  --night: #0a0a0f;
+  --fg: #e8e8ee;
+  --accent: rgb(var(--accent-rgb));
+  --accent-soft: rgb(var(--accent-soft-rgb));
+  --solana: #9945ff;
+  --red: #f87171;
+  --amber: #ffd166;
+  --line: rgba(255, 255, 255, 0.1);
+  --panel: rgba(255, 255, 255, 0.03);
+  --panel-strong: rgba(255, 255, 255, 0.06);
+  --muted: rgba(232, 232, 238, 0.45);
+  --faint: rgba(232, 232, 238, 0.25);
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 body {
@@ -22,40 +40,4 @@ body {
   padding: 0 16px !important;
   font-size: 14px !important;
   white-space: nowrap;
-}
-
-/* ── Coin-Flip-Reveal (Design-Zone, siehe components/CoinFlipView.tsx) ──────
-   Nur Geometrie und Bewegung; jede Farbe kommt aus dem Theme (accent/red/
-   white-Töne), damit NEXT_PUBLIC_ACCENT_COLOR die Münze mitfärbt.
-   `--u` = 1 % der Spielfeldkante, von der Komponente gemessen gesetzt. */
-.coin-scene {
-  perspective: calc(var(--u) * 170);
-}
-.coin-body {
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-.coin-face {
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transition: border-color 0.25s ease;
-}
-.coin-face-tails {
-  transform: rotateY(180deg);
-}
-.coin-readout {
-  opacity: 0;
-  transform: translateY(calc(var(--u) * 1.5));
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-.coin-readout-shown {
-  opacity: 1;
-  transform: none;
-}
-/* Betriebssystem-Einstellung „weniger Bewegung": kein Flug, nur das Ergebnis. */
-@media (prefers-reduced-motion: reduce) {
-  .coin-face,
-  .coin-readout {
-    transition: none;
-  }
 }

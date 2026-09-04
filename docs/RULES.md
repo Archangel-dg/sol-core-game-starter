@@ -108,6 +108,17 @@ payout-ready game — automatically.
     minute for the whole platform instead of one per creator server, and two games can never show
     two different rates at the same moment.
 
+16. **The animation shows nothing before it ends.** Every engine's reveal module
+    (`src/reveals/<engine>.js`, hosted by `components/RevealHost.tsx`) is a pure function of the
+    server outcome and elapsed time: no `Math.random()`, no near-miss dressing, no slowing down
+    beside the winning field, and the readout nodes stay EMPTY until the final frame. The flows
+    wait for that frame: HUD, sound, history, balance and win toast follow `onRevealed`. A result
+    that leaks mid-animation — a highlighted tile, a settled balance, a multiplier in the DOM —
+    is the same lie as a near-miss: it tells the player the animation was theatre. Every label in
+    a module goes through `ctx.text(...)` (rule 12 holds inside the square too). `npm run
+    check:contract` checks the static half (section 9); the kit's browser check plays every module
+    against fixtures and reads the DOM mid-flight.
+
 ## Off-limits files (they work — don't rebuild them)
 
 `app/api/*` · `lib/solcore.ts` · `lib/config.ts` · `lib/lamports.ts` · `lib/errors.ts` ·
@@ -123,7 +134,9 @@ They carry the `// ⚠ Nicht ändern — Systemvertrag` (do-not-edit / system-co
 `npm run check` runs two things. `scripts/check-contract.mjs` reads your own source and verifies
 the promises above are still wired: deposit/withdraw reachable (incl. `/api/rpc`), error texts
 from the server catalog, maximum bet visible at every bet field, the demo mode reachable, all four
-languages present with a switcher, and a Scanner link in every mechanic. `scripts/check.mjs` then talks to the configured backend.
+languages present with a switcher, a Scanner link in every mechanic, and the reveal modules
+(one per engine, no randomness, texts from the catalog, flows waiting for the final frame).
+`scripts/check.mjs` then talks to the configured backend.
 
 The contract check exists because none of this fails loudly. A re-skin that drops the max-bet line
 or repoints a verify link leaves a game that still runs, still pays out, and is quietly worse.

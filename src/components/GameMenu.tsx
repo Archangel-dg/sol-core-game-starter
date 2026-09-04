@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useT } from '@/lib/i18n';
 import { useSound } from '@/lib/sounds';
+import { useMotion } from '@/lib/motion';
 import { PLATFORM_URL } from '@/lib/links';
 import { LangSwitch } from './LangSwitch';
 import { Popover } from './Popover';
@@ -21,7 +22,7 @@ export interface GameMenuProps {
 /**
  * Spielmenü rechts in der Kopfleiste (Design-Zone). Von oben nach unten:
  * Wallet (Kürzel, Icon des Adapters, kopieren, trennen) · Sprache · Sound ·
- * letzte Runden · Seed-Hash.
+ * Animationen · letzte Runden · Seed-Hash.
  *
  * Verify-Links und Seed-Hash sind seit dem 03.09.2026 hier erreichbar statt
  * unter dem Spiel sichtbar — das Menü ist die eine Stelle, an der ein Spieler
@@ -31,6 +32,7 @@ export function GameMenu({ history, serverSeedHash, roundId, verifierUrl }: Game
   const t = useT();
   const { wallet, publicKey, connected, disconnect } = useWallet();
   const { enabled: soundOn, setEnabled: setSoundOn, play } = useSound();
+  const { enabled: motionOn, setEnabled: setMotionOn } = useMotion();
   const [copied, setCopied] = useState(false);
   const [seedOpen, setSeedOpen] = useState(false);
 
@@ -147,6 +149,34 @@ export function GameMenu({ history, serverSeedHash, roundId, verifierUrl }: Game
                 />
               </span>
               {soundOn ? t('menu.soundOn') : t('menu.soundOff')}
+            </button>
+          </div>
+
+          {/* Animationen — aus heißt: jedes Ergebnis binnen 300 ms als Endbild.
+              Die Sperre der Ergebnisse gilt trotzdem (lib/motion.ts). */}
+          <div className={`${sectionCls} flex items-center justify-between`}>
+            <span className="text-xs text-white/60">{t('menu.motion')}</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={motionOn}
+              onClick={() => setMotionOn(!motionOn)}
+              className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-xs ${
+                motionOn ? 'border-accent/50 text-accent' : 'border-white/15 text-white/50'
+              }`}
+            >
+              <span
+                className={`relative inline-block h-4 w-7 rounded-full transition-colors ${
+                  motionOn ? 'bg-accent' : 'bg-white/20'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-night transition-all ${
+                    motionOn ? 'left-3.5' : 'left-0.5'
+                  }`}
+                />
+              </span>
+              {motionOn ? t('menu.motionOn') : t('menu.motionOff')}
             </button>
           </div>
 

@@ -4,7 +4,7 @@ import { useSound } from '@/lib/sounds';
 import type { StringKey } from '@/lib/strings';
 import { VerifyLink } from './VerifyLink';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import type { EngineDef } from '@/lib/engines';
 import type { TournamentCycleInfo, TournamentLeaderboardEntry, TournamentRunView } from '@/lib/solcore';
@@ -12,6 +12,12 @@ import { toSol } from '@/lib/lamports';
 import { Amount } from './Amount';
 import { toUiError } from '@/lib/errors';
 import { usePlayerAuth } from '@/lib/player-auth';
+import { RevealHost } from './RevealHost';
+import { hasReveal } from '@/lib/reveal';
+import { tournamentOutcome } from '@/lib/reveal-session';
+
+/** Woher eine Server-Antwort kommt — entscheidet über den Ton nach dem Reveal. */
+type Antwort = 'enter' | 'step' | 'stop';
 
 /**
  * Turnier-Flow (gauntlet): enter (fester Einsatz → Pot) → step* (Risikostufe)
@@ -60,6 +66,12 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
   const [error, setError] = useState<string | null>(null);
   const trn = engine.tournament!;
   const storeKey = 'sc_tournament_run';
+  // ── Reveal-Gating (docs/RULES.md, Regel 16.4): Punkte, Bust und Bank stehen
+  // erst, wenn das Modul den Schritt gezeigt hat. Siehe SessionGame.
+  const animated = hasReveal(engine.key);
+  const [revealing, setRevealing] = useState(false);
+  const [reveal, setReveal] = useState<{ outcome: unknown; from: number } | null>(null);
+  const pending = useRef<{ view: TournamentRunView; outcome: unknown; kind: Antwort } | null>(null);
 
   const countdown = useCountdown(view?.cycle.endsAt ?? cycle?.endsAt);
 
@@ -94,8 +106,11 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
     fetch(`/api/tournament/run/${id}`)
       .then((r) => r.json())
       .then((v: TournamentRunView & { error?: unknown }) => {
-        if (!v.error && v.status === 'active') setView(v);
-        else localStorage.removeItem(storeKey);
+        if (!v.error && v.status === 'active') {
+          // Nach einem Reload steht der Stand sofort; das Modul spielt den Lauf nach.
+          setView(v);
+          setReveal({ outcome: tournamentOutcome(v, null), from: 0 });
+        } else localStorage.removeItem(storeKey);
       })
       .catch(() => localStorage.removeItem(storeKey));
   }, []);
@@ -129,7 +144,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
     const v = await call('/api/tournament/enter', { playerWallet: wallet });
     if (v) {
       localStorage.setItem(storeKey, v.runId);
-      setView(v);
+      deliver(v, 'enter');
     }
   };
 
@@ -140,29 +155,58 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
     }
   };
 
+  const sfx = (v: TournamentRunView, kind: Antwort) => {
+    if (kind === 'stop') play('cashout');
+    else if (v.status === 'busted') play('lose');
+  };
+  function deliver(v: TournamentRunView, kind: Antwort) {
+    if (!animated) {
+      sfx(v, kind);
+      setView(v);
+      finishIfEnded(v);
+      return;
+    }
+    const outcome = tournamentOutcome(v, cycle?.entryFeeLamports ?? null);
+    pending.current = { view: v, outcome, kind };
+    setRevealing(true);
+    setReveal({ outcome, from: view?.history.length ?? 0 });
+  }
+  const onRevealed = (outcome: unknown) => {
+    const p = pending.current;
+    if (!p || p.outcome !== outcome) return; // abgelöst oder schon geliefert
+    pending.current = null;
+    setRevealing(false);
+    setView(p.view);
+    sfx(p.view, p.kind);
+    finishIfEnded(p.view);
+  };
+
   const step = async (risk: 'safe' | 'medium' | 'risky') => {
     if (!view) return;
     play('click');
     const v = await call(`/api/tournament/run/${view.runId}/step`, trn.buildStep({ risk }));
-    if (v) {
-      if (v.status === 'busted') play('lose');
-      setView(v);
-      finishIfEnded(v);
-    }
+    if (v) deliver(v, 'step');
   };
 
   const stop = async () => {
     if (!view) return;
     const v = await call(`/api/tournament/run/${view.runId}/stop`);
-    if (v) {
-      play('cashout');
-      setView(v);
-      finishIfEnded(v);
-    }
+    if (v) deliver(v, 'stop');
   };
 
   const active = view?.status === 'active';
   const ended = view && view.status !== 'active';
+
+  // Statuszeile (Schritt x/y, Bust, gebankt). Mit Reveal-Modul im Bedienfeld —
+  // das Feld gehört der Animation; ohne Modul wie bisher im Feld.
+  const statusLine = view ? (
+    <>
+      {active && t('tournament.stepOf', { n: view.steps, max: view.maxSteps })}
+      {view.status === 'busted' && t('tournament.bust')}
+      {(view.status === 'stopped' || view.status === 'expired') &&
+        (view.bestScore !== undefined ? t('tournament.bankedBest', { score: view.bestScore }) : t('tournament.banked'))}
+    </>
+  ) : null;
 
   return (
     <div className="space-y-4">
@@ -195,18 +239,24 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
           frei gestalten oder ersetzen, ohne die Eingaben mit umzubauen.
           Quadratisch (aspect-square): so hoch wie breit, auf jedem Gerät. */}
       <div className="grid aspect-square rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <div className="grid h-full place-items-center overflow-auto rounded-xl bg-night px-2 py-3 text-center">
-          {view ? (
+        <div className={animated ? 'h-full w-full overflow-hidden rounded-xl bg-night' : 'grid h-full place-items-center overflow-auto rounded-xl bg-night px-2 py-3 text-center'}>
+          {animated ? (
+            // Das Reveal-Modul der Engine (src/reveals/gauntlet.js): jeder Schritt wird
+            // abgespielt, Punkte und Bust stehen erst am Ende.
+            <RevealHost
+              engineKey={engine.key}
+              engineConfig={(view?.engine?.config as Record<string, unknown> | undefined) ?? null}
+              outcome={reveal?.outcome ?? null}
+              from={reveal?.from}
+              onRevealed={onRevealed}
+              hint={t(engine.blurb)}
+            />
+          ) : view ? (
             <div>
               <div className={`text-3xl font-bold tabular-nums ${view.status === 'busted' ? 'text-red-400' : 'text-accent'}`}>
                 {view.score} <span className="text-base font-semibold text-white/50">{t('tournament.points')}</span>
               </div>
-              <div className="mt-1 text-sm text-white/70">
-                {active && t('tournament.stepOf', { n: view.steps, max: view.maxSteps })}
-                {view.status === 'busted' && t('tournament.bust')}
-                {(view.status === 'stopped' || view.status === 'expired') &&
-                  (view.bestScore !== undefined ? t('tournament.bankedBest', { score: view.bestScore }) : t('tournament.banked'))}
-              </div>
+              <div className="mt-1 text-sm text-white/70">{statusLine}</div>
             </div>
           ) : (
             <div className="px-4">
@@ -221,6 +271,9 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
 
       {/* Bedienfeld — Einsatz, Auswahl, Spielen. Getrennt vom Spielfeld. */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        {animated && statusLine && (
+          <div className="mb-3 text-center text-sm text-white/70">{statusLine}</div>
+        )}
         {!view || ended ? (
           <>
             {cycle && (
@@ -234,7 +287,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
             <button
               type="button"
               onClick={() => void enter()}
-              disabled={busy || !connected || !cycle}
+              disabled={busy || revealing || !connected || !cycle}
               className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
             >
               {!connected
@@ -254,7 +307,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
                 <button
                   key={tier}
                   type="button"
-                  disabled={busy}
+                  disabled={busy || revealing}
                   onClick={() => void step(tier)}
                   className={`rounded-lg border py-2 text-sm transition disabled:opacity-40 ${RISK_LABEL[tier]!.cls}`}
                 >
@@ -266,7 +319,7 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
             <button
               type="button"
               onClick={() => void stop()}
-              disabled={busy}
+              disabled={busy || revealing}
               className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
             >
               {t('tournament.bank', { score: view.score })}

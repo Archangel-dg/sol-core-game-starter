@@ -10,8 +10,8 @@ import { usePlayerAuth } from '@/lib/player-auth';
 import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { EngineControls } from './EngineControls';
 import { ResultView } from './ResultView';
-import { SlotGrid } from './SlotGrid';
-import { CoinFlipView } from './CoinFlipView';
+import { RevealHost } from './RevealHost';
+import { hasReveal } from '@/lib/reveal';
 import { RouletteBoard, spotKey, type RouletteSpot } from './RouletteBoard';
 import { MaxBetPick } from './BetLimitHint';
 import { FiatHint } from './FiatHint';
@@ -55,19 +55,24 @@ function plinkoControls(engine: EngineDef, engineConfig?: Record<string, number>
 }
 
 /**
- * Engines, deren Ergebnis eine eigene Animation ausspielt und deshalb SELBST
- * meldet, wann es sichtbar feststeht (`onRevealed`). Alle anderen zeigen das
- * Ergebnis sofort mit dem Render.
- *
- * Wer eine neue Reveal-Animation baut, trägt ihren Engine-Schlüssel hier ein —
- * sonst taut der Saldo auf, während die Animation noch läuft, und verrät den
- * Ausgang vor der Ziellinie.
+ * Sicherheitsnetz: Sollte eine Animation nie melden (Tab im Hintergrund,
+ * Fehler), taut der Saldo trotzdem auf. freezeUntil legt 5 s obendrauf. Das
+ * längste Modul braucht 4,5 s (Session-Protokolle) — 5 s decken jedes ab.
  */
-const ANIMATED_REVEALS = new Set<string>(['coin-flip']);
+const REVEAL_BACKSTOP_MS = 5_000;
 
-/** Sicherheitsnetz: Sollte eine Animation nie melden (Tab im Hintergrund,
- *  Fehler), taut der Saldo trotzdem auf. freezeUntil legt 5 s obendrauf. */
-const REVEAL_BACKSTOP_MS = 3_000;
+/** Das Ergebnis einer Runde, so wie es ins Reveal-Modul geht: das Server-
+ *  Ergebnis plus Einsatz, Runden-ID und die Engine-Geometrie. */
+interface RoundOutcome {
+  roundId: string;
+  win: boolean;
+  multiplierBps: number;
+  payoutLamports: string;
+  roll: number | null;
+  details: Record<string, unknown> | null;
+  betLamports: string;
+  engineConfig: Record<string, number> | null;
+}
 
 /**
  * Generischer Einzel-Bet-Flow (funktioniert für JEDE single-Engine). Die
@@ -103,16 +108,17 @@ export function SingleBetGame({
   const [rouletteSpots, setRouletteSpots] = useState<RouletteSpot[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    win: boolean;
-    multiplierBps: number;
-    payoutLamports: string;
-    roll: number | null;
-    details: Record<string, unknown> | null;
-  } | null>(null);
-  /** Was erst mit der Landung sichtbar werden darf: Ton, Verlaufseintrag,
-   *  Saldo. Bis dahin liegt es hier und NICHT in der Oberfläche. */
-  const pendingReveal = useRef<{ win: boolean; log: RoundLog } | null>(null);
+  const [result, setResult] = useState<RoundOutcome | null>(null);
+  /**
+   * Was erst mit der Landung sichtbar werden darf: Ton, Verlaufseintrag,
+   * Saldo. Bis dahin liegt es hier und NICHT in der Oberfläche — je Runde
+   * (Runden-ID), damit eine Meldung immer IHRE Runde freigibt und nie „die
+   * letzte" annimmt.
+   */
+  const pendingReveal = useRef(new Map<string, { win: boolean; log: RoundLog }>());
+  /** Läuft gerade eine Animation? Solange ja, bleibt „Spielen" gesperrt: Die
+   *  nächste Runde darf erst starten, wenn diese sichtbar entschieden ist. */
+  const [revealing, setRevealing] = useState(false);
 
   // Render-Grenzen aus der Server-Config — ändert NICHT die params-Struktur
   // (buildSingleParams bleibt unverändert), nur die angezeigten Controls.
@@ -212,10 +218,10 @@ export function SingleBetGame({
         return;
       }
       // Ab hier ist das Ergebnis da — sichtbar werden darf es erst, wenn die
-      // Animation es zeigt. Der Saldo friert sofort ein (Backstop 8 s, siehe
+      // Animation es zeigt. Der Saldo friert sofort ein (Backstop 10 s, siehe
       // freezeUntil), Ton und Verlaufseintrag warten in pendingReveal.
       freezeUntil(Date.now() + REVEAL_BACKSTOP_MS);
-      pendingReveal.current = {
+      pendingReveal.current.set(r.roundId, {
         win: r.result.win,
         log: {
           betLamports: betLamports.toString(),
@@ -224,13 +230,17 @@ export function SingleBetGame({
           payoutLamports: r.result.payoutLamports,
           roundId: r.roundId,
         },
-      };
+      });
+      setRevealing(true);
       setResult({
+        roundId: r.roundId,
         win: r.result.win,
         multiplierBps: r.result.multiplierBps,
         payoutLamports: r.result.payoutLamports,
         roll: r.result.roll,
         details: r.result.details ?? null,
+        betLamports: betLamports.toString(),
+        engineConfig: engineConfig ?? null,
       });
       // Der Seed-Hash gehört zur Runde, nicht zum Ausgang — er verrät nichts
       // und bleibt deshalb sofort erreichbar (Nachprüfbarkeit, Regel 6).
@@ -244,20 +254,25 @@ export function SingleBetGame({
   };
 
   // Die Animation meldet die Landung; erst jetzt darf das Ergebnis nach außen.
-  const onRevealed = useCallback(() => {
-    const p = pendingReveal.current;
-    pendingReveal.current = null;
-    release();
-    if (!p) return;
-    sfx(p.win ? 'win' : 'lose');
-    onLog(p.log);
-    if (demo) void refreshDemoBalance();
-  }, [release, sfx, onLog, demo, refreshDemoBalance]);
+  const onRevealed = useCallback(
+    (outcome: unknown) => {
+      const roundId = (outcome as RoundOutcome | null)?.roundId;
+      const p = roundId ? pendingReveal.current.get(roundId) : undefined;
+      if (roundId) pendingReveal.current.delete(roundId);
+      setRevealing(false);
+      release();
+      if (!p) return;
+      sfx(p.win ? 'win' : 'lose');
+      onLog(p.log);
+      if (demo) void refreshDemoBalance();
+    },
+    [release, sfx, onLog, demo, refreshDemoBalance],
+  );
 
-  // Engines ohne eigene Animation zeigen das Ergebnis mit dem Render — für sie
-  // ist die Landung genau dieser Moment.
+  // Engines ohne Reveal-Modul zeigen das Ergebnis mit dem Render — für sie ist
+  // die Landung genau dieser Moment.
   useEffect(() => {
-    if (result && !ANIMATED_REVEALS.has(engine.key)) onRevealed();
+    if (result && !hasReveal(engine.key)) onRevealed(result);
   }, [result, engine.key, onRevealed]);
 
   return (
@@ -267,47 +282,31 @@ export function SingleBetGame({
           frei gestalten oder ersetzen, ohne die Eingaben mit umzubauen.
           Quadratisch (aspect-square): so hoch wie breit, auf jedem Gerät. */}
       <div className="grid aspect-square rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        {(() => {
-          const slotsDetails =
-            engine.key === 'slots-modular' && result && Array.isArray((result.details as { grid?: unknown } | null)?.grid)
-              ? (result.details as Record<string, unknown>)
-              : null;
-          if (engine.key === 'slots-modular' && !result) {
-            // Idle: Paytable-Vorschau aus dem renderSpec.
-            return <SlotGrid engineConfig={engineConfig ?? null} details={null} />;
-          }
-          if (slotsDetails) {
-            return (
-              <SlotGrid
-                engineConfig={engineConfig ?? null}
-                details={slotsDetails}
-                win={result!.win}
-                multiplierBps={result!.multiplierBps}
-                payoutLamports={result!.payoutLamports}
-              />
-            );
-          }
-          if (engine.key === 'coin-flip') {
-            // Eigene Reveal-Animation statt der schlichten ResultView: dieselben
-            // Zahlen, von einer Münze ausgespielt. Sie zeigt auch den Leerlauf,
-            // deshalb steht sie vor der result-Verzweigung (Design-Zone).
-            return <CoinFlipView result={result} hint={t(engine.blurb)} onRevealed={onRevealed} />;
-          }
-          return result ? (
-            <ResultView {...result} />
-          ) : (
-            /* bisheriger Idle-Block unverändert (nicht-slots Engines) */
-            <div className="grid h-full place-items-center overflow-auto rounded-xl bg-night px-4 py-3 text-center">
-              <div>
-                <p className="text-white/40">{t(engine.blurb)}</p>
-                {/* Income/Outcome in einfachen Worten — was man tut, was passieren kann. */}
-                <p className="mt-2 text-xs text-white/30">
-                  {t(engine.playerFacts.inputs)} {t(engine.playerFacts.outcomes)}
-                </p>
-              </div>
+        {hasReveal(engine.key) ? (
+          // Die Reveal-Animation der Engine (src/reveals/<engine>.js): zeigt
+          // den Leerlauf aus der Server-Geometrie, spielt jede Runde ab und
+          // meldet die Landung — erst dann tauen Saldo, Ton und Verlauf auf.
+          <RevealHost
+            engineKey={engine.key}
+            engineConfig={engineConfig ?? null}
+            outcome={result}
+            onRevealed={onRevealed}
+            hint={t(engine.blurb)}
+          />
+        ) : result ? (
+          <ResultView {...result} />
+        ) : (
+          /* Leerlauf für Engines ohne Modul (eigene Engines eines Creators). */
+          <div className="grid h-full place-items-center overflow-auto rounded-xl bg-night px-4 py-3 text-center">
+            <div>
+              <p className="text-white/40">{t(engine.blurb)}</p>
+              {/* Income/Outcome in einfachen Worten — was man tut, was passieren kann. */}
+              <p className="mt-2 text-xs text-white/30">
+                {t(engine.playerFacts.inputs)} {t(engine.playerFacts.outcomes)}
+              </p>
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
 
       {/* Bedienfeld — Einsatz, Auswahl, Spielen. Getrennt vom Spielfeld. */}
@@ -358,7 +357,10 @@ export function SingleBetGame({
         <button
           type="button"
           onClick={() => void play()}
-          disabled={busy || !connected}
+          // Gesperrt, solange die Animation läuft: Die nächste Runde darf erst
+          // starten, wenn diese sichtbar entschieden ist — sonst stünde ein
+          // Ergebnis im Verlauf, das nie zu sehen war.
+          disabled={busy || revealing || !connected}
           className="mt-4 w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
         >
           {!connected ? t('common.connectWallet') : busy ? t('bet.running') : t('common.play')}

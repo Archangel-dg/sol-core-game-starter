@@ -1,0 +1,15 @@
+// Fixtures for the hilo reveal — the transcript `lib/reveal-session.ts` builds from a SessionView.
+const S = (id, startCard, steps, rest) => ({ sessionId: id, betLamports: '100000000', startCard, steps, ...rest });
+export const samples = [
+  { name: 'Three steps · cash-out', outcome: S('h1', 5, [{ guess: 'higher', card: 5, nextCard: 9, correct: true, multiplierBps: 15763 }, { guess: 'lower', card: 9, nextCard: 3, correct: true, multiplierBps: 24846 }, { guess: 'higher', card: 3, nextCard: 12, correct: true, multiplierBps: 31331 }], { status: 'cashed_out', multiplierBps: 31331, payoutLamports: '313310000', win: true }) },
+  { name: 'Second card · bust', outcome: S('h2', 13, [{ guess: 'lower', card: 13, nextCard: 2, correct: true, multiplierBps: 10508 }, { guess: 'higher', card: 2, nextCard: 1, correct: false, multiplierBps: 10508 }], { status: 'busted', multiplierBps: 0, payoutLamports: '0', win: false }) },
+  { name: 'Tie on 7 · lost', outcome: S('h3', 7, [{ guess: 'higher', card: 7, nextCard: 7, correct: false, multiplierBps: 10000 }], { status: 'busted', multiplierBps: 0, payoutLamports: '0', win: false }) },
+  { name: 'Risky chain · 20.25×', outcome: S('h4', 10, [{ guess: 'higher', card: 10, nextCard: 12, correct: true, multiplierBps: 42033 }, { guess: 'lower', card: 12, nextCard: 4, correct: true, multiplierBps: 48185 }, { guess: 'lower', card: 4, nextCard: 2, correct: true, multiplierBps: 202538 }], { status: 'cashed_out', multiplierBps: 202538, payoutLamports: '1012690000', win: true, capped: true }) },
+  { name: 'First card · bust', outcome: S('h5', 3, [{ guess: 'higher', card: 3, nextCard: 2, correct: false, multiplierBps: 10000 }], { status: 'busted', multiplierBps: 0, payoutLamports: '0', win: false }) },
+];
+export const configs = [{ name: 'default', engineConfig: { maxSteps: 10, cards: 13 } }];
+export const incremental = [
+  { name: 'start card, then the first guess', from: 0, first: S('hi1', 5, [], { status: 'active', multiplierBps: 10000, win: false }), then: S('hi1', 5, [{ guess: 'higher', card: 5, nextCard: 9, correct: true, multiplierBps: 15763 }], { status: 'active', multiplierBps: 15763, win: false }) },
+  { name: 'second guess busts', from: 1, first: S('hi2', 13, [{ guess: 'lower', card: 13, nextCard: 2, correct: true, multiplierBps: 10508 }], { status: 'active', multiplierBps: 10508, win: false }), then: S('hi2', 13, [{ guess: 'lower', card: 13, nextCard: 2, correct: true, multiplierBps: 10508 }, { guess: 'higher', card: 2, nextCard: 1, correct: false, multiplierBps: 10508 }], { status: 'busted', multiplierBps: 0, payoutLamports: '0', win: false }) },
+  { name: 'cash-out after one guess', from: 1, first: S('hi3', 5, [{ guess: 'higher', card: 5, nextCard: 9, correct: true, multiplierBps: 15763 }], { status: 'active', multiplierBps: 15763, win: false }), then: S('hi3', 5, [{ guess: 'higher', card: 5, nextCard: 9, correct: true, multiplierBps: 15763 }], { status: 'cashed_out', multiplierBps: 15763, payoutLamports: '157630000', win: true }) },
+];

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EngineDef } from '@/lib/engines';
-import type { DemoDiceDuelView } from '@/lib/solcore';
+import type { DemoDiceDuelView, DiceDuelView } from '@/lib/solcore';
 import { toSol, solToLamports } from '@/lib/lamports';
 import { usePvpLang, pvpErrorText, PVP_LANGS } from '@/lib/pvp-i18n';
 import { useT } from '@/lib/i18n';
@@ -10,6 +10,10 @@ import { usePlayer, useDemo } from './DemoProvider';
 // Das Board wird 1:1 aus DiceDuelGame wiederverwendet — die Demo unterscheidet
 // sich nur in der Steuerung (Sim-Balance, Server-Bot statt echter Lobby).
 import { DiceDuelBoard, DiceDuelEnd, DiceDuelFarkle } from './DiceDuelGame';
+import { useDiceRollReveal } from '@/lib/dice-reveal';
+/** Für den Würfelwurf-Reveal: die Tischwürfel lesen / eine Kopie mit anderen Augen bauen. */
+const diceOfDuel = (v: DiceDuelView): number[] => v.tableDice;
+const withDiceDuel = (v: DiceDuelView, tableDice: number[]): DiceDuelView => ({ ...v, tableDice });
 
 /**
  * PvP-Dice-Duel-DEMO (Plan §6.4): rundenbasiertes Farkle gegen den Server-Bot
@@ -149,7 +153,10 @@ export function DemoDiceDuelGame({
     setError(null);
   }, []);
 
-  const dd = match?.diceDuel ?? null;
+  const ddLatest = match?.diceDuel ?? null;
+  // Würfelwurf-Reveal (lib/dice-reveal.ts): ein neuer Wurf taumelt erst einen Moment, das
+  // Board zeigt solange den Stand davor — Punkte, Farkle/Bust und Bank stehen nie vor den Würfeln.
+  const { shown: dd, rolling } = useDiceRollReveal(ddLatest, diceOfDuel, withDiceDuel);
   const settled = match?.status === 'settled' || (!!dd && dd.matchOver);
 
   // Farkle-Enthüllung: die Demo pollt (kein Dauer-Poll wie das echte Match). Der
@@ -235,7 +242,7 @@ export function DemoDiceDuelGame({
             dd={dd}
             mySeat={1}
             serverNow={Date.now()}
-            busy={moveBusy}
+            busy={moveBusy || rolling}
             reduced={reduced.current}
             error={moveError}
             onMove={(keep, action) => void doMove(keep, action)}

@@ -7,7 +7,8 @@ result animation.
 
 - `src/app/globals.css`, `tailwind.config.ts` — colors, fonts, look.
 - `src/app/page.tsx` — layout / arrangement.
-- `src/components/ResultView.tsx` — result display (animation pays off here).
+- `src/reveals/<engine>.js` — the reveal animation of each engine (see below); `src/components/ResultView.tsx` —
+  the plain fallback for an engine without a module.
 - `src/components/SingleBetGame.tsx` / `SessionGame.tsx` — play area / HUD.
 - `src/components/EngineControls.tsx` — the look of the inputs.
 - `src/components/FairnessPanel.tsx`, `History.tsx`, `BalanceBar.tsx`, `HeaderBar.tsx`, `GameMenu.tsx`,
@@ -43,17 +44,54 @@ Binding rules:
    `BalanceBar`, because a real-money deposit could never be spent in that game. The freeze wiring
    itself stays — only that one engine skips the bar.
 
-## Build your own engine visuals
+## Reveal animations (`src/reveals/<engine>.js`)
 
-Want a real animation for your engine (a rising pump curve, flipping hi-lo cards) instead of the
-plain `ResultView`:
+Every engine that plays a round has a reveal module: plain browser JavaScript, no framework,
+drawn into the square play field. `RevealHost` mounts it, hands it the outcome and the
+translations, and tells the flow when the final frame stands. The flows (`SingleBetGame`,
+`SessionGame`, `TournamentGame`) WAIT for that moment: the multiplier in the HUD, the sound, the
+round history, the balance and the win toast all follow `onRevealed` — nothing that gives the
+result away moves before the animation has ended.
 
-1. Build a component that receives the **same props** as `ResultView`
-   (`win`, `multiplierBps`, `payoutLamports`, `roll`, `detail`).
-2. Replace `ResultView` in `SingleBetGame.tsx` / `SessionGame.tsx` with yours.
-3. **Do not** change the params structure in `lib/engines.ts` — it's the contract with the server.
-   Add new inputs only as extra controls whose values you assemble correctly in
-   `buildSingleParams` / `buildStep`.
+Want the coin to be a card, the plinko board to be a rocket track? Replace the module file. The
+contract is in `src/lib/reveal.ts` (`RevealModule`) and it is small: `mount(root, ctx)` returns
+`{ play(outcome, { reducedMotion, from }), reset(), destroy() }`. `ctx.engineConfig` carries the
+game's real dimensions (rows, grid size, pockets, ladder …) — draw the idle board from it; the
+outcome carries the round's own details. `ctx.text(key)` reads the catalog (four languages),
+`ctx.fmt` formats money exactly like the rest of the interface. Fixtures with the exact server
+shapes sit in `src/reveals/samples/`.
+
+Binding rules (rule 16 in `docs/RULES.md`):
+
+1. **Pure function of the outcome.** No `Math.random()`. The same round looks the same every
+   time it is played.
+2. **Nothing recognisable early.** The readout nodes stay EMPTY until the final frame — not
+   hidden, empty. DevTools, `innerText` and a screen reader learn nothing before the player.
+3. **No near-miss.** No slowing down, no wobble, no hesitation next to the winning field. A loss
+   is shown as a loss, at the same pace.
+4. **The winner stands at the end** — `play()` resolves only when the final frame stands, and it
+   stays.
+5. **Results only from the outcome.** `win`, `multiplierBps`, `payoutLamports` are read, never
+   recomputed from a roll.
+6. **No hard-coded text.** Every label goes through `ctx.text(...)`; the keys the module reads
+   are listed in its `strings` array so the contract check can find them.
+
+Session engines play their transcript STEP BY STEP: `play(o, { from })` says how many steps
+already stand on the board; the module sets those instantly and animates only the new step.
+`src/lib/reveal-session.ts` builds the transcript from the server's session view. Live engines
+(`live-odds`, `live-crash`, `live-drift`) and `pvp-coinflip` are not modules: their animation is
+a function of a server-side reveal window (`revealProgress`) and lives in `LiveResultView`,
+`CrashCurveView`, `DriftTrackView` and `PvpGame`. The PvP dice boards keep their interactive
+layout and use `lib/dice-reveal.ts`: a new roll tumbles for a moment before points, Farkle or
+bank appear.
+
+`npm run check:contract` (section 9) verifies the static part — every registered engine has its
+module, no module uses `Math.random`, no module fetches, every text key exists — and the flows
+wait for `onRevealed`. The kit's `scripts/check-reveals.mjs` plays every module in a real Chromium
+against its fixtures and reads the DOM mid-animation.
+
+A player can switch the animations off in the game menu (rule 4 still holds: the final frame
+appears at once, and everything else waits for it just the same).
 
 ## Ship one engine
 

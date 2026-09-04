@@ -2,6 +2,55 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-04 — Reveal animations for every engine, and nothing shows before they end
+- Every engine that plays a round now has a reveal module under src/reveals/<engine>.js:
+  coin-flip, dice, limbo, plinko, wheel, keno, scratch, roulette, slots-3x3, slots-modular
+  (single bets); mines, towers, hilo, dice-ladder, steps, pump, spin-tower-pro (sessions,
+  played STEP BY STEP — only the new step moves); gauntlet (tournament). The PvP dice boards
+  keep their interactive layout and tumble a new roll for a moment (lib/dice-reveal.ts)
+  before points, Farkle or bank appear. Live engines and pvp-coinflip keep their contract
+  views, which already follow the server's reveal window.
+- The modules are plain browser JavaScript without a framework — a creator who wants a
+  card instead of a coin replaces one file. Contract, registry and loader: src/lib/reveal.ts;
+  the host that mounts a module and reports the final frame: components/RevealHost.tsx.
+  Fixtures with the exact server shapes: src/reveals/samples/.
+- Every module draws its IDLE board from the game's real configuration (engineConfig from
+  /api/meta): 16 plinko rows show 17 buckets before the first drop, a 38-pocket roulette
+  wheel carries the 00, a 4×4 mines board has 16 tiles, the steps ladder shows the game's
+  own rungs and checkpoints. Per round the outcome's own details decide.
+- THE FLOWS WAIT. SingleBetGame, SessionGame and TournamentGame hold the server's answer
+  (`pending`) until the module reports the final frame (`onRevealed`): only then move the
+  HUD multiplier, the sound, the round history, the balance display (freeze released) and
+  the win toast. Inputs are locked while a reveal runs. A session step that arrives while the
+  previous one is still animating is played after it, never over it. Measured in the built
+  app at 360 px (mines, demo mode): 150 ms after a pick every tile is disabled and the HUD
+  still reads step 0; after the flip the gem stands, the HUD reads 1.10×; on the mine the
+  readout "0.00× Lost" enters the DOM only after the other mines have turned.
+- Six rules that are not taste, now written down as rule 16 in docs/RULES.md and checked:
+  pure function of the outcome (no Math.random), nothing recognisable early (readout nodes
+  EMPTY, not hidden), no near-miss, the winner stands at the end, results only from the
+  outcome, no hard-coded text (every label through ctx.text in four languages).
+  npm run check:contract section 9 checks the static half (registry ↔ files, no
+  Math.random, no network, every text key in the catalog, the flows wired to onRevealed).
+  The kit's scripts/check-reveals.mjs plays all 18 modules in Chromium against 90 fixtures
+  plus 20 step-by-step sequences and reads the DOM mid-animation.
+- A new "Animations" switch in the game menu (lib/motion.ts, stored as sc_motion); off, or
+  with the OS set to reduced motion, the final frame appears at once — and everything else
+  still waits for it.
+- Session replays after a reload: the server now carries progress.multiplierHistory (the
+  multiplier after every step call), so a reloaded page replays the round with the right
+  figure per step instead of only the current one. Older API builds still work — the
+  template writes the history itself while the session runs.
+- Removed: components/CoinFlipView.tsx and its CSS — the coin lives in src/reveals/coin-flip.js
+  now, with the same flight and the same readout. SlotGrid.tsx stays as a plain component
+  (unused by the single-bet flow; the slots modules draw the reels themselves).
+- New catalog keys (all four languages): menu.motion*, reveal.* (about 130 keys — the
+  module labels: mines, towers, hilo, dice-ladder, steps, pump, spin-tower, gauntlet, plinko,
+  dice, limbo, wheel, keno, scratch, roulette, slots). The website's strings mirror is synced.
+- Theme tokens for the modules in globals.css (--night, --fg, --accent, --red, --amber,
+  --line, --panel, --muted, --faint, --mono): NEXT_PUBLIC_ACCENT_COLOR tints coin, wheel
+  and ball as before.
+
 2026-09-04 — The currency approximation reaches every mechanic
 - Coin Flip had it; the other twelve mechanics did not. Now every MONEY INPUT in the
   template carries the approximation next to its label: session (mines, towers, pump,

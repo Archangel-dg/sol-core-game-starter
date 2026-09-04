@@ -201,7 +201,180 @@ export const STRINGS = {
   },
   'result.lost': { en: 'Lost', de: 'Verloren', fr: 'Perdu', ru: 'Проигрыш' },
 
-  // ── Coin-Flip-Reveal (CoinFlipView) ──────────────────────────────────────
+  // ── Reveal-Module (src/reveals/*.js) — gemeinsame Schlüssel ──────────────
+  // Die Endbild-Zeile jeder Animation. Kurz, weil sie in ein Quadrat passen
+  // muss, das auf dem Telefon 300 px breit ist.
+  'reveal.won': {
+    en: 'Won +{amount} ◎',
+    de: 'Gewonnen +{amount} ◎',
+    fr: 'Gagné +{amount} ◎',
+    ru: 'Выигрыш +{amount} ◎',
+  },
+  // ── Reveal-Module: gemeinsame Zusatzschlüssel ────────────────────────────
+  'reveal.roll': { en: 'Roll {roll}', de: 'Wurf {roll}', fr: 'Tirage {roll}', ru: 'Бросок {roll}' },
+  'reveal.bet': { en: 'Bet {amount} ◎', de: 'Einsatz {amount} ◎', fr: 'Mise {amount} ◎', ru: 'Ставка {amount} ◎' },
+  'reveal.more': { en: '+{n} more', de: '+{n} weitere', fr: '+{n} de plus', ru: '+{n} ещё' },
+
+  // ── Reveal: dice ─────────────────────────────────────────────────────────
+  'reveal.dice.over': { en: 'Roll over {target}', de: 'Wurf über {target}', fr: 'Tirage au-dessus de {target}', ru: 'Бросок выше {target}' },
+  'reveal.dice.under': { en: 'Roll under {target}', de: 'Wurf unter {target}', fr: 'Tirage en dessous de {target}', ru: 'Бросок ниже {target}' },
+  'reveal.dice.chance': { en: '{pct}% to win', de: '{pct}% Gewinnchance', fr: '{pct}% de chances', ru: '{pct}% на выигрыш' },
+
+  // ── Reveal: limbo ────────────────────────────────────────────────────────
+  'reveal.limbo.target': { en: 'Target {x}', de: 'Ziel {x}', fr: 'Cible {x}', ru: 'Цель {x}' },
+  'reveal.limbo.multiplier': { en: 'Multiplier', de: 'Multiplikator', fr: 'Multiplicateur', ru: 'Множитель' },
+  'reveal.limbo.climbing': { en: 'Multiplier climbing', de: 'Multiplikator steigt', fr: 'Le multiplicateur monte', ru: 'Множитель растёт' },
+  'reveal.limbo.crashed': { en: 'Crashed', de: 'Gecrasht', fr: 'Crash', ru: 'Крах' },
+  'reveal.limbo.reached': { en: 'Target reached', de: 'Ziel erreicht', fr: 'Cible atteinte', ru: 'Цель достигнута' },
+  'reveal.limbo.missed': { en: 'Target missed', de: 'Ziel verfehlt', fr: 'Cible manquée', ru: 'Цель не достигнута' },
+
+  // ── Reveal: wheel ────────────────────────────────────────────────────────
+  'reveal.wheel.cap': { en: '{n} segments · max {max}', de: '{n} Segmente · max. {max}', fr: '{n} segments · max {max}', ru: '{n} сегментов · макс. {max}' },
+  'reveal.wheel.landed': { en: 'Segment #{idx} of {n}', de: 'Segment #{idx} von {n}', fr: 'Segment n°{idx} sur {n}', ru: 'Сегмент #{idx} из {n}' },
+
+  // ── Reveal: keno ─────────────────────────────────────────────────────────
+  'reveal.keno.hits': { en: '{h} / {n} hits', de: '{h} / {n} Treffer', fr: '{h} / {n} touches', ru: '{h} / {n} попаданий' },
+  'reveal.keno.hint': { en: 'Pick your numbers · hits pay', de: 'Zahlen wählen · Treffer zahlen', fr: 'Choisis tes numéros · les touches paient', ru: 'Выбери числа · попадания платят' },
+  'reveal.keno.sub': { en: '{hits} of {picks} hits · {drawn} drawn', de: '{hits} von {picks} Treffern · {drawn} gezogen', fr: '{hits} sur {picks} touches · {drawn} tirés', ru: '{hits} из {picks} попаданий · {drawn} выпало' },
+
+  // ── Reveal: scratch ──────────────────────────────────────────────────────
+  'reveal.scratch.match': { en: 'Match 3', de: '3 gleiche', fr: '3 identiques', ru: '3 одинаковых' },
+  'reveal.scratch.hint': { en: '{n} fields · match 3 to win', de: '{n} Felder · 3 gleiche gewinnen', fr: '{n} cases · 3 identiques pour gagner', ru: '{n} полей · 3 одинаковых для выигрыша' },
+  'reveal.scratch.tier': { en: 'Prize tier {idx}', de: 'Gewinnstufe {idx}', fr: 'Palier {idx}', ru: 'Уровень приза {idx}' },
+  'reveal.scratch.prize': { en: 'Prize', de: 'Gewinn', fr: 'Prix', ru: 'Приз' },
+  'reveal.scratch.blank': { en: 'No prize', de: 'Kein Gewinn', fr: 'Pas de prix', ru: 'Без приза' },
+
+  // ── Reveal: roulette ─────────────────────────────────────────────────────
+  'reveal.roulette.cap': { en: 'European wheel · {n} pockets', de: 'Europäisches Rad · {n} Fächer', fr: 'Roue européenne · {n} cases', ru: 'Европейское колесо · {n} ячеек' },
+  'reveal.roulette.capUs': { en: 'American wheel · {n} pockets', de: 'Amerikanisches Rad · {n} Fächer', fr: 'Roue américaine · {n} cases', ru: 'Американское колесо · {n} ячеек' },
+  'reveal.roulette.sub': { en: 'Bet {bet} · Pocket {pocket}', de: 'Wette {bet} · Fach {pocket}', fr: 'Mise {bet} · Case {pocket}', ru: 'Ставка {bet} · Ячейка {pocket}' },
+  'reveal.roulette.chips': { en: '{n} chips', de: '{n} Chips', fr: '{n} jetons', ru: '{n} фишек' },
+  'reveal.roulette.green': { en: 'Green', de: 'Grün', fr: 'Vert', ru: 'Зелёное' },
+  'reveal.roulette.straight': { en: 'Straight {n}', de: 'Plein {n}', fr: 'Plein {n}', ru: 'Число {n}' },
+  'reveal.roulette.basket': { en: 'Basket {set}', de: 'Basket {set}', fr: 'Basket {set}', ru: 'Корзина {set}' },
+  'reveal.roulette.inside': { en: '{type} {set}', de: '{type} {set}', fr: '{type} {set}', ru: '{type} {set}' },
+  'reveal.roulette.splitName': { en: 'Split', de: 'Split', fr: 'Cheval', ru: 'Сплит' },
+  'reveal.roulette.streetName': { en: 'Street', de: 'Street', fr: 'Transversale', ru: 'Стрит' },
+  'reveal.roulette.cornerName': { en: 'Corner', de: 'Corner', fr: 'Carré', ru: 'Каре' },
+  'reveal.roulette.sixLineName': { en: 'Double street', de: 'Double Street', fr: 'Sixain', ru: 'Двойной стрит' },
+
+  // ── Reveal: slots-3x3 ────────────────────────────────────────────────────
+  'reveal.slots3.centre': { en: 'centre line pays', de: 'Mittellinie zahlt', fr: 'la ligne centrale paie', ru: 'платит центральная линия' },
+  'reveal.slots3.triple': { en: 'Triple', de: 'Drilling', fr: 'Triple', ru: 'Тройка' },
+  'reveal.slots3.pair': { en: 'Pair', de: 'Paar', fr: 'Paire', ru: 'Пара' },
+  'reveal.slots3.none': { en: 'No match', de: 'Kein Treffer', fr: 'Aucune combinaison', ru: 'Нет совпадений' },
+
+  // ── Reveal: slots-modular ────────────────────────────────────────────────
+  'reveal.slotsm.paytable': { en: 'Paytable · five of a kind', de: 'Auszahlung · fünf gleiche', fr: 'Table des gains · cinq identiques', ru: 'Таблица выплат · пять одинаковых' },
+  'reveal.slotsm.lines': { en: '{n} lines', de: '{n} Linien', fr: '{n} lignes', ru: '{n} линий' },
+  'reveal.slotsm.wilds': { en: 'wilds substitute', de: 'Wilds ersetzen', fr: 'les wilds remplacent', ru: 'вайлды заменяют' },
+  'reveal.slotsm.scatters': { en: '3+ scatters pay', de: '3+ Scatter zahlen', fr: '3+ scatters paient', ru: '3+ скаттера платят' },
+  'reveal.slotsm.spin': { en: 'Spin', de: 'Drehen', fr: 'Tour', ru: 'Спин' },
+  'reveal.slotsm.noLine': { en: 'no line paid', de: 'keine Linie gezahlt', fr: 'aucune ligne payée', ru: 'ни одна линия не сыграла' },
+
+  // ── Reveal: Session-/Turnier-Module (gemeinsame Bausteine) ──────────────
+  'reveal.step': { en: 'Step {n}', de: 'Schritt {n}', fr: 'Étape {n}', ru: 'Шаг {n}' },
+  'reveal.bustedStep': { en: 'Busted on step {n}', de: 'Verloren bei Schritt {n}', fr: 'Perdu à l’étape {n}', ru: 'Проигрыш на шаге {n}' },
+  'reveal.cashedSteps': { en: 'Cashed out after {n} steps', de: 'Ausgezahlt nach {n} Schritten', fr: 'Encaissé après {n} étapes', ru: 'Выплата после {n} шагов' },
+  'reveal.cashedOut': { en: 'cashed out', de: 'ausgezahlt', fr: 'encaissé', ru: 'выплата' },
+  'reveal.topReached': { en: 'top reached', de: 'oben angekommen', fr: 'sommet atteint', ru: 'вершина достигнута' },
+  'reveal.capped': { en: 'at the cap', de: 'am Limit', fr: 'au plafond', ru: 'по лимиту' },
+  'reveal.tie': { en: 'tie', de: 'Gleichstand', fr: 'égalité', ru: 'ничья' },
+  'reveal.equal': { en: 'Equal', de: 'Gleich', fr: 'Égal', ru: 'Равно' },
+
+  // ── Reveal: mines ────────────────────────────────────────────────────────
+  'reveal.mines.title': { en: 'Mines', de: 'Minen', fr: 'Mines', ru: 'Мины' },
+  'reveal.mines.board': { en: '{mines} mines / {tiles} tiles', de: '{mines} Minen / {tiles} Felder', fr: '{mines} mines / {tiles} cases', ru: '{mines} мин / {tiles} полей' },
+  'reveal.mines.gems': { en: '{n} gems · cashed out', de: '{n} Edelsteine · ausgezahlt', fr: '{n} gemmes · encaissé', ru: '{n} самоцветов · выплата' },
+  'reveal.mines.bust': { en: 'Mine on pick {n} · {mines} mines on the board', de: 'Mine beim {n}. Feld · {mines} Minen im Spiel', fr: 'Mine au choix {n} · {mines} mines sur la grille', ru: 'Мина на ходу {n} · {mines} мин на поле' },
+
+  // ── Reveal: towers ───────────────────────────────────────────────────────
+  'reveal.towers.title': { en: 'Towers', de: 'Türme', fr: 'Tours', ru: 'Башни' },
+  'reveal.towers.floor': { en: 'F{n}', de: 'E{n}', fr: 'É{n}', ru: 'Э{n}' },
+  'reveal.towers.shape': { en: '{levels} floors × {columns} · {bombs} bombs', de: '{levels} Etagen × {columns} · {bombs} Bomben', fr: '{levels} étages × {columns} · {bombs} bombes', ru: '{levels} этажей × {columns} · {bombs} бомб' },
+  'reveal.towers.mixed': { en: '{levels} floors · mixed', de: '{levels} Etagen · gemischt', fr: '{levels} étages · mixte', ru: '{levels} этажей · смешанно' },
+  'reveal.towers.cleared': { en: '{n} floors cleared · {end}', de: '{n} Etagen geschafft · {end}', fr: '{n} étages franchis · {end}', ru: '{n} этажей пройдено · {end}' },
+  'reveal.towers.bust': { en: 'Bomb on floor {n} · {bombs} bombs per floor', de: 'Bombe auf Etage {n} · {bombs} Bomben je Etage', fr: 'Bombe à l’étage {n} · {bombs} bombes par étage', ru: 'Бомба на этаже {n} · {bombs} бомб на этаж' },
+  'reveal.towers.bustShown': { en: 'Bomb on floor {n} · bombs shown', de: 'Bombe auf Etage {n} · Bomben aufgedeckt', fr: 'Bombe à l’étage {n} · bombes révélées', ru: 'Бомба на этаже {n} · бомбы показаны' },
+
+  // ── Reveal: hilo ─────────────────────────────────────────────────────────
+  'reveal.hilo.title': { en: 'Hi-Lo', de: 'Hi-Lo', fr: 'Hi-Lo', ru: 'Hi-Lo' },
+  'reveal.hilo.idle': { en: 'Higher or lower?', de: 'Höher oder tiefer?', fr: 'Plus haut ou plus bas ?', ru: 'Больше или меньше?' },
+
+  // ── Reveal: dice-ladder ──────────────────────────────────────────────────
+  'reveal.diceLadder.title': { en: 'Dice Ladder', de: 'Würfelleiter', fr: 'Échelle de dés', ru: 'Лестница костей' },
+  'reveal.diceLadder.higher': { en: '▲ Higher than {n}', de: '▲ Höher als {n}', fr: '▲ Plus que {n}', ru: '▲ Больше {n}' },
+  'reveal.diceLadder.lower': { en: '▼ Lower than {n}', de: '▼ Tiefer als {n}', fr: '▼ Moins que {n}', ru: '▼ Меньше {n}' },
+  'reveal.diceLadder.equal': { en: '= Equal to {n}', de: '= Gleich {n}', fr: '= Égal à {n}', ru: '= Равно {n}' },
+  'reveal.diceLadder.tie': { en: 'Tie on {n} · loses', de: 'Gleichstand bei {n} · verloren', fr: 'Égalité à {n} · perdu', ru: 'Ничья на {n} · проигрыш' },
+
+  // ── Reveal: steps ────────────────────────────────────────────────────────
+  'reveal.steps.title': { en: 'Steps', de: 'Stufen', fr: 'Marches', ru: 'Ступени' },
+  'reveal.steps.rungs': { en: '{n} rungs', de: '{n} Stufen', fr: '{n} marches', ru: '{n} ступеней' },
+  'reveal.steps.checkpoints': { en: '{n} checkpoints', de: '{n} Sicherungen', fr: '{n} paliers', ru: '{n} чекпоинтов' },
+  'reveal.steps.lives': { en: 'lives', de: 'Leben', fr: 'vies', ru: 'жизни' },
+  'reveal.steps.start': { en: 'start', de: 'Start', fr: 'départ', ru: 'старт' },
+  'reveal.steps.safe': { en: 'safe', de: 'sicher', fr: 'sûr', ru: 'сейф' },
+  'reveal.steps.top': { en: 'top', de: 'oben', fr: 'sommet', ru: 'верх' },
+  'reveal.steps.result': { en: 'Rung {rung} of {n} · {end}', de: 'Stufe {rung} von {n} · {end}', fr: 'Marche {rung} sur {n} · {end}', ru: 'Ступень {rung} из {n} · {end}' },
+  'reveal.steps.falls': { en: '{n} falls', de: '{n} Stürze', fr: '{n} chutes', ru: '{n} падений' },
+  'reveal.steps.bust': { en: 'Failed climb to rung {n} · {why}', de: 'Aufstieg zu Stufe {n} misslungen · {why}', fr: 'Montée vers la marche {n} ratée · {why}', ru: 'Подъём на ступень {n} не удался · {why}' },
+  'reveal.steps.noLives': { en: 'no lives left', de: 'kein Leben mehr', fr: 'plus de vies', ru: 'жизней не осталось' },
+  'reveal.steps.busted': { en: 'busted', de: 'verloren', fr: 'perdu', ru: 'проигрыш' },
+
+  // ── Reveal: pump ─────────────────────────────────────────────────────────
+  'reveal.pump.title': { en: 'Pump', de: 'Pumpe', fr: 'Pompe', ru: 'Насос' },
+  'reveal.pump.pumps': { en: 'Pumps {n}', de: 'Pumpen {n}', fr: 'Pompes {n}', ru: 'Накачек {n}' },
+  'reveal.pump.burstAt': { en: 'Burst at', de: 'Geplatzt bei', fr: 'Éclaté à', ru: 'Лопнул на' },
+  'reveal.pump.sub': { en: 'Bet {bet} ◎ · {n} pumps', de: 'Einsatz {bet} ◎ · {n} Pumpen', fr: 'Mise {bet} ◎ · {n} pompes', ru: 'Ставка {bet} ◎ · {n} накачек' },
+
+  // ── Reveal: spin-tower-pro ───────────────────────────────────────────────
+  'reveal.spinTower.title': { en: 'Spin Tower', de: 'Spin Tower', fr: 'Spin Tower', ru: 'Spin Tower' },
+  'reveal.spinTower.spin': { en: 'Spin {n}', de: 'Spin {n}', fr: 'Tour {n}', ru: 'Спин {n}' },
+  'reveal.spinTower.perSpin': { en: '{amount} ◎/spin', de: '{amount} ◎/Spin', fr: '{amount} ◎/tour', ru: '{amount} ◎/спин' },
+  'reveal.spinTower.joker': { en: 'Joker', de: 'Joker', fr: 'Joker', ru: 'Джокер' },
+  'reveal.spinTower.nothing': { en: 'Nothing', de: 'Nichts', fr: 'Rien', ru: 'Пусто' },
+  'reveal.spinTower.fail': { en: 'FAIL', de: 'FAIL', fr: 'FAIL', ru: 'FAIL' },
+  'reveal.spinTower.pot': { en: 'POT', de: 'POT', fr: 'POT', ru: 'ПОТ' },
+  'reveal.spinTower.secured': { en: 'SECURED', de: 'GESICHERT', fr: 'SÉCURISÉ', ru: 'ЗАЩИЩЕНО' },
+  'reveal.spinTower.reset': { en: 'reset', de: 'Reset', fr: 'remise à zéro', ru: 'сброс' },
+  'reveal.spinTower.stepdown': { en: 'step-down', de: 'Stufe runter', fr: 'un cran en moins', ru: 'на шаг вниз' },
+  'reveal.spinTower.busted': { en: 'FAIL · busted', de: 'FAIL · verloren', fr: 'FAIL · perdu', ru: 'FAIL · проигрыш' },
+  'reveal.spinTower.capReached': { en: 'Spin cap reached', de: 'Spin-Limit erreicht', fr: 'Plafond de tours atteint', ru: 'Лимит спинов' },
+  'reveal.spinTower.cashed': { en: 'Cashed out', de: 'Ausgezahlt', fr: 'Encaissé', ru: 'Выплата' },
+  'reveal.spinTower.sub': { en: '{status} · {n} spins · {staked} ◎ staked', de: '{status} · {n} Spins · {staked} ◎ gesetzt', fr: '{status} · {n} tours · {staked} ◎ misés', ru: '{status} · {n} спинов · {staked} ◎ поставлено' },
+
+  // ── Reveal: gauntlet ─────────────────────────────────────────────────────
+  'reveal.gauntlet.title': { en: 'Gauntlet', de: 'Gauntlet', fr: 'Gauntlet', ru: 'Гаунтлет' },
+  'reveal.gauntlet.steps': { en: '{n} steps', de: '{n} Schritte', fr: '{n} étapes', ru: '{n} шагов' },
+  'reveal.gauntlet.roll': { en: 'roll', de: 'Wurf', fr: 'tirage', ru: 'бросок' },
+  'reveal.gauntlet.survived': { en: 'survived · +{n}', de: 'überlebt · +{n}', fr: 'survécu · +{n}', ru: 'выжил · +{n}' },
+  'reveal.gauntlet.bust': { en: 'bust · roll {roll} ≥ {thr}', de: 'raus · Wurf {roll} ≥ {thr}', fr: 'perdu · tirage {roll} ≥ {thr}', ru: 'вылет · бросок {roll} ≥ {thr}' },
+  'reveal.gauntlet.banked': { en: 'banked', de: 'gebankt', fr: 'sécurisé', ru: 'зафиксировано' },
+  'reveal.gauntlet.stop': { en: 'stop', de: 'Stopp', fr: 'stop', ru: 'стоп' },
+  'reveal.gauntlet.full': { en: 'full', de: 'voll', fr: 'complet', ru: 'полный' },
+  'reveal.gauntlet.pts': { en: '{n} pts', de: '{n} Pkt.', fr: '{n} pts', ru: '{n} очк.' },
+  'reveal.gauntlet.bustStep': { en: 'Bust on step {n}', de: 'Raus bei Schritt {n}', fr: 'Perdu à l’étape {n}', ru: 'Вылет на шаге {n}' },
+  'reveal.gauntlet.expired': { en: 'Run expired', de: 'Lauf abgelaufen', fr: 'Course expirée', ru: 'Забег истёк' },
+  'reveal.gauntlet.bankedPts': { en: 'Banked {pts}', de: 'Gebankt: {pts}', fr: 'Sécurisé : {pts}', ru: 'Зафиксировано: {pts}' },
+  'reveal.gauntlet.sub': { en: '{n} of {max} steps · entry {fee} ◎ to the pot', de: '{n} von {max} Schritten · Einsatz {fee} ◎ in den Pot', fr: '{n} étapes sur {max} · mise {fee} ◎ dans le pot', ru: '{n} из {max} шагов · взнос {fee} ◎ в банк' },
+
+  // ── Reveal: plinko ───────────────────────────────────────────────────────
+  'reveal.plinko.rows': { en: '{rows} rows', de: '{rows} Reihen', fr: '{rows} rangées', ru: '{rows} рядов' },
+  'reveal.plinko.head': {
+    en: '{rows} rows · {risk}',
+    de: '{rows} Reihen · {risk}',
+    fr: '{rows} rangées · {risk}',
+    ru: '{rows} рядов · {risk}',
+  },
+  'reveal.plinko.risk.low': { en: 'low risk', de: 'geringes Risiko', fr: 'risque faible', ru: 'низкий риск' },
+  'reveal.plinko.risk.medium': { en: 'medium risk', de: 'mittleres Risiko', fr: 'risque moyen', ru: 'средний риск' },
+  'reveal.plinko.risk.high': { en: 'high risk', de: 'hohes Risiko', fr: 'risque élevé', ru: 'высокий риск' },
+  'reveal.plinko.risk.base': { en: 'base {base}', de: 'Basis {base}', fr: 'base {base}', ru: 'база {base}' },
+  'reveal.plinko.oneBall': { en: '1 ball', de: '1 Kugel', fr: '1 bille', ru: '1 шар' },
+  'reveal.plinko.balls': { en: '{n} balls · avg', de: '{n} Kugeln · Ø', fr: '{n} billes · moy.', ru: '{n} шаров · сред.' },
+
+  // ── Coin-Flip-Reveal (src/reveals/coin-flip.js) ──────────────────────────
   // ── Gewinnmeldung in der Kopfleiste (WinToast) ───────────────────────────
   'win.toast': {
     en: 'Won +{amount} ◎',
@@ -1837,6 +2010,9 @@ export const STRINGS = {
   'menu.sound': { en: 'Sound', de: 'Sound', fr: 'Son', ru: 'Звук' },
   'menu.soundOn': { en: 'On', de: 'An', fr: 'Activé', ru: 'Вкл' },
   'menu.soundOff': { en: 'Off', de: 'Aus', fr: 'Désactivé', ru: 'Выкл' },
+  'menu.motion': { en: 'Animations', de: 'Animationen', fr: 'Animations', ru: 'Анимации' },
+  'menu.motionOn': { en: 'On', de: 'An', fr: 'Activées', ru: 'Вкл' },
+  'menu.motionOff': { en: 'Off', de: 'Aus', fr: 'Désactivées', ru: 'Выкл' },
   'menu.noRounds': { en: 'No rounds yet.', de: 'Noch keine Runden.', fr: 'Pas encore de manche.', ru: 'Раундов пока нет.' },
   'menu.seedHash': { en: 'Seed hash', de: 'Seed-Hash', fr: 'Hash du seed', ru: 'Хеш сида' },
   'menu.history': { en: 'History', de: 'Historie', fr: 'Historique', ru: 'История' },

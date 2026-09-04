@@ -2,6 +2,39 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-04 — Chain controls stay on screen, and the third guess finally exists
+- Session games no longer push their controls below the fold. The board stays square but
+  its edge is now capped at a share of the screen height (`.sc-board`, 48svh with a vh
+  fallback), and on narrow screens the control block sticks to the bottom edge
+  (`.sc-controls`). Measured on the phone this came from: board, guess buttons and cash-out
+  all fit one screen at 390x664 and at 360x600 — before, "Higher/Lower" and "Cash out"
+  scrolled out of sight the moment a round was running.
+- The current value (hi-lo card, dice-ladder sum) is now a round badge riding the seam
+  between board and controls, stated ONCE. It used to stand twice: as a card in the board
+  and again as a rectangular box in the panel — exactly the height that pushed cash-out off
+  the screen. The badge hangs on the CONTROL block, not the board, so it travels with the
+  panel when that sticks.
+- Third guess: games that set `allowEqual` now get an "Equal" button. The server has
+  accepted `guess: "equal"` all along and the hi-lo animation could already draw it — only
+  the buttons were missing, so a Pro game with the setting on had a rule its players could
+  not play. Keyed on `allowEqual: 1` from the server's engine config, never on the engine
+  name; without it nothing changes (two buttons as before).
+- Guesses the server would reject are now disabled instead of clickable, with the reason at
+  the button and one line below it:
+  - impossible ("higher" on the top value, "lower" on the bottom one) — derived from
+    `cards`/`dice`/`faces` and `tieRule` in the public engine config, so a game where a tie
+    wins keeps every guess playable;
+  - over the chain limit (`maxWinBps`) — NOT recomputed here. Whether a guess breaks the cap
+    depends on the house edge, which the server deliberately does not publish; guessing it
+    would grey out legal guesses. The lock comes from the server's own rejection, which
+    lists `allowedGuesses`. That rejection then shows as a locked button instead of a red
+    error line — the same answer twice would be noise.
+- Error catalog: API-204 gained the two reasons behind those rejections
+  (`impossible_guess`, `guess_exceeds_max_win`) in all four languages. Until now both read
+  "Invalid input.", which sent players looking for a mistake in their stake.
+- Baked error-catalog snapshot refreshed from the server catalog (adds API-312/313/314,
+  which had been live on the server but missing from the fallback in this build).
+
 2026-09-04 — The reels turn out of the position they stand in
 - Slot reels (slots-3x3, slots-modular) no longer jump before a spin. Before, every
   Play click nulled the result, the host reset the module to idle, and the strips were

@@ -26,6 +26,27 @@ result animation.
 
 None of this touches the money flow — reshape it freely.
 
+### One thing to keep when you reshape a session game
+
+The controls of a session game — the guess buttons and cash-out — must stay reachable
+WITHOUT scrolling while a round is running. A square board is as tall as the screen is wide
+on a phone; add a header and a control block and the cash-out button lands below the fold,
+where a player mid-chain no longer finds it.
+
+Two rules in `globals.css` keep that from happening. Both are design zone: restyle them,
+replace them with a layout of your own — but do not simply delete them.
+
+- `.sc-board` caps the board's edge at a share of the screen height (`48svh`, with a `vh`
+  line before it as the fallback). The board stays square; only its size is bounded.
+- `.sc-controls` sticks the control block to the bottom edge on narrow screens — the
+  fallback for what the cap alone cannot cover: an error message, a long engine hint, an
+  expanded cost box. It needs `.sc-shell`'s `min-height` to have anything to stick to.
+
+The round value badge (hi-lo card, dice-ladder sum) hangs on the CONTROL block, not on the
+board, so it travels with the panel when that sticks. If you move it, keep it on the panel —
+and keep the number stated once: it used to stand both in the board and in the panel, and
+that duplicate is what pushed the cash-out button off the screen in the first place.
+
 ## Live reveal animations (`LiveResultView.tsx`)
 
 The live design zone. Build the race/reveal of your theme (horses, cars, rockets …) on top of the

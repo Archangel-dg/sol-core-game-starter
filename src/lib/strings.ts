@@ -470,6 +470,26 @@ export const STRINGS = {
   },
   'session.higher': { en: 'Higher', de: 'Höher', fr: 'Plus haut', ru: 'Больше' },
   'session.lower': { en: 'Lower', de: 'Tiefer', fr: 'Plus bas', ru: 'Меньше' },
+  // Dritter Tipp der Ketten-Engines — nur sichtbar, wenn das Spiel ihn
+  // erlaubt (allowEqual). Wortgleich mit dem Text der Animation
+  // ('reveal.equal'), damit Knopf und Aufdeckung dasselbe sagen.
+  'session.equal': { en: 'Equal', de: 'Gleich', fr: 'Égal', ru: 'Равно' },
+  // Warum ein Tipp-Knopf gesperrt ist. Beide Gründe kommen vom Server: der
+  // erste ist aus Karte und Regelwerk ableitbar, den zweiten nennt er in
+  // seiner Ablehnung (`allowedGuesses`). Stehen als `title` am Knopf und als
+  // Zeile darunter — ein grauer Knopf ohne Grund ist ein kaputter Knopf.
+  'session.guessImpossible': {
+    en: 'Not possible on this value — nothing can beat it in that direction.',
+    de: 'Bei diesem Wert nicht möglich — in diese Richtung geht nichts mehr.',
+    fr: 'Impossible sur cette valeur — rien ne va plus dans cette direction.',
+    ru: 'Невозможно при этом значении — в эту сторону ничего нет.',
+  },
+  'session.guessCapped': {
+    en: 'Not playable — this guess would exceed the chain limit. Cash out or pick a likelier guess.',
+    de: 'Nicht spielbar — dieser Tipp würde die Ketten-Obergrenze reißen. Cashout oder wahrscheinlicheren Tipp wählen.',
+    fr: 'Injouable — ce pari dépasserait la limite de la chaîne. Encaissez ou choisissez un pari plus probable.',
+    ru: 'Недоступно — эта догадка превысит предел цепочки. Заберите выигрыш или выберите более вероятный вариант.',
+  },
   'session.everySpinCosts': {
     en: 'Careful: EVERY spin costs this bet again',
     de: 'Achtung: JEDER Spin kostet erneut diesen Einsatz',

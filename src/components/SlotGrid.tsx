@@ -15,15 +15,22 @@ import type { EngineConfig } from '@/lib/engines';
 interface RenderSymbol { id: string; wild?: number; scatter?: number; paysBps?: number[] }
 interface FreeSpinsSpec { triggerScatterCount: number; maxTotalSpins: number; multiplierBps: number }
 
+/** Rastergröße aus der Engine-Config (1–6); fehlt sie, gilt der Klassiker 5×3. */
+function dim(v: unknown, fallback: number): number {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 6 ? v : fallback;
+}
+
 function specFrom(cfg: EngineConfig | null): {
-  symbols: RenderSymbol[]; paylines: number[][]; freeSpins: FreeSpinsSpec | null;
+  reels: number; rows: number; symbols: RenderSymbol[]; paylines: number[][]; freeSpins: FreeSpinsSpec | null;
 } {
-  const raw = cfg as unknown as { symbols?: unknown; paylines?: unknown; freeSpins?: unknown } | null;
+  const raw = cfg as unknown as { reels?: unknown; rows?: unknown; symbols?: unknown; paylines?: unknown; freeSpins?: unknown } | null;
+  const reels = dim(raw?.reels, 5);
+  const rows = dim(raw?.rows, 3);
   const symbols = Array.isArray(raw?.symbols)
     ? (raw!.symbols as RenderSymbol[]).filter((s) => typeof s?.id === 'string')
     : [];
   const paylines = Array.isArray(raw?.paylines)
-    ? (raw!.paylines as number[][]).filter((l) => Array.isArray(l) && l.length === 5)
+    ? (raw!.paylines as number[][]).filter((l) => Array.isArray(l) && l.length === reels)
     : [];
   const fsRaw = raw?.freeSpins as Record<string, unknown> | undefined;
   const freeSpins =
@@ -37,7 +44,7 @@ function specFrom(cfg: EngineConfig | null): {
           multiplierBps: fsRaw.multiplierBps,
         }
       : null;
-  return { symbols, paylines, freeSpins };
+  return { reels, rows, symbols, paylines, freeSpins };
 }
 
 export function SlotGrid({
@@ -53,7 +60,7 @@ export function SlotGrid({
   multiplierBps?: number;
   payoutLamports?: string;
 }) {
-  const { symbols, paylines, freeSpins } = specFrom(engineConfig);
+  const { reels, rows, symbols, paylines, freeSpins } = specFrom(engineConfig);
 
   // Mount-Transition fürs Spalten-Stagger-Reveal: blendet NUR die Optik ein
   // (opacity/scale) — das Server-Grid selbst ändert sich dadurch nie.
@@ -112,16 +119,16 @@ export function SlotGrid({
   for (const w of lineWins) {
     const geo = paylines[w.line];
     if (!geo) continue;
-    for (let reel = 0; reel < Math.min(w.count, 5); reel++) hot.add(`${reel}:${geo[reel]}`);
+    for (let reel = 0; reel < Math.min(w.count, reels); reel++) hot.add(`${reel}:${geo[reel]}`);
   }
 
   const scatterIds = new Set(symbols.filter((s) => s.scatter).map((s) => s.id));
 
   return (
     <div className="h-full overflow-auto rounded-xl bg-night p-4">
-      <div className="mx-auto grid max-w-sm grid-cols-5 gap-1.5">
-        {[0, 1, 2].map((row) =>
-          [0, 1, 2, 3, 4].map((reel) => {
+      <div className="mx-auto grid max-w-sm gap-1.5" style={{ gridTemplateColumns: `repeat(${reels}, minmax(0, 1fr))` }}>
+        {Array.from({ length: rows }, (_, row) =>
+          Array.from({ length: reels }, (_, reel) => {
             const id = grid[reel]?.[row] ?? '?';
             const art = symbolArt(id);
             const isHot = hot.has(`${reel}:${row}`);

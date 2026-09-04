@@ -22,6 +22,15 @@ export type Mechanic = 'single' | 'session' | 'tournament' | 'live' | 'pvp';
  */
 export type EngineConfig = Record<string, number>;
 
+/**
+ * Ein Tipp einer Kette (hilo, dice-ladder). 'equal' nimmt der Server NUR an,
+ * wenn die Spiel-Config `allowEqual` gesetzt hat — er meldet das im
+ * öffentlichen Engine-Config-Echo als `allowEqual: 1`. Die Oberfläche bietet
+ * den dritten Knopf deshalb genau dann an, wenn die 1 ankommt; nie nach
+ * Engine-Namen (dieselbe Herleitung wie bei `costPerStep`).
+ */
+export type GuessOption = 'higher' | 'lower' | 'equal';
+
 /** Eingabe-Control für die generische Param-UI. */
 export type Control =
   | { kind: 'select'; name: string; label: StringKey; options: { value: string; label: StringKey }[]; default: string }
@@ -59,7 +68,7 @@ export interface EngineDef {
   session?: {
     /** Wie ein Schritt ausgelöst wird. */
     step:
-      | { kind: 'guess' } // higher/lower (hilo)
+      | { kind: 'guess' } // higher/lower/equal (hilo, dice-ladder) — siehe GuessOption
       | {
           kind: 'index'; label: StringKey; min: number; max: number; // tile/column
           /** echte Grenzen aus der Server-Config; min/max sind nur Fallback
@@ -72,7 +81,7 @@ export interface EngineDef {
         }
       | { kind: 'action'; label: StringKey }; // pump
     /** Baut den Step-Body. */
-    buildStep: (input: { value?: number; guess?: 'higher' | 'lower' }) => Record<string, unknown>;
+    buildStep: (input: { value?: number; guess?: GuessOption }) => Record<string, unknown>;
     /**
      * Nur gesetzt, wenn JEDER Schritt erneut den Einsatz kostet (spin-tower-pro).
      * Alle anderen Session-Engines buchen den Einsatz EINMAL beim Start; jeder
@@ -409,9 +418,9 @@ export const ENGINES: EngineDef[] = [
       outcomes: 'engine.dice-ladder.outcomes',
     },
     session: {
-      // Identischer Step-Body wie hilo (`{ guess }`) — der Server akzeptiert
-      // zusätzlich 'equal', wenn das Spiel `allowEqual` gesetzt hat; die
-      // generische Starter-UI bietet wie bei hilo nur höher/tiefer an.
+      // Identischer Step-Body wie hilo (`{ guess }`) — inklusive 'equal',
+      // sobald das Spiel `allowEqual` gesetzt hat (SessionGame liest die 1 aus
+      // dem Engine-Config-Echo und blendet den dritten Knopf entsprechend ein).
       step: { kind: 'guess' },
       buildStep: (i) => ({ guess: i.guess ?? 'higher' }),
       hint: 'engine.dice-ladder.hint',

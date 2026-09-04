@@ -41,3 +41,43 @@ body {
   font-size: 14px !important;
   white-space: nowrap;
 }
+
+/* ── Spielfeld und Bedienfeld auf einen Bildschirm (Design-Zone) ───────────
+   Ein quadratisches Spielfeld ist auf einem Telefon so hoch wie der Bildschirm
+   breit ist. Zusammen mit Kopfleiste und Bedienfeld ergibt das mehr als eine
+   Bildschirmhöhe — Tipp-Knöpfe und Cashout landen unter der Falz, genau dort,
+   wo sie mitten in einer laufenden Runde niemand mehr sucht.
+
+   Deshalb zwei Regeln:
+   1. Das Feld bleibt quadratisch, seine KANTENLÄNGE wird aber zusätzlich auf
+      einen Teil der Bildschirmhöhe gedeckelt (max-width, weil die Breite über
+      `aspect-square` die Höhe bestimmt).
+   2. Das Bedienfeld klebt auf schmalen Schirmen am unteren Rand. Das ist der
+      Rückfall für die Fälle, die Regel 1 nicht abdeckt: eine Fehlermeldung,
+      ein langer Engine-Hinweis, ein aufgeklappter Kostenkasten.
+
+   `svh` (kleinste Ansichtshöhe) statt `vh`: Auf iOS/Android wächst und
+   schrumpft `vh` mit der ein- und ausfahrenden Browserleiste — ein Feld, das
+   bei eingefahrener Leiste passt, ragt bei ausgefahrener darüber hinaus. Die
+   `vh`-Zeile davor bleibt als Rückfall für Browser ohne `svh` stehen. */
+.sc-board {
+  max-width: 48vh;
+  max-width: 48svh;
+}
+
+@media (max-width: 767px) {
+  /* Gibt dem klebenden Block überhaupt Weg zum Kleben: Ohne eine Wurzel, die
+     über ihn hinausreicht, hat `position: sticky` als letztes Kind nichts, an
+     dem es sich festhalten könnte. */
+  .sc-shell {
+    min-height: calc(100vh - 9rem);
+    min-height: calc(100svh - 9rem);
+  }
+
+  .sc-controls {
+    position: sticky;
+    bottom: 0;
+    /* Unter der Home-Leiste des iPhones liegt sonst der Cashout-Knopf. */
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+}

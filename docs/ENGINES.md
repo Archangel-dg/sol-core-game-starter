@@ -65,8 +65,8 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 |---|---|
 | `mines` | `{ tile: 0–(gridSize−1) }` |
 | `towers` | `{ column: 0–(columns−1) }` |
-| `hilo` | `{ guess: "higher"\|"lower" }` (a tie loses; ends after 20 steps) |
-| `dice-ladder` | `{ guess: "higher"\|"lower" }` on the next **dice sum** (a tie loses unless the game sets `tieRule: "win"`; ends after `config.maxSteps`, default 15) |
+| `hilo` | `{ guess: "higher"\|"lower" }`, plus `"equal"` when the game sets `allowEqual` (a tie loses unless `tieRule: "win"`; ends after `config.maxSteps`, default 20) |
+| `dice-ladder` | `{ guess: "higher"\|"lower" }` on the next **dice sum**, plus `"equal"` when the game sets `allowEqual` (a tie loses unless the game sets `tieRule: "win"`; ends after `config.maxSteps`, default 15) |
 | `pump` | `{}` (just pump again) |
 | `steps` | `{}` (just climb again) |
 | `spin-tower-pro` | `{}` (just spin again) — **but this step is charged**, see below |
@@ -289,8 +289,8 @@ in `lib/engines.ts`). Never hardcode the old fixed values (0–100, 1–13, unif
 |---|---|---|
 | `dice` | target slider/input range | `boundsFrom`: `[config.rangeMin ?? 0, config.rangeMax ?? 100]` (both always echoed by the server, even at their defaults) |
 | `limbo` | target multiplier input | floor is always `config.minTargetBps` (default 1.00×, always echoed); ceiling only appears if the creator set `config.maxTargetBps` |
-| `hilo` | — | session only; the card is dealt by the game, not entered by the player |
-| `dice-ladder` | current-sum display + odds | `config.sumCounts` (combinations per sum, index 0 = sum `config.dice`) — the server echoes the exact distribution it prices with, so never recompute it client-side |
+| `hilo` | guess buttons (session step) | `allowEqual` adds the third button; `cards` + `tieRule` decide which guesses are impossible on the current card and are shown disabled. The card itself is dealt by the game, never entered by the player |
+| `dice-ladder` | guess buttons + current-sum display | same three-guess rule as `hilo` (`allowEqual`; `dice`·`faces` and `tieRule` decide the impossible ones), plus `config.sumCounts` (combinations per sum, index 0 = sum `config.dice`) — the server echoes the exact distribution it prices with, so never recompute it client-side |
 | `keno` | number picker | `[1, config.pool ?? 40]` instead of the old fixed 1–40 |
 | `roulette` | straight-bet value picker | `[0, pocketCount − 1]`, where `pocketCount` is 37 (european) or 38 (american) from `config.wheelType` |
 | `plinko` | ball-count select (`params.balls`) | options are filtered to what's ≤ `config.maxBalls` (1/3/10/100); the whole control is hidden when `maxBalls` is 1 (the default) |
@@ -298,6 +298,13 @@ in `lib/engines.ts`). Never hardcode the old fixed values (0–100, 1–13, unif
 
 All of these are **display/UX conveniences only** — the server re-validates every param/step against
 its own resolved config regardless of what the client sends (out-of-range ⇒ `API-204` + `validRange`).
+
+One bound is deliberately NOT computed here: whether a guess would break the chain limit
+(`maxWinBps`) depends on the house edge, and the server does not publish it. Guessing it would grey
+out guesses that are in fact legal. Instead the server states the answer in its rejection —
+`API-204` with `reason: "guess_exceeds_max_win"` carries `allowedGuesses`, the guesses still playable
+on the current value — and the UI locks the rest from that list (`SessionGame`). Same for
+`reason: "impossible_guess"`, which the UI prevents up front from `cards`/`dice`/`faces` + `tieRule`.
 
 ## What the player puts in — and what can come out
 

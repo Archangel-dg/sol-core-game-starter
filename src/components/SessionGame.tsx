@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayer, useDemo } from './DemoProvider';
 import type { EngineDef } from '@/lib/engines';
 import { SPIN_TOWER_PROTOCOL, type SessionView } from '@/lib/solcore';
@@ -12,6 +12,12 @@ import { MaxBetPick } from './BetLimitHint';
 import { FiatHint } from './FiatHint';
 import { useSound } from '@/lib/sounds';
 import { useT, type TFn } from '@/lib/i18n';
+import { RevealHost } from './RevealHost';
+import { hasReveal } from '@/lib/reveal';
+import { EMPTY_TRANSCRIPT, noteSessionStep, sessionOutcome, sessionStepCount, type SessionTranscript } from '@/lib/reveal-session';
+
+/** Woher eine Server-Antwort kommt — entscheidet über den Ton nach dem Reveal. */
+type Antwort = 'start' | 'step' | 'cashout' | 'reconnect';
 
 /** towers-Reveal: `bombColumns` ist `number[][]` (eine Spalten-Menge je
  * Etage, `c.bombs` Bomben pro Etage). Rein defensiv — akzeptiert auch ältere
@@ -235,20 +241,81 @@ export function SessionGame({
     [onLog, onRound, storeKey],
   );
 
-  // Reconnect: aktive Session nach Reload fortsetzen.
+  // ── Reveal-Gating (docs/RULES.md, Regel 16.4) ──────────────────────────────
+  // Die Antwort des Servers wird NICHT sofort angezeigt: `pending` hält sie,
+  // das Modul der Engine spielt den neuen Schritt ab, und erst `onRevealed`
+  // schaltet HUD, Ton, Verlauf und Saldo frei. Engines ohne Modul zeigen die
+  // Antwort wie bisher sofort. Die Mitschrift (`transcript`) macht aus den
+  // Server-Ständen das Protokoll, das das Modul schrittweise abspielt.
+  const animated = hasReveal(engine.key);
+  const [revealing, setRevealing] = useState(false);
+  const [reveal, setReveal] = useState<{ outcome: unknown; from: number } | null>(null);
+  const pending = useRef<{ view: SessionView; outcome: unknown; kind: Antwort } | null>(null);
+  const transcript = useRef<SessionTranscript>(EMPTY_TRANSCRIPT);
+  const sfx = (v: SessionView, kind: Antwort) => {
+    if (kind === 'cashout') play('cashout');
+    else if (v.status === 'busted') play('lose');
+    else if (v.status !== 'active') play(v.payoutLamports && v.payoutLamports !== '0' ? 'win' : 'lose');
+  };
+  const deliver = (v: SessionView, kind: Antwort, betLamports?: string) => {
+    if (!animated) {
+      if (kind !== 'reconnect') sfx(v, kind);
+      setView(v);
+      finishIfEnded(v);
+      return;
+    }
+    transcript.current = noteSessionStep(transcript.current, engine.key, v, betLamports);
+    const outcome = sessionOutcome(engine.key, v, transcript.current);
+    if (!outcome) {
+      setView(v);
+      finishIfEnded(v);
+      return;
+    }
+    if (kind === 'reconnect') {
+      // Nach einem Reload steht der Stand sofort; das Modul spielt das Protokoll
+      // nach — aber nur, wenn das Brett diese Session noch nicht zeigt. Läuft die
+      // Abfrage mitten in einer bekannten Runde, wäre eine Wiederholung von vorn
+      // ein Bruch im Spiel.
+      pending.current = null;
+      setView(v);
+      finishIfEnded(v);
+      if (view?.sessionId !== v.sessionId) setReveal({ outcome, from: 0 });
+      return;
+    }
+    pending.current = { view: v, outcome, kind };
+    setRevealing(true);
+    // `from`: so viele Schritte stehen schon auf dem Brett — nur das Neue bewegt sich.
+    setReveal({ outcome, from: sessionStepCount(engine.key, view) });
+  };
+  const deliverRef = useRef(deliver);
+  deliverRef.current = deliver;
+  const onRevealed = (outcome: unknown) => {
+    const p = pending.current;
+    if (!p || p.outcome !== outcome) return; // abgelöst oder schon geliefert
+    pending.current = null;
+    setRevealing(false);
+    setView(p.view);
+    sfx(p.view, p.kind);
+    finishIfEnded(p.view);
+  };
+
+  // Reconnect: aktive Session nach Reload fortsetzen — EINMAL je Spiel und
+  // Modus. Früher hing der Effekt an `finishIfEnded` und lief bei jedem neuen
+  // Callback des Elternteils erneut; mit einem Reveal-Modul hätte jede dieser
+  // Abfragen die laufende Runde von vorn abgespielt.
   useEffect(() => {
     const id = typeof window !== 'undefined' ? localStorage.getItem(storeKey) : null;
     if (!id) return;
     fetch(`${apiBase}/session/${id}`)
       .then((r) => r.json())
       .then((v: SessionView & { error?: unknown }) => {
-        if (!v.error) {
-          setView(v);
-          finishIfEnded(v);
-        } else localStorage.removeItem(storeKey);
+        if (!v.error && v.sessionId) deliverRef.current(v, 'reconnect');
+        else localStorage.removeItem(storeKey);
       })
       .catch(() => localStorage.removeItem(storeKey));
-  }, [storeKey, finishIfEnded]);
+    // `deliverRef` trägt den jeweils aktuellen Flow — der Effekt braucht keine weiteren Deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeKey]);
 
   const call = async (path: string, body?: unknown): Promise<SessionView | null> => {
     setBusy(true);
@@ -293,7 +360,7 @@ export function SessionGame({
     });
     if (v) {
       localStorage.setItem(storeKey, v.sessionId);
-      setView(v);
+      deliver(v, 'start', solToLamports(bet).toString());
     }
   };
 
@@ -301,22 +368,13 @@ export function SessionGame({
     if (!view) return;
     play('click');
     const v = await call(`${apiBase}/session/${view.sessionId}/step`, sess.buildStep(arg));
-    if (v) {
-      if (v.status === 'busted') play('lose');
-      else if (v.status !== 'active') play(v.payoutLamports && v.payoutLamports !== '0' ? 'win' : 'lose');
-      setView(v);
-      finishIfEnded(v);
-    }
+    if (v) deliver(v, 'step');
   };
 
   const cashout = async () => {
     if (!view) return;
     const v = await call(`${apiBase}/session/${view.sessionId}/cashout`);
-    if (v) {
-      play('cashout');
-      setView(v);
-      finishIfEnded(v);
-    }
+    if (v) deliver(v, 'cashout');
   };
 
   const active = view?.status === 'active';
@@ -471,6 +529,63 @@ export function SessionGame({
       </div>
     ) : null;
 
+  // Statuszeile unter dem Spielfeld (Schritt, Leben, Cashout-Wert, Bust/Cashout,
+  // Sturz, Cap, Bomben). Mit Reveal-Modul steht sie im Bedienfeld — das Feld
+  // gehört dann ganz der Animation; ohne Modul wie bisher im Feld.
+  const statusLine = view ? (
+    <>
+    <div className="mt-1 text-sm text-white/70">
+      {active && steps &&
+        t('session.stepInfo', {
+          n: steps.rung,
+          lives:
+            steps.livesLeft !== null
+              ? t('session.livesLeft', {
+                  left: steps.livesLeft,
+                  of: steps.lives !== null ? `/${steps.lives}` : '',
+                })
+              : '',
+          amount: toSol(view.potentialPayoutLamports),
+        })}
+      {active && !steps && costPerStep &&
+        t('session.spinInfo', {
+          n: spinsUsed,
+          max: maxSpins !== null ? `/${maxSpins}` : '',
+          amount: toSol(view.potentialPayoutLamports),
+        })}
+      {active &&
+        !steps &&
+        !costPerStep &&
+        t('session.step', {
+          // `steps` ist bei spin-tower-pro nicht gesetzt; dieser Zweig
+          // laeuft ohnehin nur ohne costPerStep, der Rueckfall haelt
+          // den Typ ehrlich.
+          n: view.steps ?? 0,
+          amount: toSol(view.potentialPayoutLamports),
+        })}
+      {/* Bei Kosten je Schritt wäre „alles verloren" gelogen: ein FAIL
+          nimmt nur den Pot, das Gesicherte wird trotzdem ausgezahlt. */}
+      {view.status === 'busted' && costPerStep &&
+        `${t('session.failPotLost')}${
+          view.payoutLamports && view.payoutLamports !== '0'
+            ? ` · ${t('session.failSecuredPaid', { amount: toSol(view.payoutLamports) })}`
+            : ''
+        }`}
+      {view.status === 'busted' && !costPerStep && t('session.busted')}
+      {view.status === 'cashed_out' &&
+        t('session.cashedOut', { amount: toSol(view.payoutLamports ?? '0') })}
+    </div>
+    {active && steps?.lastFall && (
+      <div className="mt-1 text-[11px] text-amber-300/80">
+        {t('session.fell', { from: steps.lastFall.from, to: steps.lastFall.to })}
+        {steps.lastFall.to > 0 ? ` ${t('session.safePoint')}` : ` ${t('session.ground')}`}
+      </div>
+    )}
+    {ended && view.capped && <div className="text-xs text-white/40">{t('session.payoutLimit')}</div>}
+    {towersBombText && <div className="mt-1 text-[11px] text-white/30">{towersBombText}</div>}
+    </>
+  ) : null;
+
   return (
     <div className="space-y-4">
       {/* Spielfeld — nur Animation und Ergebnis. Die Bedienelemente stehen
@@ -481,8 +596,19 @@ export function SessionGame({
           bei h-28 sichtbar über das Feld hinaus. Quadratisch (aspect-square):
           so hoch wie breit, auf jedem Gerät. */}
       <div className="grid aspect-square rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <div className="grid h-full place-items-center overflow-auto rounded-xl bg-night px-2 py-3 text-center">
-          {view ? (
+        <div className={animated ? 'h-full w-full overflow-hidden rounded-xl bg-night' : 'grid h-full place-items-center overflow-auto rounded-xl bg-night px-2 py-3 text-center'}>
+          {animated ? (
+            // Das Reveal-Modul der Engine (src/reveals/<engine>.js): Leerlauf aus der
+            // Server-Config, jeder Schritt wird abgespielt, das Ergebnis steht erst am Ende.
+            <RevealHost
+              engineKey={engine.key}
+              engineConfig={cfg as Record<string, unknown> | null}
+              outcome={reveal?.outcome ?? null}
+              from={reveal?.from}
+              onRevealed={onRevealed}
+              hint={t(engine.blurb)}
+            />
+          ) : view ? (
             <div>
               <div className={`text-3xl font-bold tabular-nums ${ended && view.status === 'busted' ? 'text-red-400' : 'text-accent'}`}>
                 {/* `multiplierBps` gibt es nur bei den klassischen Engines;
@@ -490,55 +616,7 @@ export function SessionGame({
                     Gesichertes). Ohne diesen Rückfall stand hier NaN×. */}
                 {((view.multiplierBps ?? view.returnBps ?? 0) / 10000).toFixed(2)}×
               </div>
-              <div className="mt-1 text-sm text-white/70">
-                {active && steps &&
-                  t('session.stepInfo', {
-                    n: steps.rung,
-                    lives:
-                      steps.livesLeft !== null
-                        ? t('session.livesLeft', {
-                            left: steps.livesLeft,
-                            of: steps.lives !== null ? `/${steps.lives}` : '',
-                          })
-                        : '',
-                    amount: toSol(view.potentialPayoutLamports),
-                  })}
-                {active && !steps && costPerStep &&
-                  t('session.spinInfo', {
-                    n: spinsUsed,
-                    max: maxSpins !== null ? `/${maxSpins}` : '',
-                    amount: toSol(view.potentialPayoutLamports),
-                  })}
-                {active &&
-                  !steps &&
-                  !costPerStep &&
-                  t('session.step', {
-                    // `steps` ist bei spin-tower-pro nicht gesetzt; dieser Zweig
-                    // laeuft ohnehin nur ohne costPerStep, der Rueckfall haelt
-                    // den Typ ehrlich.
-                    n: view.steps ?? 0,
-                    amount: toSol(view.potentialPayoutLamports),
-                  })}
-                {/* Bei Kosten je Schritt wäre „alles verloren" gelogen: ein FAIL
-                    nimmt nur den Pot, das Gesicherte wird trotzdem ausgezahlt. */}
-                {view.status === 'busted' && costPerStep &&
-                  `${t('session.failPotLost')}${
-                    view.payoutLamports && view.payoutLamports !== '0'
-                      ? ` · ${t('session.failSecuredPaid', { amount: toSol(view.payoutLamports) })}`
-                      : ''
-                  }`}
-                {view.status === 'busted' && !costPerStep && t('session.busted')}
-                {view.status === 'cashed_out' &&
-                  t('session.cashedOut', { amount: toSol(view.payoutLamports ?? '0') })}
-              </div>
-              {active && steps?.lastFall && (
-                <div className="mt-1 text-[11px] text-amber-300/80">
-                  {t('session.fell', { from: steps.lastFall.from, to: steps.lastFall.to })}
-                  {steps.lastFall.to > 0 ? ` ${t('session.safePoint')}` : ` ${t('session.ground')}`}
-                </div>
-              )}
-              {ended && view.capped && <div className="text-xs text-white/40">{t('session.payoutLimit')}</div>}
-              {towersBombText && <div className="mt-1 text-[11px] text-white/30">{towersBombText}</div>}
+              {statusLine}
             </div>
           ) : (
             <div className="px-4">
@@ -554,6 +632,9 @@ export function SessionGame({
 
       {/* Bedienfeld — Einsatz, Auswahl, Spielen. Getrennt vom Spielfeld. */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        {animated && statusLine && (
+          <div className="mb-3 text-center text-sm text-white/70">{statusLine}</div>
+        )}
         {!view || ended ? (
           // Start-Ansicht
           <>
@@ -603,7 +684,7 @@ export function SessionGame({
             <button
               type="button"
               onClick={() => void start()}
-              disabled={busy || !connected}
+              disabled={busy || revealing || !connected}
               className="mt-4 w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
             >
               {!connected
@@ -689,9 +770,9 @@ export function SessionGame({
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" disabled={busy} onClick={() => void step({ guess: 'higher' })}
+                  <button type="button" disabled={busy || revealing} onClick={() => void step({ guess: 'higher' })}
                     className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t('session.higher')}</button>
-                  <button type="button" disabled={busy} onClick={() => void step({ guess: 'lower' })}
+                  <button type="button" disabled={busy || revealing} onClick={() => void step({ guess: 'lower' })}
                     className="rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t('session.lower')}</button>
                 </div>
               </>
@@ -718,7 +799,7 @@ export function SessionGame({
                       <button
                         key={idx}
                         type="button"
-                        disabled={busy || picked}
+                        disabled={busy || revealing || picked}
                         onClick={() => void step({ value: idx })}
                         className={`rounded-lg border py-2 text-sm tabular-nums transition disabled:opacity-40 ${
                           picked
@@ -763,14 +844,14 @@ export function SessionGame({
             {sess.step.kind === 'action' && (
               // Bei `costPerStep` steht der Preis AUF dem Knopf — die eine Stelle,
               // an der niemand vorbeiklickt.
-              <button type="button" disabled={busy} onClick={() => void step({})}
+              <button type="button" disabled={busy || revealing} onClick={() => void step({})}
                 className="w-full rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t(sess.step.label)}
                 {costPerStep ? t('session.stepCosts', { amount: spinCostText ?? bet }) : ''}</button>
             )}
             <button
               type="button"
               onClick={() => void cashout()}
-              disabled={busy || stepsTaken < 1 || cashoutBlocked}
+              disabled={busy || revealing || stepsTaken < 1 || cashoutBlocked}
               className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
             >
               {t('session.cashoutShort')} {stepsTaken >= 1 && !cashoutBlocked ? `(${toSol(view.potentialPayoutLamports)} ◎)` : ''}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EngineDef } from '@/lib/engines';
-import type { DemoDiceProView } from '@/lib/solcore';
+import type { DemoDiceProView, DiceProView } from '@/lib/solcore';
 import { toSol, solToLamports } from '@/lib/lamports';
 import { usePvpLang, pvpErrorText, PVP_LANGS } from '@/lib/pvp-i18n';
 import { useT } from '@/lib/i18n';
@@ -12,6 +12,10 @@ import { usePlayer, useDemo } from './DemoProvider';
 import { DiceProBoard, DiceProBust, DiceProEnd } from './DiceProGame';
 // Nur points-system: die geechote Creator-Paytable fürs Board (Wertung + Anzeige).
 import { parseDiceProPaytable } from '@/lib/dice-pro';
+import { useDiceRollReveal } from '@/lib/dice-reveal';
+/** Für den Würfelwurf-Reveal: die Tischwürfel lesen / eine Kopie mit anderen Augen bauen. */
+const diceOfPro = (v: DiceProView): number[] => v.tableDice;
+const withDicePro = (v: DiceProView, tableDice: number[]): DiceProView => ({ ...v, tableDice });
 
 /**
  * PvP-Dice-Pro-DEMO (Plan §6.4): rundenbasiertes Dice Pro gegen den Server-Bot
@@ -161,7 +165,10 @@ export function DemoDiceProGame({
     setError(null);
   }, []);
 
-  const dp = match?.dicePro ?? null;
+  const dpLatest = match?.dicePro ?? null;
+  // Würfelwurf-Reveal (lib/dice-reveal.ts): ein neuer Wurf taumelt erst einen Moment, das
+  // Board zeigt solange den Stand davor — Punkte, Farkle/Bust und Bank stehen nie vor den Würfeln.
+  const { shown: dp, rolling } = useDiceRollReveal(dpLatest, diceOfPro, withDicePro, dpLatest?.faces ?? 6);
   const settled = match?.status === 'settled' || (!!dp && dp.matchOver);
 
   // Bust-Enthüllung: die Demo pollt (kein Dauer-Poll wie das echte Match). Der
@@ -260,7 +267,7 @@ export function DemoDiceProGame({
             dp={dp}
             mySeat={1}
             serverNow={Date.now()}
-            busy={moveBusy}
+            busy={moveBusy || rolling}
             reduced={reduced.current}
             error={moveError}
             paytable={paytable}

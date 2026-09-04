@@ -50,6 +50,11 @@ import {
   type JsonErr,
   type PvpGameProps,
 } from './PvpGame';
+import { useDiceRollReveal } from '@/lib/dice-reveal';
+
+/** Für den Würfelwurf-Reveal: die Tischwürfel lesen / eine Kopie mit anderen Augen bauen. */
+const diceOfPro = (v: DiceProView): number[] => v.tableDice;
+const withDicePro = (v: DiceProView, tableDice: number[]): DiceProView => ({ ...v, tableDice });
 
 /**
  * PvP-Dice-Pro-Frontend (docs/pvp-plan.md, "Dice Pro"). Wiederverwendet die
@@ -336,7 +341,10 @@ export function DiceProGame({
   }, [frozen, refreshBalance]);
 
   const serverNow = nowTick + offsetMs;
-  const dp = matchView?.dicePro ?? null;
+  const dpLatest = matchView?.dicePro ?? null;
+  // Würfelwurf-Reveal (lib/dice-reveal.ts): ein neuer Wurf taumelt erst einen Moment, das
+  // Board zeigt solange den Stand davor — Punkte, Farkle/Bust und Bank stehen nie vor den Würfeln.
+  const { shown: dp, rolling } = useDiceRollReveal(dpLatest, diceOfPro, withDicePro, dpLatest?.faces ?? 6);
   const mStatus = matchView?.status ?? null;
   // Ein laufendes/abgeschlossenes Match beansprucht die Bühne (die Lobby-Sicht
   // tritt zurück). failed/voided ⇒ das Match ist nie gelaufen (Refund) → zurück.
@@ -634,7 +642,7 @@ export function DiceProGame({
               dp={dp}
               mySeat={mySeat}
               serverNow={serverNow}
-              busy={moveBusy}
+              busy={moveBusy || rolling}
               reduced={reduced}
               error={moveError}
               paytable={paytable}

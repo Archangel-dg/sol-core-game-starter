@@ -21,6 +21,10 @@
  *   5. SPRACHEN — Englisch als Hauptsprache, dazu Deutsch, Französisch,
  *      Russisch; jeder Schlüssel in allen vieren, und ein Umschalter dafür.
  *   6. VERIFY-LINK auf den Sol-Core Scanner — nicht auf rohes JSON.
+ *   7. HERKUNFT — „Powered by Sol-Core Engine" am Fuß jeder Seite.
+ *   8. PAY-PER-SPIN — Kosten sagen UND anmelden.
+ *   9. REVEAL — die Animation zeigt nichts, bevor sie steht; jedes Modul
+ *      ohne Zufall, ohne Netzwerk, mit Texten aus dem Katalog.
  *
  * Lauf:  node scripts/check-contract.mjs   (auch Teil von `npm run check`)
  * Exit-Code 1, sobald eine Zusage gebrochen ist.
@@ -470,6 +474,64 @@ pruef(dateiDa('src/components/PoweredBy.tsx'), 'Herkunftszeile vorhanden (Powere
       'Kein Kostenhinweis an `costPerStep`. Der Handschlag sagt dem Server ' +
         '„dieser Client kennt das Kostenmodell" — das darf er nur behaupten, ' +
         'wenn der Spieler es auch liest.',
+    );
+  }
+}
+
+// ── 9. Reveal-Animationen ───────────────────────────────────────────────────
+// Die Module unter src/reveals/*.js zeigen ein Ergebnis erst, wenn die
+// Animation steht (docs/RULES.md, Regel 16). Was sich statisch prüfen lässt,
+// wird hier geprüft; die Fairness im Zeitverlauf prüft der Browser-Prüfstand
+// des Kits (scripts/check-reveals.mjs im Sol-Core-Repo).
+console.log('\n9) Reveal — die Animation zeigt nichts, bevor sie steht');
+{
+  const revealsDir = join(WURZEL, 'src/reveals');
+  const registry = existsSync(join(WURZEL, 'src/lib/reveal.ts'))
+    ? readFileSync(join(WURZEL, 'src/lib/reveal.ts'), 'utf8')
+    : '';
+  const keys = [...registry.matchAll(/import\('@\/reveals\/([\w-]+)'\)/g)].map((m) => m[1]);
+  pruef(dateiDa('src/lib/reveal.ts') && keys.length > 0, `Reveal-Registry vorhanden (${keys.length} Engines)`);
+  pruef(dateiDa('src/components/RevealHost.tsx'), 'Reveal-Host vorhanden (components/RevealHost.tsx)');
+  const module = existsSync(revealsDir)
+    ? readdirSync(revealsDir).filter((f) => f.endsWith('.js')).map((f) => f.replace(/\.js$/, ''))
+    : [];
+  const ohneDatei = keys.filter((k) => !module.includes(k));
+  const ohneEintrag = module.filter((k) => !keys.includes(k));
+  pruef(ohneDatei.length === 0, 'Jeder Registry-Eintrag hat sein Modul', ohneDatei.join(', '));
+  pruef(ohneEintrag.length === 0, 'Jedes Modul ist registriert', ohneEintrag.join(', '));
+  // Katalog-Schlüssel, die die Module lesen, müssen im Katalog stehen (alle vier
+  // Sprachen prüft Abschnitt 5 — hier nur: der Schlüssel existiert überhaupt).
+  const kat = existsSync(join(WURZEL, 'src/lib/strings.ts'))
+    ? readFileSync(join(WURZEL, 'src/lib/strings.ts'), 'utf8')
+    : '';
+  const katKeys = new Set([...kat.matchAll(/^ {2}'([a-z][\w.-]*)':/gm)].map((m) => m[1]));
+  const zufall = [];
+  const fremd = [];
+  const fehlend = [];
+  for (const k of module) {
+    const src = readFileSync(join(revealsDir, `${k}.js`), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    if (/Math\.random\s*\(/.test(src)) zufall.push(k);
+    if (/\b(fetch\s*\(|XMLHttpRequest|WebSocket|import\s*\(|require\s*\()/.test(src)) fremd.push(k);
+    const strings = src.match(/strings:\s*\[([\s\S]*?)\]/);
+    const used = strings ? [...strings[1].matchAll(/'([^']+)'/g)].map((m) => m[1]) : [];
+    for (const key of used) if (!katKeys.has(key)) fehlend.push(`${k}: ${key}`);
+  }
+  pruef(zufall.length === 0, 'Kein Math.random in einem Modul (Regel 16.1)', zufall.join(', '));
+  pruef(fremd.length === 0, 'Kein Netzwerk, kein Import aus einem Modul', fremd.join(', '));
+  pruef(fehlend.length === 0, 'Jeder Modul-Text steht im Katalog', fehlend.slice(0, 6).join(' · '));
+  // Die Flows warten auf das Modul: Ergebnis, Ton, Verlauf und Saldo hängen an onRevealed.
+  for (const [rel, name] of [
+    ['src/components/SingleBetGame.tsx', 'Einzelwette'],
+    ['src/components/SessionGame.tsx', 'Session'],
+    ['src/components/TournamentGame.tsx', 'Turnier'],
+  ]) {
+    const t = INHALT.get(join(WURZEL, rel)) ?? '';
+    pruef(
+      /<RevealHost[\s\S]*onRevealed=\{onRevealed\}/.test(t),
+      `${name} wartet auf das Endbild (RevealHost + onRevealed)`,
+      `${rel} zeigt das Ergebnis, ohne auf die Animation zu warten.`,
     );
   }
 }

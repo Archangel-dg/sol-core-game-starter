@@ -78,10 +78,18 @@ them only if the user explicitly asks and you are certain the contract with the 
     the line is dropped entirely; no placeholder, no last known value. The rate comes from the
     platform (`/api/price` → `/api/public/sol-price`), never from a per-game source.
 
+14. The animation shows nothing before it ends (rule 16 in `docs/RULES.md`): every reveal module
+    is a pure function of the outcome (no `Math.random`, no near-miss), its readout nodes stay
+    empty until the final frame, and the flows (`SingleBetGame`, `SessionGame`,
+    `TournamentGame`, the PvP dice boards) wait for `onRevealed` before HUD, sound, history,
+    balance and toast move. `check:contract` section 9 checks the static half.
+
 ## Tasks that are safe
 
-- Change design/styling; build the result animation (in `ResultView` or a replacement with the same
-  props).
+- Change design/styling; replace an engine's reveal animation (`src/reveals/<engine>.js` — plain
+  browser JS, contract in `src/lib/reveal.ts`, rules in `docs/CUSTOMIZE.md`). It must stay a pure
+  function of the server outcome, show nothing before the final frame, and read every label
+  through `ctx.text(...)`. `ResultView` is only the fallback for an engine without a module.
 - Build the live reveal animation (in `LiveResultView` or a replacement with the same props) —
   it must be a pure function of `resultIndex` + `revealProgress` (deterministic replay across all
   skins of a stream), and the winner must stand at `revealProgress = 1`.

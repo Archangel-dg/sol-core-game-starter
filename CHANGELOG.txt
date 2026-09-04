@@ -2,6 +2,28 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-04 — The currency approximation reaches every mechanic
+- Coin Flip had it; the other twelve mechanics did not. Now every MONEY INPUT in the
+  template carries the approximation next to its label: session (mines, towers, pump,
+  dice-ladder, steps, spin-tower-pro), live odds, live crash, live drift, PvP, and the
+  stake slider of the lobby dialog that PvP, Dice Duel and Dice Pro share.
+- Plus the three figures a player actually asks about: the tournament pot, the payout of
+  a finished duel (Dice Duel / Dice Pro), and the pot of a demo PvP match.
+- WHERE IT DELIBERATELY DOES NOT GO, and why: not into the round history, not into the
+  live list of other players' bets, not into the session HUD (pot / secured / cash-out
+  side by side), not into the slot win line. Those are places where numbers are compared
+  WITH EACH OTHER, not converted — and a second currency in every row of a list is the
+  same mistake as printing the max bet twice: it is read once and the page looks
+  careless. The balance and the win notification already answer "how much is that" for
+  every mechanic.
+- FiatHint inherits its label colour now instead of a fixed white. Crash and drift paint
+  their labels from their own CSS variables, and a hard-coded white looked like a
+  foreign body there.
+- Measured at 360 px: session reads "Bet (SOL) ≈ 0,89 €   Max ◎ 2.7611", crash reads
+  "STAKE (◎) ≈ 8,88 €   Max ◎ 2.7611" — both on one line, nothing pushed out of frame.
+- No new strings, no contract change: check:contract, typecheck, build and the 13 byte-
+  mirror checks are green.
+
 2026-09-04 — SOL amounts carry a currency approximation
 - Next to every SOL figure the template can now show "≈ 17,40 €" / "≈ $18.90": the
   balance (wallet and demo), the stake label while you type, the result payout and the

@@ -14,6 +14,7 @@ import type {
 } from '@/lib/solcore';
 import { buildDepositTx, warteAufBestaetigung } from '@/lib/player-program';
 import { toSol, solToLamports } from '@/lib/lamports';
+import { Amount } from './Amount';
 import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { usePlayerAuth } from '@/lib/player-auth';
 import { usePvpLang, pvpErrorText, PVP_LANGS, type TFn } from '@/lib/pvp-i18n';
@@ -1187,7 +1188,9 @@ export function DiceDuelEnd({
         {settled ? (win ? t('reveal.youWon') : t('reveal.youLost')) : t('dd.settling')}
       </p>
       <p className="mt-1 text-sm text-white/50">
-        {t('reveal.payout')}: {toSol(payout)} ◎
+        {/* Der Moment, in dem die Frage „wie viel ist das" wirklich gestellt
+            wird — hier steht die Naeherung, sonst nirgends im Duell. */}
+        {t('reveal.payout')}: <Amount lamports={payout} layout="inline" />
       </p>
 
       {dd && (

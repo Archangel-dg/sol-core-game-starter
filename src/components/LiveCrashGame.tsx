@@ -17,6 +17,7 @@ import type { StringKey } from '@/lib/strings';
 import { usePlayerAuth } from '@/lib/player-auth';
 import { useBetLimits } from '@/lib/bet-limits';
 import { MaxBetPick } from './BetLimitHint';
+import { FiatHint } from './FiatHint';
 import { VerifyLink } from './VerifyLink';
 import { CRASH_THEME, CrashCurveView, formatMultiplier } from './CrashCurveView';
 
@@ -510,7 +511,10 @@ export function LiveCrashGame({
                   className="mb-1 flex items-baseline justify-between gap-2 text-[11px] uppercase tracking-wide"
                   style={{ color: 'var(--crash-muted)' }}
                 >
-                  <span>{t('crash.stake')}</span>
+                  <span className="min-w-0 truncate">
+                    {t('crash.stake')}{' '}
+                    <FiatHint sol={amount} className="normal-case tracking-normal" />
+                  </span>
                   <MaxBetPick onPick={setAmount} className="normal-case tracking-normal" />
                 </span>
                 <input

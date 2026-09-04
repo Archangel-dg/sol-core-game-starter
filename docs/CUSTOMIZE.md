@@ -15,7 +15,11 @@ result animation.
   regenerate with `npm run generate-sounds`).
 
 - `src/lib/fiat.tsx`, `src/components/Amount.tsx`, `FiatHint.tsx`, `FiatSwitch.tsx` — the
-  currency approximation next to a SOL amount. Restyle it, move it, drop it from a screen. Two
+  currency approximation next to a SOL amount. It sits at every money INPUT (beside the
+  label), at the balance, at the result payout and in the win notification — and
+  deliberately NOT in the round history, the live list of other players' bets, the
+  session HUD or the slot win line: those compare numbers with each other rather than
+  asking what one is worth, and a second currency per row reads as clutter. Restyle it, move it, drop it from a screen. Two
   things are not yours to change: it never REPLACES the SOL figure, and without a usable rate it
   renders nothing at all (see rule 15 in `docs/RULES.md`).
 

@@ -9,6 +9,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import type { EngineDef } from '@/lib/engines';
 import type { TournamentCycleInfo, TournamentLeaderboardEntry, TournamentRunView } from '@/lib/solcore';
 import { toSol } from '@/lib/lamports';
+import { Amount } from './Amount';
 import { toUiError } from '@/lib/errors';
 import { usePlayerAuth } from '@/lib/player-auth';
 
@@ -173,9 +174,13 @@ export function TournamentGame({ engine, verifierUrl }: { engine: EngineDef; ver
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wider text-white/40">{t('tournament.pot')}</div>
-          <div className="text-sm font-semibold tabular-nums text-accent">
-            {toSol(view?.cycle.potLamports ?? cycle?.potLamports ?? '0')} ◎
-          </div>
+          {/* Der Pot ist die Zahl, wegen der jemand mitspielt — deshalb
+              steht hier die Naeherung und nicht an den vier Nachbarfeldern. */}
+          <Amount
+            lamports={view?.cycle.potLamports ?? cycle?.potLamports ?? '0'}
+            className="text-sm font-semibold tabular-nums text-accent"
+            fiatClassName="text-[10px] font-normal"
+          />
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wider text-white/40">{t('tournament.entries')}</div>

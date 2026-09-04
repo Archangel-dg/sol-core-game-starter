@@ -8,7 +8,7 @@ import { solToLamports, toSol } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
 import { usePlayerAuth } from '@/lib/player-auth';
 import type { RoundLog } from './SingleBetGame';
-import { BetLimitHint, MaxBetPick } from './BetLimitHint';
+import { MaxBetPick } from './BetLimitHint';
 import { useSound } from '@/lib/sounds';
 import { useT, type TFn } from '@/lib/i18n';
 
@@ -573,9 +573,6 @@ export function SessionGame({
                   stakeLocked ? 'cursor-not-allowed text-white/60' : ''
                 }`}
               />
-              {/* Hoechsteinsatz direkt unter dem Feld — Spielgrenze, keine
-                  Kontogrenze (seit 03.09.2026 hier statt am Guthaben). */}
-              {!stakeLocked && <BetLimitHint className="mt-1" />}
             </label>
             {costPerStep && (
               // Anzeigepflicht vor dem ersten Klick: hier kostet nicht die Runde,

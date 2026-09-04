@@ -1355,3 +1355,28 @@ export function getBetLimits(): Promise<BetLimitsView> {
   const cfg = serverConfig();
   return request<BetLimitsView>(`/api/public/games/${cfg.gameId}/limits`);
 }
+
+/** SOL-Kurs für die ANZEIGE (Näherung in Landeswährung neben dem SOL-Betrag). */
+export interface SolPriceView {
+  /** SOL in USD — `null`, wenn keine Quelle antwortet. */
+  usd: number | null;
+  /** SOL in EUR — `null`, wenn der Kurs oder der Devisenkurs fehlt. */
+  eur: number | null;
+  source: string | null;
+  /** ISO-Zeitstempel des Standes. */
+  at: string;
+}
+
+/**
+ * Kurs von der Plattform, nicht aus dem Browser.
+ *
+ * Die Quelle sieht so eine Anfrage je Minute für ALLE Creator-Spiele statt
+ * eine je Besucher; niemand braucht einen eigenen API-Schlüssel, und zwei
+ * Spiele zeigen im selben Moment denselben Kurs. Antwortet der Server nicht
+ * oder kennt er die Route nicht (älterer API-Stand), gibt es keinen Kurs —
+ * die Oberfläche lässt die Angabe dann weg. Ein Ersatzwert wäre eine
+ * Falschaussage über Geld.
+ */
+export function getSolPrice(): Promise<SolPriceView> {
+  return request<SolPriceView>('/api/public/sol-price');
+}

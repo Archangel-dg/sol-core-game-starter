@@ -141,32 +141,12 @@ export const STRINGS = {
   },
 
   // ── Höchsteinsatz ────────────────────────────────────────────────────────
-  'limit.now': {
-    en: 'Max bet right now',
-    de: 'Max. Einsatz jetzt',
-    fr: 'Mise max maintenant',
-    ru: 'Макс. ставка сейчас',
-  },
-  'limit.upTo': {
-    en: 'Max bet up to',
-    de: 'Max. Einsatz bis zu',
-    fr: 'Mise max jusqu’à',
-    ru: 'Макс. ставка до',
-  },
   'limit.locked': {
     en: 'not playable right now',
     de: 'gerade nicht spielbar',
     fr: 'injouable pour le moment',
     ru: 'сейчас недоступно',
   },
-  'limit.take': {
-    en: 'Use the maximum bet',
-    de: 'Höchsteinsatz übernehmen',
-    fr: 'Utiliser la mise maximale',
-    ru: 'Взять максимальную ставку',
-  },
-  'limit.why': { en: 'why?', de: 'warum?', fr: 'pourquoi ?', ru: 'почему?' },
-  'limit.less': { en: 'less', de: 'weniger', fr: 'moins', ru: 'свернуть' },
   'limit.max': { en: 'Max', de: 'Max', fr: 'Max', ru: 'Макс' },
   'limit.maxUpTo': { en: 'Max up to', de: 'Max bis', fr: 'Max jusqu’à', ru: 'Макс до' },
 
@@ -220,6 +200,24 @@ export const STRINGS = {
     ru: 'Выигрыш! Выплата {amount} ◎',
   },
   'result.lost': { en: 'Lost', de: 'Verloren', fr: 'Perdu', ru: 'Проигрыш' },
+
+  // ── Coin-Flip-Reveal (CoinFlipView) ──────────────────────────────────────
+  // ── Gewinnmeldung in der Kopfleiste (WinToast) ───────────────────────────
+  'win.toast': {
+    en: 'Won +{amount} ◎',
+    de: 'Gewonnen +{amount} ◎',
+    fr: 'Gagné +{amount} ◎',
+    ru: 'Выигрыш +{amount} ◎',
+  },
+
+  'coinflip.you': { en: 'You:', de: 'Du:', fr: 'Vous :', ru: 'Ваш выбор:' },
+  'coinflip.roll': { en: 'Roll {roll}', de: 'Wurf {roll}', fr: 'Tirage {roll}', ru: 'Бросок {roll}' },
+  'coinflip.idle': {
+    en: 'Heads or Tails',
+    de: 'Kopf oder Zahl',
+    fr: 'Face ou Pile',
+    ru: 'Орёл или решка',
+  },
 
   // ── Einzelwette ──────────────────────────────────────────────────────────
   'bet.stake': {
@@ -1817,6 +1815,21 @@ export const STRINGS = {
     fr: 'Aucun wallet connecté',
     ru: 'Кошелёк не подключён',
   },
+  // ── Wallet-Knopf (WalletButton → BaseWalletMultiButton) ──────────────────
+  'wallet.connect': { en: 'Connect', de: 'Verbinden', fr: 'Connecter', ru: 'Подключить' },
+  'wallet.connecting': { en: 'Connecting…', de: 'Verbinde…', fr: 'Connexion…', ru: 'Подключение…' },
+  'wallet.change': { en: 'Change wallet', de: 'Wallet wechseln', fr: 'Changer de wallet', ru: 'Сменить кошелёк' },
+
+  // ── Währungs-Näherung (fiat.tsx, Amount, BalanceBar) ─────────────────────
+  'fiat.show': { en: 'Show value in', de: 'Wert anzeigen in', fr: 'Afficher la valeur en', ru: 'Показывать в' },
+  'fiat.off': { en: 'Off', de: 'Aus', fr: 'Non', ru: 'Выкл' },
+  'fiat.note': {
+    en: 'Approximate, for orientation only. Every bet and payout is settled in SOL.',
+    de: 'Nur ein Näherungswert zur Orientierung. Abgerechnet wird jede Wette und jede Auszahlung in SOL.',
+    fr: 'Valeur approximative, à titre indicatif. Chaque mise et chaque gain sont réglés en SOL.',
+    ru: 'Приблизительно, для ориентира. Все ставки и выплаты рассчитываются в SOL.',
+  },
+
   'menu.copyAddress': { en: 'Copy address', de: 'Adresse kopieren', fr: 'Copier l’adresse', ru: 'Скопировать адрес' },
   'menu.copied': { en: 'Copied', de: 'Kopiert', fr: 'Copié', ru: 'Скопировано' },
   'menu.disconnect': { en: 'Disconnect', de: 'Trennen', fr: 'Déconnecter', ru: 'Отключить' },

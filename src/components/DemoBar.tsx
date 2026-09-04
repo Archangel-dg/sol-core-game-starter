@@ -4,6 +4,8 @@ import { useT } from '@/lib/i18n';
 import { useDemo } from './DemoProvider';
 import { Popover } from './Popover';
 import { toSol } from '@/lib/lamports';
+import { useFiat } from '@/lib/fiat';
+import { FiatSwitch } from './FiatSwitch';
 
 /**
  * Demo-Abzeichen in der Kopfleiste (Design-Zone). Zeigt den simulierten Saldo;
@@ -17,6 +19,7 @@ import { toSol } from '@/lib/lamports';
  */
 export function DemoBar() {
   const { demo, demoBalance, starting, error, startDemo, exitDemo } = useDemo();
+  const { format } = useFiat();
   const t = useT();
 
   if (!demo) {
@@ -47,7 +50,8 @@ export function DemoBar() {
 
   return (
     <Popover
-      align="center"
+      // Rechtsbündig wie das Saldo-Feld — beide sitzen am rechten Rand.
+      align="end"
       panelClassName="w-64"
       trigger={() => (
         <span
@@ -63,8 +67,20 @@ export function DemoBar() {
     >
       {(close) => (
         <div className="space-y-3 text-xs text-white/70">
+          {/* Der Saldo noch einmal im Feld, weil das Abzeichen selbst für die
+              Näherung zu schmal ist — auf einem 360-px-Gerät steht daneben
+              schon der Spielname und das Menü. */}
+          {demoBalance !== null && format(demoBalance) && (
+            <p className="font-bold tabular-nums text-accent">
+              {toSol(demoBalance)} ◎
+              <span className="ml-1.5 text-[11px] font-normal text-white/40">{format(demoBalance)}</span>
+            </p>
+          )}
           <p>{t('demo.autoNote')}</p>
           <p className="text-[11px] text-white/40">{t('demo.note')}</p>
+          {/* Auch hier, nicht nur hinter der Wallet: Der Demo-Modus startet von
+              selbst, also ist DAS für die meisten Besucher die Saldo-Anzeige. */}
+          <FiatSwitch />
           <button
             type="button"
             onClick={() => {

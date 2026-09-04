@@ -1,17 +1,20 @@
 'use client';
 import { useT } from '@/lib/i18n';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayer, useDemo } from './DemoProvider';
 import type { Control, EngineDef } from '@/lib/engines';
 import { solToLamports } from '@/lib/lamports';
 import { toUiError } from '@/lib/errors';
 import { usePlayerAuth } from '@/lib/player-auth';
+import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { EngineControls } from './EngineControls';
 import { ResultView } from './ResultView';
 import { SlotGrid } from './SlotGrid';
+import { CoinFlipView } from './CoinFlipView';
 import { RouletteBoard, spotKey, type RouletteSpot } from './RouletteBoard';
-import { BetLimitHint, MaxBetPick } from './BetLimitHint';
+import { MaxBetPick } from './BetLimitHint';
+import { FiatHint } from './FiatHint';
 import { useSound } from '@/lib/sounds';
 
 export interface RoundLog {
@@ -52,6 +55,21 @@ function plinkoControls(engine: EngineDef, engineConfig?: Record<string, number>
 }
 
 /**
+ * Engines, deren Ergebnis eine eigene Animation ausspielt und deshalb SELBST
+ * meldet, wann es sichtbar feststeht (`onRevealed`). Alle anderen zeigen das
+ * Ergebnis sofort mit dem Render.
+ *
+ * Wer eine neue Reveal-Animation baut, trägt ihren Engine-Schlüssel hier ein —
+ * sonst taut der Saldo auf, während die Animation noch läuft, und verrät den
+ * Ausgang vor der Ziellinie.
+ */
+const ANIMATED_REVEALS = new Set<string>(['coin-flip']);
+
+/** Sicherheitsnetz: Sollte eine Animation nie melden (Tab im Hintergrund,
+ *  Fehler), taut der Saldo trotzdem auf. freezeUntil legt 5 s obendrauf. */
+const REVEAL_BACKSTOP_MS = 3_000;
+
+/**
  * Generischer Einzel-Bet-Flow (funktioniert für JEDE single-Engine). Die
  * Ergebnis-Darstellung ist bewusst schlicht — hier ist die Design-Zone.
  */
@@ -75,6 +93,10 @@ export function SingleBetGame({
   // kein Solana-Wallet, das signieren könnte — er bleibt bewusst tokenlos.
   const { moneyFetch } = usePlayerAuth();
   const { play: sfx } = useSound();
+  // Reveal-Freeze: Der Server bucht sofort, die Animation braucht ihre Zeit.
+  // Zwischen beidem bleibt JEDE Saldo-Anzeige stehen (echt wie Demo), sonst
+  // steht das Ergebnis in der Kopfleiste, bevor die Animation es zeigt.
+  const { freezeUntil, release } = useBalanceFreeze();
   const [bet, setBet] = useState('0.01');
   const [values, setValues] = useState<Record<string, string>>({});
   /** Roulette: gewählte Wettfelder (Easy = genau eins, Pro = mehrere Chips). */
@@ -88,6 +110,9 @@ export function SingleBetGame({
     roll: number | null;
     details: Record<string, unknown> | null;
   } | null>(null);
+  /** Was erst mit der Landung sichtbar werden darf: Ton, Verlaufseintrag,
+   *  Saldo. Bis dahin liegt es hier und NICHT in der Oberfläche. */
+  const pendingReveal = useRef<{ win: boolean; log: RoundLog } | null>(null);
 
   // Render-Grenzen aus der Server-Config — ändert NICHT die params-Struktur
   // (buildSingleParams bleibt unverändert), nur die angezeigten Controls.
@@ -186,7 +211,20 @@ export function SingleBetGame({
         sfx('error');
         return;
       }
-      sfx(r.result.win ? 'win' : 'lose');
+      // Ab hier ist das Ergebnis da — sichtbar werden darf es erst, wenn die
+      // Animation es zeigt. Der Saldo friert sofort ein (Backstop 8 s, siehe
+      // freezeUntil), Ton und Verlaufseintrag warten in pendingReveal.
+      freezeUntil(Date.now() + REVEAL_BACKSTOP_MS);
+      pendingReveal.current = {
+        win: r.result.win,
+        log: {
+          betLamports: betLamports.toString(),
+          win: r.result.win,
+          multiplierBps: r.result.multiplierBps,
+          payoutLamports: r.result.payoutLamports,
+          roundId: r.roundId,
+        },
+      };
       setResult({
         win: r.result.win,
         multiplierBps: r.result.multiplierBps,
@@ -194,15 +232,9 @@ export function SingleBetGame({
         roll: r.result.roll,
         details: r.result.details ?? null,
       });
+      // Der Seed-Hash gehört zur Runde, nicht zum Ausgang — er verrät nichts
+      // und bleibt deshalb sofort erreichbar (Nachprüfbarkeit, Regel 6).
       onRound(r.proof.serverSeedHash, r.roundId);
-      onLog({
-        betLamports: betLamports.toString(),
-        win: r.result.win,
-        multiplierBps: r.result.multiplierBps,
-        payoutLamports: r.result.payoutLamports,
-        roundId: r.roundId,
-      });
-      if (demo) void refreshDemoBalance();
     } catch (e) {
       setError((e as Error).message);
       sfx('error');
@@ -210,6 +242,23 @@ export function SingleBetGame({
       setBusy(false);
     }
   };
+
+  // Die Animation meldet die Landung; erst jetzt darf das Ergebnis nach außen.
+  const onRevealed = useCallback(() => {
+    const p = pendingReveal.current;
+    pendingReveal.current = null;
+    release();
+    if (!p) return;
+    sfx(p.win ? 'win' : 'lose');
+    onLog(p.log);
+    if (demo) void refreshDemoBalance();
+  }, [release, sfx, onLog, demo, refreshDemoBalance]);
+
+  // Engines ohne eigene Animation zeigen das Ergebnis mit dem Render — für sie
+  // ist die Landung genau dieser Moment.
+  useEffect(() => {
+    if (result && !ANIMATED_REVEALS.has(engine.key)) onRevealed();
+  }, [result, engine.key, onRevealed]);
 
   return (
     <div className="space-y-4">
@@ -238,6 +287,12 @@ export function SingleBetGame({
               />
             );
           }
+          if (engine.key === 'coin-flip') {
+            // Eigene Reveal-Animation statt der schlichten ResultView: dieselben
+            // Zahlen, von einer Münze ausgespielt. Sie zeigt auch den Leerlauf,
+            // deshalb steht sie vor der result-Verzweigung (Design-Zone).
+            return <CoinFlipView result={result} hint={t(engine.blurb)} onRevealed={onRevealed} />;
+          }
           return result ? (
             <ResultView {...result} />
           ) : (
@@ -262,7 +317,11 @@ export function SingleBetGame({
               Einsatz ist das Minimum aus Spiel-, Level-, Solvenz- und Tagesdeckel
               und bewegt sich im Betrieb. Ohne diese Zahl tippt der Spieler blind. */}
           <span className="flex items-baseline justify-between gap-2">
-            <span>{t('bet.stake')}</span>
+            {/* Der Einsatz in Landeswährung steht NEBEN dem Label, nicht unter
+                dem Feld: eine Randnotiz, die das Feld nicht auseinanderzieht. */}
+            <span className="min-w-0 truncate">
+              {t('bet.stake')} <FiatHint sol={bet} />
+            </span>
             <MaxBetPick onPick={setBet} />
           </span>
           <input
@@ -271,11 +330,6 @@ export function SingleBetGame({
             inputMode="decimal"
             className="mt-1 w-full rounded-lg border border-white/10 bg-night px-3 py-2 tabular-nums text-white outline-none focus:border-accent/50"
           />
-          {/* Was JETZT hoechstens gesetzt werden darf, direkt unter dem Feld:
-              die engste Grenze ist meist die Pool-Groesse, und die bewegt sich
-              im Betrieb. Steht seit dem 03.09.2026 hier statt am Guthaben —
-              es ist eine Spielgrenze, keine Kontogrenze. */}
-          <BetLimitHint className="mt-1" />
         </label>
 
         <div className="mt-3">

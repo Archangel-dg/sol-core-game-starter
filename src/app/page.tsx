@@ -46,9 +46,14 @@ export default function Home() {
       .catch(() => setMeta({ error: { message: 'backend_unreachable' } } as Meta));
   }, []);
   return (
-    <DemoProvider>
-      <HomeInner meta={meta} />
-    </DemoProvider>
+    // Der Balance-Freeze steht GANZ oben — über dem DemoProvider. Sonst kann
+    // der Demo-Saldo ihn nicht sehen und verrät den Ausgang mitten in der
+    // Animation, genau wie es der echte Saldo vor dem 04.09.2026 tat.
+    <BalanceFreezeProvider>
+      <DemoProvider>
+        <HomeInner meta={meta} />
+      </DemoProvider>
+    </BalanceFreezeProvider>
   );
 }
 
@@ -59,13 +64,22 @@ function HomeInner({ meta }: { meta: Meta | null }) {
   const [seedHash, setSeedHash] = useState<string | null>(null);
   const [roundId, setRoundId] = useState<string | null>(null);
   const [history, setHistory] = useState<RoundLog[]>([]);
+  /** Zuletzt AUFGEDECKTER Gewinn für die Meldung in der Kopfleiste. `key`
+   *  zählt hoch, damit zwei gleich hohe Gewinne hintereinander zwei Meldungen
+   *  ergeben und nicht eine stumme. */
+  const [win, setWin] = useState<{ payoutLamports: string; key: number } | null>(null);
 
   const engine = meta && !meta.error ? getEngine(meta.engine) : undefined;
   const onRound = (h: string, r: string) => {
     setSeedHash(h);
     setRoundId(r);
   };
-  const onLog = (r: RoundLog) => setHistory((h) => [r, ...h].slice(0, 20));
+  // Die Spiele rufen onLog erst, wenn die Animation das Ergebnis ZEIGT — der
+  // Verlauf und die Gewinnmeldung dürfen es keine Sekunde früher verraten.
+  const onLog = (r: RoundLog) => {
+    setHistory((h) => [r, ...h].slice(0, 20));
+    if (r.win) setWin((w) => ({ payoutLamports: r.payoutLamports, key: (w?.key ?? 0) + 1 }));
+  };
 
   // Demo-Modus ist die Eingangstür (Systemvertrag): Er startet von selbst,
   // sobald das Spiel geladen ist und keine Wallet verbunden ist — einmal je
@@ -94,7 +108,7 @@ function HomeInner({ meta }: { meta: Meta | null }) {
     // Coin-Flip-Reveal), dann pro Engine nach Demo/echt — beide teilen die
     // Lobby-Erfahrung. Demo läuft gegen den Server-Bot auf Sim-Balance.
     return (
-      <BalanceFreezeProvider>
+      <>
         {engine.key === 'pvp-dice-duel' ? (
           demo ? (
             <DemoDiceDuelGame
@@ -151,7 +165,7 @@ function HomeInner({ meta }: { meta: Meta | null }) {
             onDemoPlay={startDemo}
           />
         )}
-      </BalanceFreezeProvider>
+      </>
     );
   }
 
@@ -166,7 +180,7 @@ function HomeInner({ meta }: { meta: Meta | null }) {
     .join(' · ');
 
   return (
-    <BalanceFreezeProvider>
+    <>
       <div className="min-h-screen">
         {/* Kopfleiste über JEDEM Zustand (Laden, Fehler, Spiel): Spielname,
             Wallet/Guthaben mit Ein- und Auszahlen, Demo-Abzeichen, Menü mit
@@ -177,6 +191,7 @@ function HomeInner({ meta }: { meta: Meta | null }) {
           subtitle={subtitle}
           devMock={meta?.devMock ?? false}
           showDemo={demoDoor}
+          win={win}
           menu={{
             history,
             serverSeedHash: seedHash,
@@ -259,6 +274,6 @@ function HomeInner({ meta }: { meta: Meta | null }) {
         )}
       </main>
       </div>
-    </BalanceFreezeProvider>
+    </>
   );
 }

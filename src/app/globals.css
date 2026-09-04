@@ -23,3 +23,39 @@ body {
   font-size: 14px !important;
   white-space: nowrap;
 }
+
+/* ── Coin-Flip-Reveal (Design-Zone, siehe components/CoinFlipView.tsx) ──────
+   Nur Geometrie und Bewegung; jede Farbe kommt aus dem Theme (accent/red/
+   white-Töne), damit NEXT_PUBLIC_ACCENT_COLOR die Münze mitfärbt.
+   `--u` = 1 % der Spielfeldkante, von der Komponente gemessen gesetzt. */
+.coin-scene {
+  perspective: calc(var(--u) * 170);
+}
+.coin-body {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.coin-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transition: border-color 0.25s ease;
+}
+.coin-face-tails {
+  transform: rotateY(180deg);
+}
+.coin-readout {
+  opacity: 0;
+  transform: translateY(calc(var(--u) * 1.5));
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.coin-readout-shown {
+  opacity: 1;
+  transform: none;
+}
+/* Betriebssystem-Einstellung „weniger Bewegung": kein Flug, nur das Ergebnis. */
+@media (prefers-reduced-motion: reduce) {
+  .coin-face,
+  .coin-readout {
+    transition: none;
+  }
+}

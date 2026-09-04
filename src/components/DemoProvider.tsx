@@ -1,7 +1,8 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useBalanceFreeze } from '@/lib/balance-freeze';
 
 /**
  * Demo-Modus-Kontext. Meldet den Spieler mit einer server-generierten
@@ -36,16 +37,31 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Der Demo-Saldo folgt demselben Freeze wie der echte (Systemvertrag,
+  // lib/balance-freeze.tsx): Solange eine Reveal-Animation läuft, werden
+  // Poll-Ergebnisse verworfen. Ohne das stand der neue Stand schon in der
+  // Kopfleiste, während die Münze noch flog — der Ausgang war verraten,
+  // bevor die Animation ihn zeigte.
+  const { frozen } = useBalanceFreeze();
+  const frozenRef = useRef(frozen);
+  frozenRef.current = frozen;
+
   const refreshDemoBalance = useCallback(async () => {
     const w = demoWallet;
     if (!w) return;
     try {
       const r = await fetch(`/api/demo/balance/${w}`).then((x) => x.json());
+      if (frozenRef.current) return; // Anzeige eingefroren — Ergebnis verwerfen
       if (typeof r.balanceLamports === 'string') setDemoBalance(r.balanceLamports);
     } catch {
       /* still */
     }
   }, [demoWallet]);
+
+  // Nach dem Auftauen sofort den echten Stand holen — wie in BalanceBar.
+  useEffect(() => {
+    if (!frozen) void refreshDemoBalance();
+  }, [frozen, refreshDemoBalance]);
 
   // Bestehende Demo-Wallet nach Reload fortsetzen.
   useEffect(() => {

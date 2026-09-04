@@ -50,10 +50,17 @@ payout-ready game — automatically.
 10. **Show the maximum bet, quietly but always.** The allowed bet is the MINIMUM of the game,
     level, solvency, single- and daily-payout caps, and the tightest of them moves during
     operation (measured 2026-08-28: game and level cap 50 SOL each, actually allowed 0.0365 SOL).
-    Use `MaxBetPick` at the label and `BetLimitHint` under the input of every bet field — both read
-    the same source, so they cannot disagree. It is a game limit, not an account limit: deposit and
-    withdraw limits come back from the server as errors, the money menu shows none. Without that number a player types blind and gets a
-    rejection with no visible reason.
+    Use `MaxBetPick` at the label of every bet field, and state the figure ONCE. It is a game
+    limit, not an account limit: deposit and withdraw limits come back from the server as errors,
+    the money menu shows none. Without that number a player types blind and gets a rejection with
+    no visible reason.
+
+    The server also sends a sentence saying WHICH cap is binding right now. It rides in
+    `MaxBetPick`'s `title`. A second line under the input used to spell it out; the operator had it
+    removed on 04.09.2026 because it repeated the number. Be aware of what that costs: a `title` is
+    a hover tooltip, and a phone has no hover, so a player who wonders why a game advertising
+    50 SOL allows 2.76 has nowhere to look. If you bring the explanation back, give it its own
+    surface — and do not print the number a second time.
 
 11. **The demo mode stays.** `/api/demo/*` plus `DemoProvider`/`DemoBar` let a visitor play with a
     simulated 3 SOL balance before depositing anything — and every demo spin is decided by the
@@ -90,15 +97,16 @@ payout-ready game — automatically.
     size, spacing, position within the footer — but keep the sentence, keep the link target, and
     keep it on every page. Only "Powered by" is translated; "Sol-Core Engine" is a proper name.
 
-14. **Every page carries its origin.** At the foot of the page stands
-    `Powered by Sol-Core Engine`, where the name links to <https://sol-core.com>.
-    `components/PoweredBy.tsx` renders it, and it sits in `app/layout.tsx` — above all seven
-    render paths (loading, engine mismatch, the normal game, four full-bleed PvP surfaces), each
-    of which ends in its own `<main>`. A footer that lives inside a game component does not
-    survive the first re-skin: that is exactly how the six older "Powered by Sol-Core" lines
-    ended up pointing at the platform or the verifier instead of the engine. Restyle it — colour,
-    size, spacing, position within the footer — but keep the sentence, keep the link target, and
-    keep it on every page. Only "Powered by" is translated; "Sol-Core Engine" is a proper name.
+15. **The currency approximation is DISPLAY ONLY.** Next to a SOL amount the game may show
+    `≈ 17,40 €` / `≈ $18.90`. The SOL figure stays the number: the server settles in lamports, the
+    Scanner shows SOL, the maximum bet is in SOL — replace the figure and a player can no longer
+    reconcile a round with the verify page. The rate is a float and never touches a money path
+    (rule 3); `lib/fiat.tsx` converts for the screen and returns a string. If the rate is missing,
+    unusable or older than fifteen minutes, the line is DROPPED — no placeholder, no last known
+    value. A stale number beside a payout is a promise nobody made. The rate comes from the
+    platform (`/api/price` → Sol-Core `/api/public/sol-price`), not from each game: one request a
+    minute for the whole platform instead of one per creator server, and two games can never show
+    two different rates at the same moment.
 
 ## Off-limits files (they work — don't rebuild them)
 

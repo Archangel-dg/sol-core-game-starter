@@ -14,6 +14,11 @@ result animation.
   `DemoBar.tsx`, `Popover.tsx`, and the sound set (`src/lib/sounds.ts`, `public/sounds/*.wav`,
   regenerate with `npm run generate-sounds`).
 
+- `src/lib/fiat.tsx`, `src/components/Amount.tsx`, `FiatHint.tsx`, `FiatSwitch.tsx` — the
+  currency approximation next to a SOL amount. Restyle it, move it, drop it from a screen. Two
+  things are not yours to change: it never REPLACES the SOL figure, and without a usable rate it
+  renders nothing at all (see rule 15 in `docs/RULES.md`).
+
 None of this touches the money flow — reshape it freely.
 
 ## Live reveal animations (`LiveResultView.tsx`)

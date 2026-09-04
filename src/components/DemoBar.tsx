@@ -47,7 +47,8 @@ export function DemoBar() {
 
   return (
     <Popover
-      align="center"
+      // Rechtsbündig wie das Saldo-Feld — beide sitzen am rechten Rand.
+      align="end"
       panelClassName="w-64"
       trigger={() => (
         <span

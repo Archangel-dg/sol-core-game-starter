@@ -112,7 +112,9 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
 
   return (
     <Popover
-      align="center"
+      // Rechtsbündig: Der Saldo sitzt seit dem 04.09.2026 rechts neben dem
+      // Menü. Mittig ausgerichtet lief das Feld dort aus dem Bild.
+      align="end"
       panelClassName="w-72"
       trigger={(open) => (
         <span

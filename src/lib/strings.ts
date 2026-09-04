@@ -1835,6 +1835,11 @@ export const STRINGS = {
     fr: 'Aucun wallet connecté',
     ru: 'Кошелёк не подключён',
   },
+  // ── Wallet-Knopf (WalletButton → BaseWalletMultiButton) ──────────────────
+  'wallet.connect': { en: 'Connect', de: 'Verbinden', fr: 'Connecter', ru: 'Подключить' },
+  'wallet.connecting': { en: 'Connecting…', de: 'Verbinde…', fr: 'Connexion…', ru: 'Подключение…' },
+  'wallet.change': { en: 'Change wallet', de: 'Wallet wechseln', fr: 'Changer de wallet', ru: 'Сменить кошелёк' },
+
   'menu.copyAddress': { en: 'Copy address', de: 'Adresse kopieren', fr: 'Copier l’adresse', ru: 'Скопировать адрес' },
   'menu.copied': { en: 'Copied', de: 'Kopiert', fr: 'Copié', ru: 'Скопировано' },
   'menu.disconnect': { en: 'Disconnect', de: 'Trennen', fr: 'Déconnecter', ru: 'Отключить' },

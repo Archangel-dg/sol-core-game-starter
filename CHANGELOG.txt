@@ -2,6 +2,25 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-04 — The header holds its own edge
+- The balance dropdown ran off the right of the screen once the balance moved to the
+  right of the header (reported on a phone; reproduced at 360 and 390 px).
+- Popover keeps itself on screen now: after opening it measures and shifts sideways if
+  needed (12 px margin, re-measured on resize). A fixed alignment is not enough —
+  centred, the balance panel left the screen on the right; right-aligned, the demo
+  panel left it on the LEFT, because its trigger is not the outermost element of the
+  group. Where a trigger sits is the creator's choice, so the primitive handles it.
+  Measured: panel x went from -22 px (390 px screen) and -52 px (360 px) to 12 px.
+- BalanceBar and DemoBar switched to align="end" — they sit at the right edge now.
+- Wallet button: "Select Wallet" (165 px) became "Connect" (88 px), so it no longer
+  dwarfs the balance pill it is replaced by. The header used to jump on connect.
+- The button's labels now run through the catalog and follow the language switch. This
+  needed BaseWalletMultiButton instead of WalletMultiButton: the latter hardcodes its
+  English labels and takes no override, which is why this one button stayed English
+  through every language change since the switcher shipped.
+- New catalog keys in all four languages: wallet.connect, wallet.connecting,
+  wallet.change. Copy address / copied / disconnect reuse the existing menu.* keys.
+
 2026-09-04 — The reveal decides what the header may show
 - The balance no longer moves before the animation shows the result. It used to drop
   ~2 s early — while the coin was still flying, the header already said whether you won.

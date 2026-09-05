@@ -200,9 +200,9 @@ export function DemoDiceProGame({
   }, [matchId, needsPoll, refreshDemoBalance]);
 
   return (
-    <main className="mx-auto min-h-screen max-w-md px-4 pb-10">
+    <main className="mx-auto sc-vh max-w-md px-4 pb-10">
       {/* Kopf: Demo-Badge + Saldo + Beenden */}
-      <header className="sticky top-0 z-20 -mx-4 mb-4 flex items-center justify-between gap-2 border-b border-white/10 bg-night/80 px-4 py-3 backdrop-blur">
+      <header className="sc-header sticky top-0 z-20 -mx-4 mb-4 flex items-center justify-between gap-2 border-b border-white/10 bg-night/80 px-4 py-3 backdrop-blur">
         <div className="min-w-0">
           <h1 className="truncate text-base font-bold text-white">{gameName}</h1>
           <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">

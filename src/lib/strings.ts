@@ -285,12 +285,14 @@ export const STRINGS = {
   // ── Reveal: mines ────────────────────────────────────────────────────────
   'reveal.mines.title': { en: 'Mines', de: 'Minen', fr: 'Mines', ru: 'Мины' },
   'reveal.mines.board': { en: '{mines} mines / {tiles} tiles', de: '{mines} Minen / {tiles} Felder', fr: '{mines} mines / {tiles} cases', ru: '{mines} мин / {tiles} полей' },
+  'reveal.mines.tile': { en: 'Field {n}', de: 'Feld {n}', fr: 'Case {n}', ru: 'Поле {n}' },
   'reveal.mines.gems': { en: '{n} gems · cashed out', de: '{n} Edelsteine · ausgezahlt', fr: '{n} gemmes · encaissé', ru: '{n} самоцветов · выплата' },
   'reveal.mines.bust': { en: 'Mine on pick {n} · {mines} mines on the board', de: 'Mine beim {n}. Feld · {mines} Minen im Spiel', fr: 'Mine au choix {n} · {mines} mines sur la grille', ru: 'Мина на ходу {n} · {mines} мин на поле' },
 
   // ── Reveal: towers ───────────────────────────────────────────────────────
   'reveal.towers.title': { en: 'Towers', de: 'Türme', fr: 'Tours', ru: 'Башни' },
   'reveal.towers.floor': { en: 'F{n}', de: 'E{n}', fr: 'É{n}', ru: 'Э{n}' },
+  'reveal.towers.tile': { en: 'Floor {floor}, column {n}', de: 'Etage {floor}, Spalte {n}', fr: 'Étage {floor}, colonne {n}', ru: 'Этаж {floor}, столбец {n}' },
   'reveal.towers.shape': { en: '{levels} floors × {columns} · {bombs} bombs', de: '{levels} Etagen × {columns} · {bombs} Bomben', fr: '{levels} étages × {columns} · {bombs} bombes', ru: '{levels} этажей × {columns} · {bombs} бомб' },
   'reveal.towers.mixed': { en: '{levels} floors · mixed', de: '{levels} Etagen · gemischt', fr: '{levels} étages · mixte', ru: '{levels} этажей · смешанно' },
   'reveal.towers.cleared': { en: '{n} floors cleared · {end}', de: '{n} Etagen geschafft · {end}', fr: '{n} étages franchis · {end}', ru: '{n} этажей пройдено · {end}' },
@@ -1986,6 +1988,42 @@ export const STRINGS = {
     de: 'Linie {line}: {count}× {symbol} ({pay}×)',
     fr: 'Ligne {line} : {count}× {symbol} ({pay}×)',
     ru: 'Линия {line}: {count}× {symbol} ({pay}×)',
+  },
+  'slot.lineWinRtl': {
+    en: 'Line {line} ←: {count}× {symbol} ({pay}×)',
+    de: 'Linie {line} ←: {count}× {symbol} ({pay}×)',
+    fr: 'Ligne {line} ← : {count}× {symbol} ({pay}×)',
+    ru: 'Линия {line} ←: {count}× {symbol} ({pay}×)',
+  },
+  'slot.wildMult': {
+    en: 'WILD · ×{m} when substituting',
+    de: 'WILD · ×{m} beim Ersetzen',
+    fr: 'WILD · ×{m} en remplaçant',
+    ru: 'WILD · ×{m} при замене',
+  },
+  'slot.wildMultStack': {
+    en: 'WILD · ×{m} per wild, stacked',
+    de: 'WILD · ×{m} je Wild, gestapelt',
+    fr: 'WILD · ×{m} par wild, cumulé',
+    ru: 'WILD · ×{m} за вайлд, накопительно',
+  },
+  'slot.wildMultHit': {
+    en: '· wild ×{m}',
+    de: '· Wild ×{m}',
+    fr: '· wild ×{m}',
+    ru: '· вайлд ×{m}',
+  },
+  'slot.wayWin': {
+    en: '{symbol} on {count} reels × {ways} ways ({pay}×)',
+    de: '{symbol} auf {count} Walzen × {ways} Wege ({pay}×)',
+    fr: '{symbol} sur {count} rouleaux × {ways} voies ({pay}×)',
+    ru: '{symbol} на {count} барабанах × {ways} путей ({pay}×)',
+  },
+  'slot.sumWin': {
+    en: '{count}× {symbol} anywhere ({pay}×)',
+    de: '{count}× {symbol} irgendwo ({pay}×)',
+    fr: '{count}× {symbol} n’importe où ({pay}×)',
+    ru: '{count}× {symbol} где угодно ({pay}×)',
   },
   'slot.scatterWin': {
     en: '{count} scatter ({pay}×)',

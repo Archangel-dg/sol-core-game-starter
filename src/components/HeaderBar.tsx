@@ -50,7 +50,7 @@ export function HeaderBar({
     // am Desktop Platz. Der Name schrumpft (min-w-0 flex-1 + truncate), die
     // rechte Gruppe nie (shrink-0) — sonst drückt ein langer Spielname am
     // Handy erst den Saldo und dann das Menü aus dem Bild.
-    <header className="sticky top-0 z-20 mb-6 border-b border-white/10 bg-night/85 backdrop-blur">
+    <header className="sc-header sticky top-0 z-20 mb-6 border-b border-white/10 bg-night/85 backdrop-blur">
       <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-2.5 sm:py-3">
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-bold text-white sm:text-lg">{gameName}</h1>

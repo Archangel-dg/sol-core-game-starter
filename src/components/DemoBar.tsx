@@ -43,7 +43,16 @@ export function DemoBar() {
         }`}
       >
         {fehler && <span aria-hidden>!</span>}
-        {starting ? '…' : t('demo.play')}
+        {/* Am Telefon nur das Wort: „Demo spielen (3 ◎)" nahm bei 393px der
+            Kopfleiste so viel, dass vom Spielnamen „Min…" blieb; selbst
+            „Demo (3 ◎)" ließ bei 375px 23px zu wenig. Den Betrag nennt das
+            Feld nach dem Start — hier zählt, dass die Tür sichtbar bleibt. */}
+        {starting ? '…' : (
+          <>
+            <span className="sm:hidden">{t('demo.badge')}</span>
+            <span className="hidden sm:inline">{t('demo.play')}</span>
+          </>
+        )}
       </button>
     );
   }

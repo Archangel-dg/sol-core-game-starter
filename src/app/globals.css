@@ -41,6 +41,12 @@ body {
   font-size: 14px !important;
   white-space: nowrap;
 }
+@media (max-width: 399px) {
+  .wallet-adapter-button-trigger {
+    padding: 0 12px !important;
+    font-size: 13px !important;
+  }
+}
 
 /* ── Spielfeld und Bedienfeld auf einen Bildschirm (Design-Zone) ───────────
    Ein quadratisches Spielfeld ist auf einem Telefon so hoch wie der Bildschirm
@@ -80,4 +86,93 @@ body {
     /* Unter der Home-Leiste des iPhones liegt sonst der Cashout-Knopf. */
     padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
   }
+}
+
+/* ── Mobile: Tippen ohne Zoom, kein Seitwärts-Scrollen, sichere Ränder ──────
+   (Design-Zone — aber mit Zusagen, die scripts/check-mobile.mjs im Kit misst.)
+
+   1. SCHRIFT IN EINGABEFELDERN NIE UNTER 16px AUF TOUCH-GERÄTEN. iOS Safari zoomt
+      beim Fokus in jedes <input>/<select>/<textarea>, dessen Schrift kleiner ist.
+      Das ist die EINZIGE Ursache des „Ranzoomens" — und `maximum-scale=1` im
+      Viewport wäre die falsche Medizin: Es sperrt auf Android den Pinch-Zoom
+      (WCAG 1.4.4). Die Regel greift nur bei grobem Zeiger (Finger); am Desktop
+      bleiben die dichteren `text-sm`-Felder, wie sie sind. `!important`, weil
+      ein einzelnes vergessenes `text-xs` an einem neuen Feld sonst die ganze
+      Zusage bricht — genau das ist am 05.09.2026 an 13 Feldern passiert.
+   2. KEIN SEITWÄRTS-SCROLLEN. `overflow-x: clip` statt `hidden`: `hidden` macht
+      html/body zum Scroll-Container und bricht `position: sticky` (Kopfleiste,
+      Bedienfeld) in Safari. `clip` schneidet nur ab. Das ist ein NETZ, keine
+      Lösung: Was über den Rand ragt, ist weiterhin abgeschnitten — der
+      Prüfstand meldet jedes Element, dessen rechte Kante über die Breite ragt.
+   3. SAFE-AREA. Mit `viewport-fit=cover` (layout.tsx) reicht die Seite bis unter
+      Notch und Home-Leiste. Die Insets halten frei, was dort nicht liegen darf:
+      links/rechts am Körper (Querformat), oben an der klebenden Kopfleiste
+      (Standalone), unten an Fußzeile und Bedienfeld.
+   4. TIPPZIELE. `touch-action: manipulation` nimmt Knöpfen und Kacheln den
+      Doppeltipp-Zoom — seit das Brett bedient wird, ist ein schneller zweiter
+      Tipp auf eine Kachel der Normalfall, nicht die Ausnahme. Knöpfe außerhalb
+      der Spielfelder sind mindestens 2.5rem (40px) hoch; die Kacheln der Reveal-
+      Module sind davon ausgenommen (ein 8×8-Brett hätte sonst keinen Platz) und
+      werden vom Prüfstand mit 24px (WCAG 2.5.8) gemessen. Inline-Textknöpfe
+      (`underline`, z. B. der Höchsteinsatz am Einsatzfeld) bleiben inline.
+   5. HÖHE. `sc-vh` statt `min-h-screen`: `100vh` ist auf iOS/Android die Höhe
+      bei EINGEFAHRENER Browserleiste — die Fußzeile liegt dann unter der Falz.
+      `svh` (kleinste Ansichtshöhe) ist stabil; `vh` bleibt als Rückfall für
+      ältere WebViews (In-App-Browser von Wallets) davor stehen. */
+html {
+  overflow-x: clip;
+  /* Scrollt iOS ein fokussiertes Feld ins Bild, bleibt unten Platz für das
+     klebende Bedienfeld — sonst landet das Feld hinter der Leiste. */
+  scroll-padding-bottom: 9rem;
+  /* Safari vergrößert Text beim Drehen ins Querformat eigenmächtig. Nicht hier. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  overflow-x: clip;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  /* Die Fußzeile (PoweredBy, Systemvertrag — wird nicht angefasst) ist das
+     letzte Kind des Körpers: Der Rand hier hält sie über der Home-Leiste. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* Themenfarbe hinter der Adressleiste, kein Grau beim Überscrollen. */
+  overscroll-behavior-y: none;
+}
+.sc-vh {
+  min-height: 100vh;
+  min-height: 100svh;
+}
+.sc-header {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+button, [role='button'], a, input, select, textarea, label, summary {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgb(var(--accent-rgb) / 0.18);
+}
+@media (pointer: coarse) {
+  input, select, textarea {
+    font-size: max(1rem, 16px) !important;
+  }
+  button:not([data-reveal] button):not(.underline), select {
+    min-height: 2.5rem;
+  }
+}
+/* Querformat auf einem Telefon: ~390px hoch. Der Deckel `48svh` (oben) hielte
+   das Feld bei 187px, während daneben alles leer bleibt — deshalb stehen Feld
+   und Bedienfeld hier nebeneinander und das Feld darf höher werden. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .sc-board {
+    max-width: 78vh;
+    max-width: 78svh;
+  }
+  .sc-shell {
+    flex-direction: row;
+    align-items: flex-start;
+    min-height: 0;
+  }
+  .sc-shell > .sc-board { flex: 0 0 auto; }
+  .sc-shell > .sc-controls { position: static; flex: 1 1 0; min-width: 16rem; }
+  /* `.sc-main` statt `main`: `max-w-md` ist eine Klasse und schlüge einen
+     Element-Selektor — die Bedienleiste stand dann in 90px Breite. */
+  .sc-main { max-width: 56rem; }
 }

@@ -65,6 +65,28 @@ Binding rules:
    `BalanceBar`, because a real-money deposit could never be spent in that game. The freeze wiring
    itself stays — only that one engine skips the bar.
 
+## Playable on a phone
+
+Most players hold the game in one hand. Four things in the template keep it usable there,
+and the kit's `scripts/check-mobile.mjs` measures them in a real Chromium over ten viewports
+(Galaxy Fold outer 344px up to iPad, plus two landscapes):
+
+1. **No zoom when typing.** iOS Safari zooms into any `<input>`/`<select>`/`<textarea>`
+   whose font is under 16px. `globals.css` forces ≥ 16px on coarse pointers. Do NOT reach
+   for `maximum-scale=1` or `user-scalable=no` in the viewport: it blocks pinch-zoom on
+   Android (WCAG 1.4.4) and the check fails on it.
+2. **No sideways scrolling.** `overflow-x: clip` on html/body is a net; the check still
+   reports every element whose edge leaves the screen — fix the element, not the net.
+   Long strings (hashes, addresses) need `break-all`; absolutely positioned toasts and
+   popovers need a right anchor on phones.
+3. **Safe areas.** `viewportFit: 'cover'` in `layout.tsx` plus `env(safe-area-inset-*)`
+   on body, the sticky header (`sc-header`) and the sticky controls keep content out from
+   under the Dynamic Island and the home bar. Use `sc-vh` instead of `min-h-screen`.
+4. **Targets.** Buttons outside the reveal boards are ≥ 40px tall on touch; board tiles
+   ≥ 24px. `touch-action: manipulation` is global — a fast second tap on a tile must not
+   zoom. The header must keep a 13-character game name uncut from 375px up: anything you
+   add to the header takes space from the name first.
+
 ## Reveal animations (`src/reveals/<engine>.js`)
 
 Every engine that plays a round has a reveal module: plain browser JavaScript, no framework,
@@ -77,7 +99,7 @@ result away moves before the animation has ended.
 Want the coin to be a card, the plinko board to be a rocket track? Replace the module file. The
 contract is in `src/lib/reveal.ts` (`RevealModule`) and it is small: `mount(root, ctx)` returns
 `{ play(outcome, { reducedMotion, from }), reset(), destroy() }` plus, optionally,
-`arm({ reducedMotion })` / `disarm()`. `ctx.engineConfig` carries the
+`arm({ reducedMotion })` / `disarm()` and `setPick(opts)`. `ctx.engineConfig` carries the
 game's real dimensions (rows, grid size, pockets, ladder …) — draw the idle board from it; the
 outcome carries the round's own details. `ctx.text(key)` reads the catalog (four languages),
 `ctx.fmt` formats money exactly like the rest of the interface. Fixtures with the exact server
@@ -105,6 +127,24 @@ Binding rules (rule 16 in `docs/RULES.md`):
    that motion without a cut; `disarm()` settles them without a result when the round failed.
    The pre-roll knows no outcome, so it can show none. The two slot modules do this; a module
    without `arm()` simply keeps its last frame until the outcome arrives.
+8. **A playable board reports, it does not draw.** For engines whose step IS a field choice
+   (mines: which tile, towers: which column) a module may implement `setPick(opts)` and make
+   its own fields operable — the flow then drops the number list it would otherwise show
+   below the game. Four things are binding there:
+   - a click only calls `opts.onPick(index)`; the field changes with the next `play()`, i.e.
+     with the server's answer. A module that turns the tile on the click has guessed the
+     result;
+   - `opts.taken` holds ONLY fields the player already chose. Never build a hint about a mine
+     or a win out of the disabled state — not in the class, not in `aria-label`, `title` or a
+     `data-` attribute;
+   - the flow closes the board (`enabled: false`) while a request is in flight or the module
+     is playing; honour it, or a double tap sends a second step against the same state;
+   - make the fields real `<button>`s. The board is the input now, so it has to work with a
+     keyboard and read correctly to a screen reader — label them with the field's number
+     through `ctx.text(...)`, nothing more.
+   A module without `setPick` loses nothing: `RevealHost` reports that through
+   `onPickSupport`, and the flow shows its own number list. That fallback is what keeps a
+   round playable when a module fails to load, so never route the input around it.
 
 Session engines play their transcript STEP BY STEP: `play(o, { from })` says how many steps
 already stand on the board; the module sets those instantly and animates only the new step.

@@ -2,6 +2,17 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-05 — The GameBuilder emblem is the tab icon
+- New: `src/app/icon.png`, `apple-icon.png`, `favicon.ico` — the Sol-Core GameBuilder emblem
+  (green crystal in an atom orbit, wrench and hammer). Next.js links them automatically; the
+  layout deliberately sets no `icons:` so the files stay in charge. Before, the template shipped
+  no favicon at all — every game built from it showed the browser's blank globe.
+- Design zone: replace all three files with your own icon (same names). `check:contract`
+  section 10 only insists that ONE exists.
+- Fixed in the publishing script (Sol-Core repo, `scripts/game-starter-sync.mjs`): binary
+  files were copied as UTF-8 text, which had silently corrupted every `public/sounds/*.wav`
+  in the published template (roughly doubled in size, unplayable). They are byte-exact again.
+
 2026-09-04 — Chain controls stay on screen, and the third guess finally exists
 - Session games no longer push their controls below the fold. The board stays square but
   its edge is now capped at a share of the screen height (`.sc-board`, 48svh with a vh

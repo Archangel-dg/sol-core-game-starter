@@ -5,6 +5,10 @@ import './globals.css';
 import { Providers } from '@/components/Providers';
 import { PoweredBy } from '@/components/PoweredBy';
 
+// KEIN `icons:` hier: Das Favicon kommt aus den Dateien NEBEN dieser Datei
+// (icon.png, apple-icon.png, favicon.ico — das GameBuilder-Zeichen). Next.js
+// verlinkt sie von selbst in den richtigen Größen; ein `icons:`-Eintrag würde
+// das übersteuern. Eigenes Icon? Die drei Dateien ersetzen, sonst nichts.
 export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_GAME_NAME ?? 'Sol-Core Game',
   // Metadaten rendert der Server, bevor die Sprache des Besuchers feststeht —

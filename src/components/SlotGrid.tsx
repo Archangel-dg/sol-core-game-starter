@@ -3,7 +3,7 @@ import { useT } from '@/lib/i18n';
 
 import { useEffect, useState } from 'react';
 import { toSol } from '@/lib/lamports';
-import { symbolArt } from '@/lib/symbolArt';
+import { SymbolIcon } from './SymbolIcon';
 import type { EngineConfig } from '@/lib/engines';
 
 /**
@@ -22,8 +22,10 @@ function dim(v: unknown, fallback: number): number {
 
 function specFrom(cfg: EngineConfig | null): {
   reels: number; rows: number; symbols: RenderSymbol[]; paylines: number[][]; freeSpins: FreeSpinsSpec | null;
+  /** Wild-Multiplikator (Echo `wildMultFactor`/`wildMultStack`), sonst null. */
+  wildMult: { factor: number; stack: boolean } | null;
 } {
-  const raw = cfg as unknown as { reels?: unknown; rows?: unknown; symbols?: unknown; paylines?: unknown; freeSpins?: unknown } | null;
+  const raw = cfg as unknown as { reels?: unknown; rows?: unknown; symbols?: unknown; paylines?: unknown; freeSpins?: unknown; wildMultFactor?: unknown; wildMultStack?: unknown } | null;
   const reels = dim(raw?.reels, 5);
   const rows = dim(raw?.rows, 3);
   const symbols = Array.isArray(raw?.symbols)
@@ -44,7 +46,11 @@ function specFrom(cfg: EngineConfig | null): {
           multiplierBps: fsRaw.multiplierBps,
         }
       : null;
-  return { reels, rows, symbols, paylines, freeSpins };
+  const wildMult =
+    typeof raw?.wildMultFactor === 'number' && raw.wildMultFactor > 1
+      ? { factor: raw.wildMultFactor, stack: raw.wildMultStack === 1 }
+      : null;
+  return { reels, rows, symbols, paylines, freeSpins, wildMult };
 }
 
 export function SlotGrid({
@@ -60,7 +66,7 @@ export function SlotGrid({
   multiplierBps?: number;
   payoutLamports?: string;
 }) {
-  const { reels, rows, symbols, paylines, freeSpins } = specFrom(engineConfig);
+  const { reels, rows, symbols, paylines, freeSpins, wildMult } = specFrom(engineConfig);
 
   // Mount-Transition fürs Spalten-Stagger-Reveal: blendet NUR die Optik ein
   // (opacity/scale) — das Server-Grid selbst ändert sich dadurch nie.
@@ -80,12 +86,17 @@ export function SlotGrid({
         {symbols.length > 0 && (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {symbols.map((s) => {
-              const art = symbolArt(s.id);
               return (
                 <div key={s.id} className="rounded-lg bg-white/[0.04] p-2 text-center">
-                  <div className="text-2xl" style={{ color: art.tint }}>{art.glyph}</div>
+                  <SymbolIcon id={s.id} className="mx-auto h-8 w-8" />
                   <div className="mt-1 text-[10px] text-white/40">
-                    {s.wild ? t('slot.wild') : s.scatter ? t('slot.scatter') : (s.paysBps ?? []).map((p) => `${p / 10000}×`).join(' / ')}
+                    {s.wild
+                      ? wildMult
+                        ? t(wildMult.stack ? 'slot.wildMultStack' : 'slot.wildMult', { m: wildMult.factor })
+                        : t('slot.wild')
+                      : s.scatter
+                        ? t('slot.scatter')
+                        : (s.paysBps ?? []).map((p) => `${p / 10000}×`).join(' / ')}
                   </div>
                 </div>
               );
@@ -107,19 +118,45 @@ export function SlotGrid({
 
   const grid = Array.isArray(details.grid) ? (details.grid as string[][]) : null;
   const lineWins = Array.isArray(details.lineWins)
-    ? (details.lineWins as { line: number; symbol: string; count: number; payBps: number }[])
+    ? (details.lineWins as { line: number; symbol: string; count: number; payBps: number; direction?: 'rtl'; wildMult?: number }[])
+    : [];
+  // Gewinnarten (04.09.2026): All Ways / Summe liefern eigene Treffer-Listen.
+  const wayWins = Array.isArray(details.wayWins)
+    ? (details.wayWins as { symbol: string; count: number; ways: number; payBps: number; wildOnly?: 1; wildBoost?: 1 }[])
+    : [];
+  const sumWins = Array.isArray(details.sumWins)
+    ? (details.sumWins as { symbol: string; count: number; payBps: number }[])
     : [];
   const scatterCount = typeof details.scatterCount === 'number' ? details.scatterCount : 0;
   const scatterPayBps = typeof details.scatterPayBps === 'number' ? details.scatterPayBps : 0;
 
   if (!grid) return null; // alte API ohne details → Aufrufer zeigt ResultView
 
-  // Zellen, die auf einer Gewinnlinie liegen (für Highlight):
+  // Treffer-Zellen (für Highlight) — rein aus den Server-Treffern: Linien über
+  // die Muster (beide Richtungen), All Ways über die gezählten Walzen (Symbol
+  // oder Wild; reine Wild-Wege nur die Wilds), Summe über jede Zelle des Symbols.
+  const wildId = symbols.find((s) => s.wild)?.id ?? '';
   const hot = new Set<string>();
   for (const w of lineWins) {
     const geo = paylines[w.line];
     if (!geo) continue;
-    for (let reel = 0; reel < Math.min(w.count, reels); reel++) hot.add(`${reel}:${geo[reel]}`);
+    const n = Math.min(w.count, reels);
+    for (let k = 0; k < n; k++) {
+      const reel = w.direction === 'rtl' ? reels - 1 - k : k;
+      hot.add(`${reel}:${geo[reel]}`);
+    }
+  }
+  for (const w of wayWins) {
+    for (let reel = 0; reel < Math.min(w.count, reels); reel++) {
+      (grid[reel] ?? []).forEach((id, row) => {
+        if (w.wildOnly ? id === wildId : id === w.symbol || id === wildId) hot.add(`${reel}:${row}`);
+      });
+    }
+  }
+  for (const w of sumWins) {
+    grid.forEach((col, reel) => col.forEach((id, row) => {
+      if (id === w.symbol) hot.add(`${reel}:${row}`);
+    }));
   }
 
   const scatterIds = new Set(symbols.filter((s) => s.scatter).map((s) => s.id));
@@ -130,20 +167,19 @@ export function SlotGrid({
         {Array.from({ length: rows }, (_, row) =>
           Array.from({ length: reels }, (_, reel) => {
             const id = grid[reel]?.[row] ?? '?';
-            const art = symbolArt(id);
             const isHot = hot.has(`${reel}:${row}`);
             const isScatter = scatterIds.has(id) && scatterCount >= 3;
             return (
               <div
                 key={`${reel}:${row}`}
-                className={`grid aspect-square place-items-center rounded-lg text-2xl transition-all duration-300 ${
+                className={`grid aspect-square place-items-center rounded-lg transition-all duration-300 ${
                   revealed ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
                 } ${
                   isHot ? 'bg-accent/20 ring-2 ring-accent' : isScatter ? 'bg-white/10 ring-2 ring-purple-400' : 'bg-white/[0.05]'
                 }`}
-                style={{ color: art.tint, transitionDelay: `${reel * 80}ms` }}
+                style={{ transitionDelay: `${reel * 80}ms` }}
               >
-                {art.glyph}
+                <SymbolIcon id={id} className="h-3/4 w-3/4" />
               </div>
             );
           }),
@@ -156,10 +192,14 @@ export function SlotGrid({
         <div className="mt-0.5 text-sm text-white/70">
           {win ? t('result.won', { amount: toSol(payoutLamports ?? '0') }) : t('result.lost')}
         </div>
-        {(lineWins.length > 0 || scatterPayBps > 0) && (
+        {(lineWins.length > 0 || wayWins.length > 0 || sumWins.length > 0 || scatterPayBps > 0) && (
           <div className="mt-1 text-xs text-white/40">
-            {lineWins.map((w) => t('slot.lineWin', { line: w.line + 1, count: w.count, symbol: w.symbol, pay: (w.payBps / 10000).toFixed(2) })).join(' · ')}
-            {scatterPayBps > 0 ? `${lineWins.length ? ' · ' : ''}${t('slot.scatterWin', { count: scatterCount, pay: (scatterPayBps / 10000).toFixed(2) })}` : ''}
+            {[
+              ...lineWins.map((w) => t(w.direction === 'rtl' ? 'slot.lineWinRtl' : 'slot.lineWin', { line: w.line + 1, count: w.count, symbol: w.symbol, pay: (w.payBps / 10000).toFixed(2) }) + (w.wildMult ? ` ${t('slot.wildMultHit', { m: w.wildMult })}` : '')),
+              ...wayWins.map((w) => t('slot.wayWin', { count: w.count, symbol: w.symbol, ways: w.ways, pay: (w.payBps / 10000).toFixed(2) })),
+              ...sumWins.map((w) => t('slot.sumWin', { count: w.count, symbol: w.symbol, pay: (w.payBps / 10000).toFixed(2) })),
+              ...(scatterPayBps > 0 ? [t('slot.scatterWin', { count: scatterCount, pay: (scatterPayBps / 10000).toFixed(2) })] : []),
+            ].join(' · ')}
           </div>
         )}
         {(() => {

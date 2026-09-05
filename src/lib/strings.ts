@@ -1987,6 +1987,42 @@ export const STRINGS = {
     fr: 'Ligne {line} : {count}× {symbol} ({pay}×)',
     ru: 'Линия {line}: {count}× {symbol} ({pay}×)',
   },
+  'slot.lineWinRtl': {
+    en: 'Line {line} ←: {count}× {symbol} ({pay}×)',
+    de: 'Linie {line} ←: {count}× {symbol} ({pay}×)',
+    fr: 'Ligne {line} ← : {count}× {symbol} ({pay}×)',
+    ru: 'Линия {line} ←: {count}× {symbol} ({pay}×)',
+  },
+  'slot.wildMult': {
+    en: 'WILD · ×{m} when substituting',
+    de: 'WILD · ×{m} beim Ersetzen',
+    fr: 'WILD · ×{m} en remplaçant',
+    ru: 'WILD · ×{m} при замене',
+  },
+  'slot.wildMultStack': {
+    en: 'WILD · ×{m} per wild, stacked',
+    de: 'WILD · ×{m} je Wild, gestapelt',
+    fr: 'WILD · ×{m} par wild, cumulé',
+    ru: 'WILD · ×{m} за вайлд, накопительно',
+  },
+  'slot.wildMultHit': {
+    en: '· wild ×{m}',
+    de: '· Wild ×{m}',
+    fr: '· wild ×{m}',
+    ru: '· вайлд ×{m}',
+  },
+  'slot.wayWin': {
+    en: '{symbol} on {count} reels × {ways} ways ({pay}×)',
+    de: '{symbol} auf {count} Walzen × {ways} Wege ({pay}×)',
+    fr: '{symbol} sur {count} rouleaux × {ways} voies ({pay}×)',
+    ru: '{symbol} на {count} барабанах × {ways} путей ({pay}×)',
+  },
+  'slot.sumWin': {
+    en: '{count}× {symbol} anywhere ({pay}×)',
+    de: '{count}× {symbol} irgendwo ({pay}×)',
+    fr: '{count}× {symbol} n’importe où ({pay}×)',
+    ru: '{count}× {symbol} где угодно ({pay}×)',
+  },
   'slot.scatterWin': {
     en: '{count} scatter ({pay}×)',
     de: '{count} Scatter ({pay}×)',

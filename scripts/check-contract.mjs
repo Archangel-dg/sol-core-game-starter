@@ -25,6 +25,8 @@
  *   8. PAY-PER-SPIN — Kosten sagen UND anmelden.
  *   9. REVEAL — die Animation zeigt nichts, bevor sie steht; jedes Modul
  *      ohne Zufall, ohne Netzwerk, mit Texten aus dem Katalog.
+ *  10. TAB-ICON — ein Favicon liegt neben dem Layout; ein leerer Tab sieht
+ *      nach halbfertigem Spiel aus.
  *
  * Lauf:  node scripts/check-contract.mjs   (auch Teil von `npm run check`)
  * Exit-Code 1, sobald eine Zusage gebrochen ist.
@@ -538,6 +540,31 @@ console.log('\n9) Reveal — die Animation zeigt nichts, bevor sie steht');
       `${rel} zeigt das Ergebnis, ohne auf die Animation zu warten.`,
     );
   }
+}
+
+// ── 10. Tab-Icon ────────────────────────────────────────────────────────────
+// Seit 05.09.2026 liefert die Vorlage das GameBuilder-Zeichen als Favicon mit
+// (src/app/icon.png + apple-icon.png + favicon.ico, Next.js-Dateikonvention).
+// Der Creator darf es ersetzen — aber nicht weglassen: Ein Spiel ohne
+// Tab-Icon zeigt den leeren Browser-Globus, und das liest jeder als
+// „hier hat jemand aufgehört, bevor es fertig war".
+console.log('\n10) Tab-Icon — ein Favicon liegt neben dem Layout');
+{
+  const kandidaten = ['src/app/icon.png', 'src/app/icon.svg', 'src/app/icon.ico', 'src/app/favicon.ico'];
+  pruef(
+    kandidaten.some(dateiDa),
+    'Ein Icon liegt in src/app/ (icon.png, icon.svg, icon.ico oder favicon.ico)',
+    'Kein Tab-Icon. Die Vorlage bringt src/app/icon.png mit — beim Umbau verloren? ' +
+      'Eigenes Icon unter demselben Namen ablegen; Next.js verlinkt es von selbst.',
+  );
+  const layout = existsSync(join(WURZEL, 'src/app/layout.tsx'))
+    ? readFileSync(join(WURZEL, 'src/app/layout.tsx'), 'utf8')
+    : '';
+  pruef(
+    !/^\s*icons\s*:/m.test(layout),
+    'Kein `icons:` in den Layout-Metadaten (würde die Icon-Dateien übersteuern)',
+    'src/app/layout.tsx setzt `icons:` — damit zeigt Next.js die Dateien in src/app/ nicht mehr.',
+  );
 }
 
 console.log(

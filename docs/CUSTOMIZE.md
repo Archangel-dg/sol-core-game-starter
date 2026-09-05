@@ -14,6 +14,10 @@ result animation.
 - `src/components/FairnessPanel.tsx`, `History.tsx`, `BalanceBar.tsx`, `HeaderBar.tsx`, `GameMenu.tsx`,
   `DemoBar.tsx`, `Popover.tsx`, and the sound set (`src/lib/sounds.ts`, `public/sounds/*.wav`,
   regenerate with `npm run generate-sounds`).
+- `src/app/icon.png`, `apple-icon.png`, `favicon.ico` — the browser-tab icon. Ships as the
+  Sol-Core GameBuilder emblem; replace all three with your own (same names, Next.js links them
+  automatically). Keep one — `check:contract` fails on a game without a tab icon, because a blank
+  tab reads as an unfinished game.
 
 - `src/lib/fiat.tsx`, `src/components/Amount.tsx`, `FiatHint.tsx`, `FiatSwitch.tsx` — the
   currency approximation next to a SOL amount. It sits at every money INPUT (beside the

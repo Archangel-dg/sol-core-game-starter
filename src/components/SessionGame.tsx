@@ -13,7 +13,7 @@ import { FiatHint } from './FiatHint';
 import { useSound } from '@/lib/sounds';
 import { useT, type TFn } from '@/lib/i18n';
 import { RevealHost } from './RevealHost';
-import { hasReveal } from '@/lib/reveal';
+import { hasReveal, type RevealPickOptions } from '@/lib/reveal';
 import { EMPTY_TRANSCRIPT, noteSessionStep, sessionOutcome, sessionStepCount, type SessionTranscript } from '@/lib/reveal-session';
 
 /** Woher eine Server-Antwort kommt — entscheidet über den Ton nach dem Reveal. */
@@ -370,6 +370,16 @@ export function SessionGame({
   };
   const deliverRef = useRef(deliver);
   deliverRef.current = deliver;
+  // ── Das Brett IST die Auswahl ─────────────────────────────────────────────
+  // Bei Index-Schritten (mines: welches Feld, towers: welche Spalte) doppelte
+  // eine Zahlenliste unter dem Spielfeld genau das, was das Brett schon zeigt.
+  // Kann das Modul der Engine bedient werden (`setPick`), fällt die Liste weg.
+  //
+  // `pickSupported` ist bewusst der EINZIGE Schalter dafür — und er kommt vom
+  // Host, nicht aus einer Engine-Liste hier: Lädt das Modul nicht (Netzfehler,
+  // kaputtes Modul), meldet der Host `false` und die Liste ist wieder da. Eine
+  // Runde, die niemand bedienen kann, darf es nicht geben.
+  const [pickSupported, setPickSupported] = useState(false);
   const onRevealed = (outcome: unknown) => {
     const p = pending.current;
     if (!p || p.outcome !== outcome) return; // abgelöst oder schon geliefert
@@ -499,6 +509,25 @@ export function SessionGame({
     guessChoices.find((b) => b.locked === 'session.guessCapped')?.locked ??
     guessChoices.find((b) => b.locked === 'session.guessImpossible')?.locked ??
     null;
+  // Felder, die dieser Schritt nicht mehr annimmt. Nur mines führt sie
+  // (`progress.picks`); bei towers ist jede Etage frisch, dort bleibt es
+  // `undefined` — dieselbe Lesart, die die Zahlenliste unten schon hatte.
+  const takenPicks =
+    view && Array.isArray(view.progress?.picks) ? (view.progress.picks as number[]) : undefined;
+  // Was das Brett gerade annehmen darf. `null` heißt: nichts ist anklickbar.
+  const pick: RevealPickOptions | null =
+    animated && idxStep && bounds && view && view.status === 'active'
+      ? {
+          // Zu, solange eine Anfrage läuft oder das Modul spielt: sonst schickt
+          // ein zweiter Tipp den nächsten Schritt los, während der vorige noch
+          // fliegt — und der Server sähe zwei Züge zu einem Stand.
+          enabled: !busy && !revealing,
+          min: bounds.min,
+          max: bounds.max,
+          taken: takenPicks,
+          onPick: (value) => void step({ value }),
+        }
+      : null;
   const steps = engine.key === 'steps' && view ? stepsInfo(view.progress, cfg) : null;
   // steps: Cashout erst ab Stufe 1 sinnvoll (der Server lehnt am Boden ohnehin
   // ab — nach einem Fall wäre `view.steps ≥ 1`, aber die Auszahlung 0).
@@ -728,6 +757,8 @@ export function SessionGame({
               outcome={reveal?.outcome ?? null}
               from={reveal?.from}
               onRevealed={onRevealed}
+              pick={pick}
+              onPickSupport={setPickSupported}
               hint={t(engine.blurb)}
             />
           ) : view ? (
@@ -944,7 +975,18 @@ export function SessionGame({
                 )}
               </>
             )}
-            {idxStep && bounds && (
+            {/* Die angenommenen Grenzen bleiben sichtbar, auch wenn die Liste
+                unten entfällt: Wer auf ein Standard-Brett tippt statt auf das
+                echte, soll das wissen. */}
+            {idxStep && bounds && pickSupported && boundsAssumed && (
+              <p className="text-[10px] text-amber-300/70">{t('session.configNotLoaded')}</p>
+            )}
+            {/* Zahlen-Auswahl — nur noch RÜCKFALL. Kann das Brett bedient
+                werden (`pickSupported`), ist sie eine Verdopplung: dieselben
+                25 Felder stünden zweimal auf der Seite. Ohne bedienbares Brett
+                (Modul lädt nicht, fehlt, ist kaputt) ist sie die einzige Tür in
+                den nächsten Schritt und MUSS bleiben. */}
+            {idxStep && bounds && !pickSupported && (
               <div>
                 <div className="mb-1 flex items-baseline justify-between">
                   <span className="text-xs text-white/40">{t('session.pick', { what: t(idxStep.label) })}</span>

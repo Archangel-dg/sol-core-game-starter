@@ -285,12 +285,14 @@ export const STRINGS = {
   // ── Reveal: mines ────────────────────────────────────────────────────────
   'reveal.mines.title': { en: 'Mines', de: 'Minen', fr: 'Mines', ru: 'Мины' },
   'reveal.mines.board': { en: '{mines} mines / {tiles} tiles', de: '{mines} Minen / {tiles} Felder', fr: '{mines} mines / {tiles} cases', ru: '{mines} мин / {tiles} полей' },
+  'reveal.mines.tile': { en: 'Field {n}', de: 'Feld {n}', fr: 'Case {n}', ru: 'Поле {n}' },
   'reveal.mines.gems': { en: '{n} gems · cashed out', de: '{n} Edelsteine · ausgezahlt', fr: '{n} gemmes · encaissé', ru: '{n} самоцветов · выплата' },
   'reveal.mines.bust': { en: 'Mine on pick {n} · {mines} mines on the board', de: 'Mine beim {n}. Feld · {mines} Minen im Spiel', fr: 'Mine au choix {n} · {mines} mines sur la grille', ru: 'Мина на ходу {n} · {mines} мин на поле' },
 
   // ── Reveal: towers ───────────────────────────────────────────────────────
   'reveal.towers.title': { en: 'Towers', de: 'Türme', fr: 'Tours', ru: 'Башни' },
   'reveal.towers.floor': { en: 'F{n}', de: 'E{n}', fr: 'É{n}', ru: 'Э{n}' },
+  'reveal.towers.tile': { en: 'Floor {floor}, column {n}', de: 'Etage {floor}, Spalte {n}', fr: 'Étage {floor}, colonne {n}', ru: 'Этаж {floor}, столбец {n}' },
   'reveal.towers.shape': { en: '{levels} floors × {columns} · {bombs} bombs', de: '{levels} Etagen × {columns} · {bombs} Bomben', fr: '{levels} étages × {columns} · {bombs} bombes', ru: '{levels} этажей × {columns} · {bombs} бомб' },
   'reveal.towers.mixed': { en: '{levels} floors · mixed', de: '{levels} Etagen · gemischt', fr: '{levels} étages · mixte', ru: '{levels} этажей · смешанно' },
   'reveal.towers.cleared': { en: '{n} floors cleared · {end}', de: '{n} Etagen geschafft · {end}', fr: '{n} étages franchis · {end}', ru: '{n} этажей пройдено · {end}' },

@@ -2,6 +2,49 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-09-05 — Playable on a phone: no zoom on input, no sideways scroll, safe areas
+- Typing no longer zooms the page on iOS. The cause was never the viewport: Safari zooms
+  into any <input>/<select> whose font is under 16px, and 13 fields plus the language
+  <select> were 12–14px. globals.css now forces ≥ 16px on coarse pointers (`!important`,
+  so one forgotten `text-xs` cannot break the promise); desktop keeps its denser fields.
+  NOT done on purpose: `maximum-scale=1` / `user-scalable=no` — that blocks pinch-zoom on
+  Android (WCAG 1.4.4). layout.tsx exports `viewport` with `viewportFit: 'cover'` and
+  themeColor, and the comment there says why the scale lock is out of bounds.
+- No sideways scrolling: `overflow-x: clip` on html/body (`clip`, not `hidden` — hidden
+  breaks position: sticky in Safari). It is a net, not a fix: the win toast, centred under
+  a narrow balance group at the right edge, used to poke out; it now sits right-aligned on
+  phones. The kit's new browser check reports every element whose edge leaves the screen.
+- Safe areas: header padding-top, body padding-left/right/bottom from env(safe-area-inset-*)
+  — under the Dynamic Island in standalone mode and under the home bar the footer and the
+  sticky controls stay clear. New app/manifest.ts (name from env, standalone, night
+  colours; no invented icon) and appleWebApp metadata, so "Add to Home Screen" gives a
+  framed game instead of a white status bar.
+- `sc-vh` replaces `min-h-screen` in the layout and the seven full-bleed mains: 100vh is
+  the height with the browser bar HIDDEN, so the footer sat under the fold. svh with a
+  vh fallback for older wallet in-app browsers.
+- Touch: `touch-action: manipulation` on buttons, links, fields — no double-tap zoom on a
+  fast second tap on a tile. Buttons outside the reveal boards are ≥ 40px tall on coarse
+  pointers (reveal tiles are exempt; an 8×8 board has no room, they are checked at 24px).
+  Tap highlight in the accent colour instead of the grey system flash.
+- Header on phones: "Play demo (3 ◎)" is now just "Demo" under sm, and the wallet button
+  is compact under 400px. Before, at 393px the game name collapsed to "Min…"; even
+  "Demo (3 ◎)" left 23px too little at 375px. From 375px up the name is not cut.
+- Landscape phones (≤ 500px high): board and controls side by side, board up to 78svh,
+  `.sc-main` widens to 56rem (a class, because `max-w-md` beats a `main` selector).
+- Chromium check in the kit: scripts/check-mobile.mjs builds the template, runs it over ten
+  viewports (Fold outer 344px, 360, SE 375, iPhone 15, Pixel, Pro Max, iPad mini, two
+  landscapes, desktop) and measures: nothing past the edge (idle, menu open, demo open),
+  fields ≥ 16px, targets ≥ 40px / tiles ≥ 24px, header name not cut from 375px, board
+  fits the landscape height. A run that measured no controls does not pass.
+- Ported from mines-classic (PR #1 there): the board is the input for mines and towers —
+  `setPick` on the reveal contract, tiles as <button>s, number list only as fallback,
+  mines board 60% → 78%, header collision fix. check-reveals.mjs now also drives the
+  back channel: a click must leave the DOM byte-identical, `taken` and `enabled:false`
+  must lock, opened fields stay locked without `taken`.
+- scripts/check-contract.mjs: a CSS font stack ("'Space Grotesk', Inter, system-ui,
+  sans-serif") is no longer mistaken for a sentence — SymbolIcon.tsx had held the
+  contract red on main.
+
 2026-09-05 — The GameBuilder emblem is the tab icon
 - New: `src/app/icon.png`, `apple-icon.png`, `favicon.ico` — the Sol-Core GameBuilder emblem
   (green crystal in an atom orbit, wrench and hammer). Next.js links them automatically; the

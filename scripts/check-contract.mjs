@@ -346,6 +346,10 @@ pruef(
       const text = m[2].replace(/\$\{[^}]*\}/g, '');
       if (!/\s/.test(text.trim())) continue;
       if (/\bvar\(--|\d+px\b|^[MLHVCSQTAZ]-?\d/.test(text)) continue;
+      // Ein Font-Stack ("'Space Grotesk', Inter, system-ui, sans-serif") ist
+      // ein CSS-Wert, kein Satz: kommagetrennt, mit einer generischen Familie
+      // am Ende. Am 05.09.2026 hielt SymbolIcon.tsx den Vertrag genau daran auf.
+      if (/,\s*(system-ui|sans-serif|serif|monospace|ui-monospace|cursive|fantasy)\s*$/.test(text.trim())) continue;
       // Ein Literal, das Code enthält (Aufruf, Klammern, Operatoren), ist ein
       // Fehlgriff der Regex zwischen zwei fremden Anführungszeichen.
       if (/\w\(|[{}]|\|\||&&|=>/.test(text)) continue;

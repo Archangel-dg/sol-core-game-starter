@@ -181,7 +181,7 @@ function HomeInner({ meta }: { meta: Meta | null }) {
 
   return (
     <>
-      <div className="min-h-screen">
+      <div className="sc-vh">
         {/* Kopfleiste über JEDEM Zustand (Laden, Fehler, Spiel): Spielname,
             Wallet/Guthaben mit Ein- und Auszahlen, Demo-Abzeichen, Menü mit
             Sprache, Sound, letzten Runden und Seed-Hash. Die Geld-Leiste ist
@@ -200,7 +200,7 @@ function HomeInner({ meta }: { meta: Meta | null }) {
           }}
         />
 
-      <main className="mx-auto max-w-md px-4 pb-8">
+      <main className="sc-main mx-auto max-w-md px-4 pb-8">
         {meta?.error ? (
           <div className="rounded-xl border border-red-400/30 bg-red-400/[0.06] p-4 text-sm text-red-200">
             {meta.error.message === 'backend_unreachable'

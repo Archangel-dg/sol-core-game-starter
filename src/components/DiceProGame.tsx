@@ -574,8 +574,8 @@ export function DiceProGame({
   const iAmReady = meMember?.ready ?? false;
 
   return (
-    <main className="mx-auto min-h-screen max-w-md px-4 pb-10">
-      <header className="sticky top-0 z-20 -mx-4 mb-4 flex items-center justify-between gap-2 border-b border-white/10 bg-night/80 px-4 py-3 backdrop-blur">
+    <main className="mx-auto sc-vh max-w-md px-4 pb-10">
+      <header className="sc-header sticky top-0 z-20 -mx-4 mb-4 flex items-center justify-between gap-2 border-b border-white/10 bg-night/80 px-4 py-3 backdrop-blur">
         <div className="min-w-0">
           <h1 className="truncate text-base font-bold text-white">{gameName}</h1>
           <p className="text-[10px] uppercase tracking-wider text-accent/80">{engine.label}</p>

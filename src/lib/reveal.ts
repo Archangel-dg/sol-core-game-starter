@@ -81,6 +81,51 @@ export interface RevealArmOptions {
   reducedMotion: boolean;
 }
 
+/**
+ * ██ RÜCKKANAL ██ — der Spieler bedient das BRETT statt einer Liste darunter.
+ *
+ * Bis hierhin fließt alles in eine Richtung: Der Host reicht ein Ergebnis
+ * hinein, das Modul zeigt es. Für Engines, deren Schritt eine Feld-Auswahl IST
+ * (mines: welche Kachel, towers: welche Spalte), ist eine zweite Zahlenliste
+ * unter dem Spielfeld eine Verdopplung — das Brett steht ja schon da.
+ *
+ * Ein Modul, das `setPick` anbietet, macht seine Felder bedienbar. Vier Regeln,
+ * die daran hängen und keine Geschmacksfrage sind:
+ *
+ *  1. EIN KLICK ZEICHNET NICHTS. `onPick` meldet nur nach oben; das Feld ändert
+ *     sich erst mit dem nächsten `play()`, also mit der Antwort des Servers.
+ *     Ein Modul, das die Kachel schon beim Klick umdreht, hat das Ergebnis
+ *     geraten — genau das verbietet Regel 16.5.
+ *  2. GESPERRT HEISST AUFGEDECKT, NIE „HIER LIEGT WAS". `taken` enthält
+ *     ausschließlich Felder, die der Spieler bereits gewählt hat. Ein Modul
+ *     darf aus dem Sperrzustand keinen Hinweis auf Mine oder Gewinn bauen —
+ *     auch nicht in `aria-label`, `title` oder einem `data-`-Attribut.
+ *  3. WÄHREND DER ANIMATION IST ZU. Der Host schickt `enabled:false`, solange
+ *     eine Anfrage läuft oder das Modul spielt; ohne diese Sperre schickt ein
+ *     Doppelklick den nächsten Schritt los, während der vorige noch fliegt.
+ *  4. DIE BEDIENUNG ÜBERLEBT DEN AUSFALL. Der Flow zeigt seine eigene
+ *     Ersatz-Auswahl, sobald kein Modul mit `setPick` da ist (Ladefehler,
+ *     fremde Engine). Ein Modul ist eine Verschönerung, nie die einzige Tür.
+ *
+ * Der Index ist der Wert, den der Server für den Schritt erwartet
+ * (`{ value: index }`) — bei mines die Kachel 0…gridSize-1, bei towers die
+ * Spalte 0…columns-1 DER AKTUELLEN ETAGE. Die Grenzen kommen aus der
+ * Server-Config, nicht aus dem Modul.
+ */
+export interface RevealPickOptions {
+  /** `false` ⇒ nichts ist anklickbar (Runde vorbei, Anfrage unterwegs). */
+  enabled: boolean;
+  /** Kleinster gültiger Index des nächsten Schritts (einschließlich). */
+  min: number;
+  /** Größter gültiger Index des nächsten Schritts (einschließlich). */
+  max: number;
+  /** Indizes, die dieser Schritt nicht mehr annimmt — ausschließlich bereits
+   *  vom Spieler gewählte Felder (siehe Regel 2 oben). */
+  taken?: readonly number[];
+  /** Der Spieler hat gewählt. Das Modul zeichnet daraufhin nichts. */
+  onPick(index: number): void;
+}
+
 export interface RevealController {
   /**
    * Animiert VOM AKTUELLEN BILD zum Endbild; löst auf, sobald es steht. Das
@@ -104,6 +149,15 @@ export interface RevealController {
    * Ohne laufenden Vorlauf ein No-op.
    */
   disarm?(): void;
+  /**
+   * Optional — RÜCKKANAL. Macht die Felder des Bretts bedienbar (siehe
+   * `RevealPickOptions`). `null` schaltet die Bedienung ganz ab und räumt
+   * jeden Zustand weg, der nur zu ihr gehört (Fokus, Hover, Rollen).
+   *
+   * Module OHNE diese Methode bleiben unverändert gültig: Der Flow merkt das
+   * am fehlenden `setPick` und zeigt weiter seine eigene Auswahl.
+   */
+  setPick?(opts: RevealPickOptions | null): void;
   /** Zurück zum Leerlauf — synchron. Stellung der Walzen/Figuren bleibt, nur
    *  Ergebnis, Markierungen und ein laufender Vorlauf gehen. */
   reset(): void;

@@ -67,7 +67,7 @@ export function WinToast({ win }: WinToastProps) {
       // steht — er unterbricht aber nichts, was der Spieler gerade tut.
       role="status"
       aria-live="polite"
-      className={`pointer-events-none absolute left-1/2 top-full z-30 mt-2 -translate-x-1/2 whitespace-nowrap rounded-full border border-accent/40 bg-night/95 px-3 py-1.5 text-xs font-bold tabular-nums text-accent shadow-lg shadow-accent/10 backdrop-blur transition-all duration-200 ${
+      className={`pointer-events-none absolute right-0 top-full z-30 mt-2 whitespace-nowrap sm:left-1/2 sm:right-auto sm:-translate-x-1/2 rounded-full border border-accent/40 bg-night/95 px-3 py-1.5 text-xs font-bold tabular-nums text-accent shadow-lg shadow-accent/10 backdrop-blur transition-all duration-200 ${
         visible ? 'translate-y-0 opacity-100' : '-translate-y-1 opacity-0'
       }`}
     >

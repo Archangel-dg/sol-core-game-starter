@@ -6,12 +6,12 @@ import type { StringKey } from '@/lib/strings';
 import { toSol } from '@/lib/lamports';
 import { useFiat } from '@/lib/fiat';
 import { isReducedMotion, useMotion } from '@/lib/motion';
-import { loadReveal, type RevealContext, type RevealController, type RevealModule } from '@/lib/reveal';
+import { loadReveal, type RevealContext, type RevealController, type RevealModule, type RevealPickOptions } from '@/lib/reveal';
 
 /**
  * ██ GESTALTUNGSZONE ██ — hängt das Reveal-Modul einer Engine ins Spielfeld.
  *
- * Der Host tut vier Dinge, und nur die:
+ * Der Host tut fünf Dinge, und nur die:
  *  1. lädt das Modul der Engine (`lib/reveal.ts`) und zeichnet den Leerlauf
  *     aus `engineConfig`;
  *  2. spielt jedes neue `outcome` ab (Objekt-Identität — jede Runde ist ein
@@ -20,7 +20,15 @@ import { loadReveal, type RevealContext, type RevealController, type RevealModul
  *     damit z. B. Walzen schon rollen und nie aus dem Leerlauf springen;
  *  3. meldet `onRevealed(outcome)` EINMAL, sobald das Endbild steht — daran
  *     hängt der Aufrufer alles, was den Ausgang verrät;
- *  4. reicht Sprache, Formatierer und den Animations-Schalter hinein.
+ *  4. reicht Sprache, Formatierer und den Animations-Schalter hinein;
+ *  5. reicht die Feld-Auswahl (`pick`) an Module weiter, die einen Rückkanal
+ *     anbieten, und meldet über `onPickSupport`, OB dieses Modul einen hat —
+ *     daran entscheidet der Flow, ob er seine eigene Ersatz-Auswahl zeigt.
+ *
+ * Zu 5. gehört eine Ehrlichkeit, die leicht verlorengeht: `onPickSupport(false)`
+ * kommt auch dann, wenn das Modul gar nicht erst geladen hat (Netzfehler,
+ * kaputtes Modul). Der Flow bekommt so seine Liste zurück, statt mit einem
+ * leeren Brett dazustehen, das niemand bedienen kann.
  *
  * Wird ein laufendes Abspielen durch ein neues Ergebnis oder den Abbau
  * abgelöst, meldet der Host das ALTE trotzdem als offengelegt: Die Runde hat
@@ -45,12 +53,25 @@ export interface RevealHostProps {
   pending?: boolean;
   /** Einmal je Ergebnis, sobald das Endbild steht. */
   onRevealed?: (outcome: unknown) => void;
+  /**
+   * Feld-Auswahl des nächsten Schritts — nur Module mit `setPick` verwenden
+   * sie (mines: Kachel, towers: Spalte der aktuellen Etage). `null`/`undefined`
+   * schaltet die Bedienung ab. Das Objekt darf bei jedem Render neu entstehen;
+   * der Host reicht es nur weiter, wenn sich sein INHALT ändert — sonst
+   * verlöre eine Kachel bei jedem Render Fokus und Hover.
+   */
+  pick?: RevealPickOptions | null;
+  /**
+   * Kann dieses Modul überhaupt bedient werden? Kommt nach jedem Ein- und
+   * Ausbau. `false` heißt: der Aufrufer muss seine eigene Auswahl zeigen.
+   */
+  onPickSupport?: (supported: boolean) => void;
   /** Übersetzte Kurzbeschreibung der Engine für den Leerlauf (siehe RevealContext.hint). */
   hint?: string | null;
   className?: string;
 }
 
-export function RevealHost({ engineKey, engineConfig, outcome, from, pending = false, onRevealed, hint = null, className = '' }: RevealHostProps) {
+export function RevealHost({ engineKey, engineConfig, outcome, from, pending = false, onRevealed, pick = null, onPickSupport, hint = null, className = '' }: RevealHostProps) {
   const t = useT();
   const { format } = useFiat();
   const { enabled: motionOn } = useMotion();
@@ -63,8 +84,8 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, pending = f
   // Alles Lebendige in einem Ref: Das Modul hält den Kontext einmal, ruft
   // aber `ctx.text(...)` erst beim Schreiben — so trifft ein Sprachwechsel
   // auch Beschriftungen, die nach dem Einbau entstehen.
-  const live = useRef({ t, format, engineConfig: engineConfig ?? null, onRevealed, hint });
-  live.current = { t, format, engineConfig: engineConfig ?? null, onRevealed, hint };
+  const live = useRef({ t, format, engineConfig: engineConfig ?? null, onRevealed, hint, pick, onPickSupport });
+  live.current = { t, format, engineConfig: engineConfig ?? null, onRevealed, hint, pick, onPickSupport };
 
   const ctx = useMemo<RevealContext>(
     () => ({
@@ -108,8 +129,12 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, pending = f
     ctlRef.current = ctl;
     ctl.reset();
     setMounted((n) => n + 1);
+    // Kann dieses Modul bedient werden? Der Flow braucht die Antwort, BEVOR er
+    // entscheidet, ob er seine Ersatz-Auswahl zeigt.
+    live.current.onPickSupport?.(typeof ctl.setPick === 'function');
     return () => {
       ctlRef.current = null;
+      live.current.onPickSupport?.(false); // ausgebaut ⇒ nichts ist mehr bedienbar
       ctl.destroy();
       // Nicht jedes Modul räumt seine Knoten selbst weg — der Host tut es
       // immer, sonst stapeln sich im Dev-Strict-Mode zwei Bretter übereinander.
@@ -153,6 +178,32 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, pending = f
     if (pending) ctl.arm?.({ reducedMotion: isReducedMotion() });
     else ctl.disarm?.();
   }, [pending, mounted]);
+
+  // 3c. Rückkanal — die Felder des Bretts bedienbar machen (siehe
+  //     `RevealPickOptions`). Verglichen wird eine SIGNATUR, nicht die
+  //     Objekt-Identität: `pick` entsteht im Aufrufer bei jedem Render neu, und
+  //     ein `setPick` je Render nähme einer Kachel Fokus und Hover.
+  const pickKey = pick ? `${pick.enabled}|${pick.min}|${pick.max}|${(pick.taken ?? []).join(',')}` : '';
+  useEffect(() => {
+    const ctl = ctlRef.current;
+    if (!ctl?.setPick) return;
+    const p = live.current.pick;
+    if (!p) {
+      ctl.setPick(null);
+      return;
+    }
+    ctl.setPick({
+      enabled: p.enabled,
+      min: p.min,
+      max: p.max,
+      taken: p.taken,
+      // Immer der FRISCHE Handler aus dem Ref: Der Schritt-Aufruf im Aufrufer
+      // hängt an Zustand, der sich zwischen zwei Auswahlen ändert. Ein beim
+      // Einhängen eingefrorener Handler schickte den Zug mit altem Stand los.
+      onPick: (i) => live.current.pick?.onPick(i),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickKey, mounted]);
 
   // 4. Sprachwechsel im Leerlauf: Beschriftungen neu zeichnen. Während einer
   //    Runde nicht — ein Neustart mitten im Flug wäre schlimmer als ein

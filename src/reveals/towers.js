@@ -11,6 +11,14 @@
 // (`o.sessionId`) are set instantly without transitions, only the new step and the
 // ending are animated. A different session (e.g. after a reload) replays everything.
 //
+// PLAYABLE: the tower is also the input. `setPick(...)` (contract in `src/lib/reveal.ts`)
+// makes the tiles of the CURRENT floor real <button>s — the player climbs by tapping the
+// column instead of picking a number from a list below the game. Only the floor the
+// session actually stands on opens; every other floor stays untouchable. A click only
+// reports upwards — the tile lights when the server's answer arrives, never before.
+// Without `setPick` the flow shows its own number list, so the game stays playable if
+// this module fails to load.
+//
 // Fairness (docs/RULES.md, rule 16): every tile looks the same until the transcript lights
 // it; columns, order, safe or bomb, per-floor multipliers and the bomb layout come from
 // the server as they are; a bust shows the red tile at the same pace as every climb.
@@ -20,7 +28,7 @@
 export const reveal = {
   key: 'towers',
   mechanic: 'session',
-  strings: ['reveal.won', 'result.lost', 'reveal.towers.title', 'reveal.towers.floor', 'reveal.towers.shape', 'reveal.towers.mixed', 'reveal.towers.cleared', 'reveal.towers.bust', 'reveal.towers.bustShown', 'reveal.cashedOut', 'reveal.topReached'],
+  strings: ['reveal.won', 'result.lost', 'reveal.towers.title', 'reveal.towers.floor', 'reveal.towers.shape', 'reveal.towers.mixed', 'reveal.towers.cleared', 'reveal.towers.bust', 'reveal.towers.bustShown', 'reveal.cashedOut', 'reveal.topReached', 'reveal.towers.tile'],
 
   mount(root, ctx) {
     const C = 'sca-towers';
@@ -42,7 +50,7 @@ export const reveal = {
 .${C} .${C}-run{flex:0 0 auto;font-weight:600;color:var(--fg);letter-spacing:0;transition:color .25s ease}
 .${C}.${C}-win .${C}-run{color:var(--accent)}
 .${C}.${C}-loss .${C}-run{color:var(--red)}
-.${C} .${C}-tower{position:absolute;left:8%;width:82%;top:12.5%;height:61%}
+.${C} .${C}-tower{position:absolute;left:6%;width:86%;top:11.5%;height:66%}
 .${C} .${C}-ground{position:absolute;left:0;right:0;bottom:calc(var(--u)*-1.2);height:1px;background:var(--line)}
 .${C} .${C}-rows{position:absolute;inset:0;display:grid;grid-auto-rows:1fr}
 .${C} .${C}-row{position:relative;display:flex;align-items:stretch}
@@ -51,7 +59,12 @@ export const reveal = {
 .${C} .${C}-lab.${C}-top{color:var(--accent);font-weight:600}
 .${C}.${C}-loss .${C}-lab.${C}-top{color:var(--red)}
 .${C} .${C}-tiles{flex:1 1 auto;display:flex;gap:calc(var(--u)*1.4);padding:calc(var(--u)*.7) 0}
-.${C} .${C}-tile{position:relative;flex:1 1 0;box-sizing:border-box;border-radius:calc(var(--u)*1.1);border:1px solid var(--line);background:var(--panel-strong);transition:background .22s ease,border-color .22s ease,opacity .3s ease}
+.${C} .${C}-tile{position:relative;flex:1 1 0;box-sizing:border-box;appearance:none;-webkit-appearance:none;margin:0;padding:0;font:inherit;color:inherit;border-radius:calc(var(--u)*1.1);border:1px solid var(--line);background:var(--panel-strong);transition:background .22s ease,border-color .22s ease,opacity .3s ease,box-shadow .18s ease}
+.${C} .${C}-tile[data-pick="on"]{cursor:pointer}
+.${C} .${C}-tile[data-pick="on"]:hover{border-color:var(--accent);background:rgba(var(--accent-rgb)/.12)}
+.${C} .${C}-tile[data-pick="on"]:hover::after{background:var(--accent)}
+.${C} .${C}-tile[data-pick="on"]:active{transform:scale(.95)}
+.${C} .${C}-tile:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 calc(var(--u)*.7) rgba(var(--accent-rgb)/.35)}
 .${C} .${C}-tile::after{content:'';position:absolute;left:50%;top:50%;width:calc(var(--u)*1.2);height:calc(var(--u)*1.2);margin:calc(var(--u)*-.6) 0 0 calc(var(--u)*-.6);border-radius:50%;background:var(--faint);transition:background .22s ease}
 .${C} .${C}-tile.${C}-safe{border-color:var(--accent);background:rgba(var(--accent-rgb)/.16)}
 .${C} .${C}-tile.${C}-safe::after{background:var(--accent)}
@@ -175,8 +188,17 @@ export const reveal = {
         const tiles = el('div', C + '-tiles');
         const list = [];
         for (let c = 0; c < cfg.floors[f].columns; c++) {
-          const t = el('div', C + '-tile');
+          // Real <button>: the tower IS the input (see `setPick` below), so a column has
+          // to be reachable by keyboard and readable by a screenreader. The label names
+          // floor and column and nothing else — never what lies behind the tile.
+          const t = el('button', C + '-tile');
+          t.type = 'button';
+          t.disabled = true;               // opens only when `setPick` says so
+          t.dataset.f = String(f);
+          t.dataset.c = String(c);
+          t.setAttribute('aria-label', ctx.text('reveal.towers.tile', { floor: f + 1, n: c + 1 }));
           t.innerHTML = BOMB;
+          t.addEventListener('click', onTileClick);
           tiles.appendChild(t);
           list.push(t);
         }
@@ -191,7 +213,44 @@ export const reveal = {
         ? ctx.text('reveal.towers.shape', { levels, columns: first.columns, bombs: first.bombs })
         : ctx.text('reveal.towers.mixed', { levels }))));
       markerTo(-1);
+      applyPick();
     }
+    // ── The tower as input (contract: RevealPickOptions in lib/reveal.ts) ────────
+    // Unlike mines, a step here is not "any free tile" but "a column ON THE FLOOR THE
+    // SESSION STANDS ON". `curFloor` is that floor, and it is derived from what the
+    // transcript has already drawn — never guessed: every climb sets it, idle resets it.
+    let pick = null;
+    let curFloor = 0;
+    function pickable(c) {
+      if (!pick || !pick.enabled) return false;
+      if (!(c >= pick.min && c <= pick.max)) return false;
+      if (pick.taken && pick.taken.indexOf(c) >= 0) return false;
+      const fl = floors[curFloor];
+      const t = fl && fl.tiles[c];
+      // A floor that already carries a result is done — nothing on it is clickable.
+      return !!t && !fl.tiles.some((x) => x.classList.contains(C + '-safe') || x.classList.contains(C + '-bust'));
+    }
+    function applyPick() {
+      for (let f = 0; f < floors.length; f++) {
+        const open = f === curFloor;
+        floors[f].tiles.forEach((t, c) => {
+          const on = open && pickable(c);
+          t.disabled = !on;
+          if (on) t.dataset.pick = 'on';
+          else delete t.dataset.pick;
+        });
+      }
+    }
+    // A click REPORTS, it does not draw. The tile lights when the server's answer arrives
+    // as the next `play()` — anything else would be the module guessing the result.
+    function onTileClick(ev) {
+      const t = ev.currentTarget;
+      if (Number(t.dataset.f) !== curFloor) return;
+      const c = Number(t.dataset.c);
+      if (!pickable(c)) return;
+      pick.onPick(c);
+    }
+
     // Marker at floor f (0 = bottom); -1 = the ground line below the tower.
     function markerTo(f) {
       marker.style.top = f < 0 ? '100%' : (((levels - 1 - f) + 0.5) / levels * 100).toFixed(3) + '%';
@@ -207,11 +266,14 @@ export const reveal = {
         run.textContent = ctx.fmt.mult(k.multiplierBps);
       }
       markerTo(k.floor);
+      curFloor = k.floor + 1;              // the session now stands one floor higher
+      applyPick();
     }
     const clearReadout = () => { multEl.textContent = ''; resEl.textContent = ''; fiatEl.textContent = ''; subEl.textContent = ''; };
     function idle() {
       box.className = C;
       hint.textContent = ctx.hint || '';
+      curFloor = 0;
       build(config(null));
       run.textContent = '1.00×';
       clearReadout();
@@ -250,6 +312,7 @@ export const reveal = {
         const inc = from > 0 && !!shown && shown.key === o.sessionId && shown.n === from;
         root.dataset.state = 'playing';
         box.className = C + ' ' + C + '-live ' + C + '-still';
+        curFloor = 0;                      // the replay starts at the ground; climbs raise it
         build(p.cfg);
         run.textContent = '1.00×';
         clearReadout();
@@ -288,6 +351,7 @@ export const reveal = {
           raf = requestAnimationFrame(tick);
         });
       },
+      setPick(opts) { pick = opts || null; applyPick(); },
       reset() { cancel(); shown = null; idle(); root.dataset.state = 'idle'; },
       destroy() { cancel(); if (ro) ro.disconnect(); ro = null; },
     };

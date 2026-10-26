@@ -2,6 +2,17 @@ CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
 
+2026-10-26 — Slot reveal: optional line numbers next to the reels
+- `slots-modular` draws the numbered payline badges left and right of the reels ONLY when the
+  Slot Lab chose them: `presentation.display.lineBadges === true` (line slots, 3+ reels). Default
+  is off — then nothing changes and the reels keep the whole panel.
+- With badges each line sits at the row where it enters (left) and leaves (right), in one to
+  three columns depending on how many lines share a row; a badge lights up with its line.
+  The badges take side width from the reels (5×3 with 20 lines: cell 44 instead of 54 px at
+  360 px).
+- New fixture "Line numbers · two lines · win" and config "20 lines + Liniennummern" for the
+  reveal bench.
+
 2026-09-05 — Playable on a phone: no zoom on input, no sideways scroll, safe areas
 - Typing no longer zooms the page on iOS. The cause was never the viewport: Safari zooms
   into any <input>/<select> whose font is under 16px, and 13 fields plus the language

@@ -26,6 +26,13 @@ const METHODEN = new Set([
   'simulateTransaction', // Preflight mancher Wallets vor dem Senden
   'getSignatureStatuses', // Bestätigung per HTTP-Polling (kein WebSocket hier)
   'getBlockHeight',
+  // Guthaben-Check VOR dem Wallet-Dialog (05.09.2026, siehe lib/deckung.ts):
+  // Ohne ihn öffnete sich der Bestätigungs-Dialog auch bei zu wenig SOL, die
+  // Simulation scheiterte dort und Phantom stufte das Spiel auf ROT hoch.
+  // Beides sind einzelne Lese-Abfragen auf öffentliche Kettendaten und laufen
+  // nur beim Druck auf „Einzahlen" — nichts wird damit im Takt abgefragt.
+  'getBalance',
+  'getAccountInfo',
 ]);
 
 interface RpcAnfrage {

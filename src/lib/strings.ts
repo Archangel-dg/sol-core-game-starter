@@ -103,6 +103,18 @@ export const STRINGS = {
     fr: 'Dépôt envoyé — votre solde apparaît dans ~5–10 s.',
     ru: 'Депозит отправлен — баланс появится через ~5–10 с.',
   },
+  'money.notEnoughSol': {
+    en: 'Not enough SOL in your wallet: you have {have} ◎, this deposit needs {need} ◎ (amount + network fee).',
+    de: 'Zu wenig SOL im Wallet: du hast {have} ◎, diese Einzahlung braucht {need} ◎ (Betrag + Netzwerkgebühr).',
+    fr: 'Pas assez de SOL dans votre wallet : vous avez {have} ◎, ce dépôt demande {need} ◎ (montant + frais de réseau).',
+    ru: 'Недостаточно SOL в кошельке: у вас {have} ◎, для депозита нужно {need} ◎ (сумма + комиссия сети).',
+  },
+  'money.notEnoughSolFirst': {
+    en: 'Not enough SOL in your wallet: you have {have} ◎, this first deposit needs {need} ◎ — it also opens your game account on-chain (one-time rent ≈ 0.0012 ◎, it stays yours).',
+    de: 'Zu wenig SOL im Wallet: du hast {have} ◎, diese erste Einzahlung braucht {need} ◎ — sie legt auch dein Spielkonto an (einmalige Miete ≈ 0,0012 ◎, bleibt deins).',
+    fr: 'Pas assez de SOL dans votre wallet : vous avez {have} ◎, ce premier dépôt demande {need} ◎ — il ouvre aussi votre compte de jeu (loyer unique ≈ 0,0012 ◎, il reste à vous).',
+    ru: 'Недостаточно SOL в кошельке: у вас {have} ◎, для первого депозита нужно {need} ◎ — он также создаёт ваш игровой счёт (разовая рента ≈ 0,0012 ◎, остаётся вашей).',
+  },
   'money.depositFailed': {
     en: 'Deposit failed: {msg}',
     de: 'Einzahlung fehlgeschlagen: {msg}',
@@ -271,6 +283,19 @@ export const STRINGS = {
   'reveal.slotsm.scatters': { en: '3+ scatters pay', de: '3+ Scatter zahlen', fr: '3+ scatters paient', ru: '3+ скаттера платят' },
   'reveal.slotsm.spin': { en: 'Spin', de: 'Drehen', fr: 'Tour', ru: 'Спин' },
   'reveal.slotsm.noLine': { en: 'no line paid', de: 'keine Linie gezahlt', fr: 'aucune ligne payée', ru: 'ни одна линия не сыграла' },
+  'reveal.slotsm.ways': { en: '{n} ways', de: '{n} Wege', fr: '{n} chemins', ru: '{n} путей' },
+  'reveal.slotsm.total': { en: 'total count', de: 'Summe im Raster', fr: 'total sur la grille', ru: 'сумма по сетке' },
+  'reveal.slotsm.grid': { en: '{reels}×{rows}', de: '{reels}×{rows}', fr: '{reels}×{rows}', ru: '{reels}×{rows}' },
+  'reveal.slotsm.big': { en: 'BIG WIN', de: 'BIG WIN', fr: 'BIG WIN', ru: 'BIG WIN' },
+  'reveal.slotsm.mega': { en: 'MEGA WIN', de: 'MEGA WIN', fr: 'MEGA WIN', ru: 'MEGA WIN' },
+  'reveal.slotsm.epic': { en: 'EPIC WIN', de: 'EPIC WIN', fr: 'EPIC WIN', ru: 'EPIC WIN' },
+  'reveal.slotsm.freeSpin': { en: 'Free spin {i}/{n}', de: 'Free Spin {i}/{n}', fr: 'Free spin {i}/{n}', ru: 'Фриспин {i}/{n}' },
+  'reveal.slotsm.respin': { en: 'Respin {i}/{n}', de: 'Respin {i}/{n}', fr: 'Respin {i}/{n}', ru: 'Респин {i}/{n}' },
+  'reveal.slotsm.coinsLocked': { en: '{n} coins held', de: '{n} Münzen gehalten', fr: '{n} pièces retenues', ru: 'Удержано монет: {n}' },
+  'reveal.slotsm.cascade': { en: 'Cascade {i}/{n}', de: 'Kaskade {i}/{n}', fr: 'Cascade {i}/{n}', ru: 'Каскад {i}/{n}' },
+  'reveal.slotsm.featureStart': { en: 'Feature!', de: 'Feature!', fr: 'Feature !', ru: 'Фича!' },
+  'reveal.slotsm.featureEnd': { en: 'Feature total {amount}', de: 'Feature gesamt {amount}', fr: 'Feature total {amount}', ru: 'Фича всего {amount}' },
+  'reveal.slotsm.retrigger': { en: '+{n} spins', de: '+{n} Spins', fr: '+{n} tours', ru: '+{n} спинов' },
 
   // ── Reveal: Session-/Turnier-Module (gemeinsame Bausteine) ──────────────
   'reveal.step': { en: 'Step {n}', de: 'Schritt {n}', fr: 'Étape {n}', ru: 'Шаг {n}' },

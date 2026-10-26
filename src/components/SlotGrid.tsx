@@ -24,8 +24,10 @@ function specFrom(cfg: EngineConfig | null): {
   reels: number; rows: number; symbols: RenderSymbol[]; paylines: number[][]; freeSpins: FreeSpinsSpec | null;
   /** Wild-Multiplikator (Echo `wildMultFactor`/`wildMultStack`), sonst null. */
   wildMult: { factor: number; stack: boolean } | null;
+  /** Wild zählt als Scatter (Echo `wildAsScatter: 1`): Wild-Zellen leuchten dann mit als Scatter-Treffer. */
+  wildAsScatter: boolean;
 } {
-  const raw = cfg as unknown as { reels?: unknown; rows?: unknown; symbols?: unknown; paylines?: unknown; freeSpins?: unknown; wildMultFactor?: unknown; wildMultStack?: unknown } | null;
+  const raw = cfg as unknown as { reels?: unknown; rows?: unknown; symbols?: unknown; paylines?: unknown; freeSpins?: unknown; wildMultFactor?: unknown; wildMultStack?: unknown; wildAsScatter?: unknown } | null;
   const reels = dim(raw?.reels, 5);
   const rows = dim(raw?.rows, 3);
   const symbols = Array.isArray(raw?.symbols)
@@ -50,7 +52,7 @@ function specFrom(cfg: EngineConfig | null): {
     typeof raw?.wildMultFactor === 'number' && raw.wildMultFactor > 1
       ? { factor: raw.wildMultFactor, stack: raw.wildMultStack === 1 }
       : null;
-  return { reels, rows, symbols, paylines, freeSpins, wildMult };
+  return { reels, rows, symbols, paylines, freeSpins, wildMult, wildAsScatter: raw?.wildAsScatter === 1 };
 }
 
 export function SlotGrid({
@@ -66,7 +68,7 @@ export function SlotGrid({
   multiplierBps?: number;
   payoutLamports?: string;
 }) {
-  const { reels, rows, symbols, paylines, freeSpins, wildMult } = specFrom(engineConfig);
+  const { reels, rows, symbols, paylines, freeSpins, wildMult, wildAsScatter } = specFrom(engineConfig);
 
   // Mount-Transition fürs Spalten-Stagger-Reveal: blendet NUR die Optik ein
   // (opacity/scale) — das Server-Grid selbst ändert sich dadurch nie.
@@ -159,7 +161,9 @@ export function SlotGrid({
     }));
   }
 
-  const scatterIds = new Set(symbols.filter((s) => s.scatter).map((s) => s.id));
+  // Wild zählt als Scatter: dann hat auch die Wild-Zelle zur Scatter-Anzahl
+  // beigetragen und leuchtet mit — sonst sähe „3 Scatter" nach zweien aus.
+  const scatterIds = new Set(symbols.filter((s) => s.scatter || (wildAsScatter && s.wild)).map((s) => s.id));
 
   return (
     <div className="h-full overflow-auto rounded-xl bg-night p-4">

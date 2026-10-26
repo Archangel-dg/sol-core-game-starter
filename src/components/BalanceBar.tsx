@@ -4,6 +4,7 @@ import { useT } from '@/lib/i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { buildDepositTx, warteAufBestaetigung } from '@/lib/player-program';
+import { pruefeDeckung } from '@/lib/deckung';
 import { toSol, solToLamports } from '@/lib/lamports';
 import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { usePlayerAuth } from '@/lib/player-auth';
@@ -71,6 +72,19 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
     setMsg(null);
     try {
       const lamports = solToLamports(amount);
+      // Erst prüfen, dann das Wallet fragen: Ein Dialog, dessen Simulation an
+      // fehlendem SOL scheitert, wird von Phantom als Betrugswarnung angezeigt
+      // (siehe lib/deckung.ts). `null` = nicht prüfbar ⇒ weiter wie bisher.
+      const deckung = await pruefeDeckung(connection, publicKey, lamports);
+      if (deckung && !deckung.ok) {
+        setMsg(
+          t(deckung.rent ? 'money.notEnoughSolFirst' : 'money.notEnoughSol', {
+            have: toSol(deckung.have),
+            need: toSol(deckung.need),
+          }),
+        );
+        return;
+      }
       const tx = await buildDepositTx(connection, publicKey, lamports);
       const sig = await sendTransaction(tx, connection);
       await warteAufBestaetigung(connection, sig);

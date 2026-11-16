@@ -18,7 +18,7 @@
 export const reveal = {
   key: 'wheel',
   mechanic: 'single',
-  strings: ['reveal.won', 'result.lost', 'reveal.roll', 'reveal.wheel.cap', 'reveal.wheel.landed'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.roll', 'reveal.wheel.cap', 'reveal.wheel.landed'],
 
   mount(root, ctx) {
     const C = 'sca-wheel';
@@ -181,7 +181,7 @@ export const reveal = {
       const land = () => {
         apply(target % 360);
         outMult.textContent = ctx.fmt.mult(o.multiplierBps);
-        outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+        outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
         outFiat.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
         const parts = [];
         if (typeof o.roll === 'number' && isFinite(o.roll)) parts.push(ctx.text('reveal.roll', { roll: o.roll.toFixed(2) }));

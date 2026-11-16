@@ -15,7 +15,7 @@
 export const reveal = {
   key: 'scratch',
   mechanic: 'single',
-  strings: ['reveal.won', 'result.lost', 'reveal.roll', 'reveal.scratch.match', 'reveal.scratch.hint', 'reveal.scratch.tier', 'reveal.scratch.prize', 'reveal.scratch.blank'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.roll', 'reveal.scratch.match', 'reveal.scratch.hint', 'reveal.scratch.tier', 'reveal.scratch.prize', 'reveal.scratch.blank'],
 
   mount(root, ctx) {
     const C = 'sca-scratch';
@@ -85,7 +85,7 @@ export const reveal = {
         const P = perm9(h % 8 | 0);
         const cells = BLANK9.slice();
         let line = null;
-        if (o.win) {
+        if (o.hit ?? o.win) {
           line = LINES[(idx - 1) % LINES.length];
           for (const i of line) cells[i] = m;
           const others = [1, 2, 5, 10, 50].filter((v) => v !== m);
@@ -107,7 +107,7 @@ export const reveal = {
       const cells = [];
       for (let i = 0; i < n; i++) cells.push(fillers[(i + Math.floor(h) % fillers.length) % fillers.length]);
       const hits = [];
-      if (o.win) {
+      if (o.hit ?? o.win) {
         const step = Math.max(1, Math.floor(n / 3));
         for (let k = 0; k < Math.min(3, n); k++) hits.push((idx - 1 + k * step) % n);
         for (const i of hits) cells[i] = m;
@@ -212,9 +212,9 @@ export const reveal = {
         wrap.classList.add(o.win ? C + '-win' : C + '-loss');
         // the readout enters the DOM only now
         outMult.textContent = ctx.fmt.mult(o.multiplierBps);
-        outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+        outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
         outFiat.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
-        const parts = [o.win ? (idx != null ? ctx.text('reveal.scratch.tier', { idx }) : ctx.text('reveal.scratch.prize')) : ctx.text('reveal.scratch.blank')];
+        const parts = [(o.hit ?? o.win) ? (idx != null ? ctx.text('reveal.scratch.tier', { idx }) : ctx.text('reveal.scratch.prize')) : ctx.text('reveal.scratch.blank')];
         if (typeof o.roll === 'number' && isFinite(o.roll)) parts.push(ctx.text('reveal.roll', { roll: o.roll.toFixed(2) }));
         outRoll.textContent = parts.join(' · ');
         wrap.classList.add(C + '-done');

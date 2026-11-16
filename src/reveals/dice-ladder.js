@@ -20,7 +20,7 @@
 export const reveal = {
   key: 'dice-ladder',
   mechanic: 'session',
-  strings: ['reveal.won', 'result.lost', 'reveal.diceLadder.title', 'reveal.diceLadder.higher', 'reveal.diceLadder.lower', 'reveal.diceLadder.equal', 'reveal.diceLadder.tie', 'reveal.step', 'reveal.bustedStep', 'reveal.cashedSteps', 'reveal.capped'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.diceLadder.title', 'reveal.diceLadder.higher', 'reveal.diceLadder.lower', 'reveal.diceLadder.equal', 'reveal.diceLadder.tie', 'reveal.step', 'reveal.bustedStep', 'reveal.cashedSteps', 'reveal.capped'],
 
   mount(root, ctx) {
     const C = 'sca-dice-ladder';
@@ -264,10 +264,10 @@ export const reveal = {
           R.readoutSet = true;
           wrap.classList.add(o.win ? C + '-win' : C + '-loss');
           outMult.textContent = ctx.fmt.mult(o.multiplierBps);
-          outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+          outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
           outFiat.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
           const last = steps[steps.length - 1];
-          outNote.textContent = o.win
+          outNote.textContent = (o.hit ?? o.win)
             ? ctx.text('reveal.cashedSteps', { n: steps.length }) + (o.capped ? ' · ' + ctx.text('reveal.capped') : '')
             : last && Number(last.toSum) === Number(last.fromSum) ? ctx.text('reveal.diceLadder.tie', { n: last.toSum })
             : ctx.text('reveal.bustedStep', { n: Math.max(1, steps.length) });

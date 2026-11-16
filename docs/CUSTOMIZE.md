@@ -120,7 +120,11 @@ Binding rules (rule 16 in `docs/RULES.md`):
 4. **The winner stands at the end** — `play()` resolves only when the final frame stands, and it
    stays.
 5. **Results only from the outcome.** `win`, `multiplierBps`, `payoutLamports` are read, never
-   recomputed from a roll.
+   recomputed from a roll. `win` is the NET verdict (16.11.2026): true only when the payout
+   exceeds stake plus fees (`src/lib/outcome.ts`). Only `win` gets celebration, the win colour and
+   "Won"; a smaller payout is a partial return — write it with `ctx.fmt.lost(o.payoutLamports)`,
+   which reads "Back: 0.04 ◎" by itself. `hit` is what happened in the game (a hit, a taken
+   cash-out) — use it for the scene, never for celebration; when it is missing, fall back to `win`.
 6. **No hard-coded text.** Every label goes through `ctx.text(...)`; the keys the module reads
    are listed in its `strings` array so the contract check can find them.
 7. **A round starts from the picture on screen.** The board never snaps back to idle between

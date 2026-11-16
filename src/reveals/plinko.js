@@ -23,7 +23,7 @@ export const reveal = {
   mechanic: 'single',
   strings: [
     'reveal.won',
-    'result.lost',
+    'result.lost', 'result.back',
     'reveal.plinko.rows',
     'reveal.plinko.head',
     'reveal.plinko.risk.low',
@@ -161,7 +161,7 @@ export const reveal = {
       if (B.labels[slot]) B.labels[slot].classList.add('sca-plinko-lit');
       box.setAttribute('data-tone', win ? 'win' : 'loss');
       mult.textContent = ctx.fmt.mult(o.multiplierBps);
-      out.textContent = win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+      out.textContent = win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
       fiat.textContent = (win && ctx.fmt.fiat(o.payoutLamports)) || '';
     };
     // Ball waypoints: drop point → the pin it meets in every row → the bucket centre.

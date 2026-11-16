@@ -14,7 +14,7 @@ export const reveal = {
   key: 'limbo',
   mechanic: 'single',
   strings: [
-    'reveal.won', 'result.lost',
+    'reveal.won', 'result.lost', 'result.back',
     'reveal.limbo.target', 'reveal.limbo.multiplier', 'reveal.limbo.climbing',
     'reveal.limbo.crashed', 'reveal.limbo.reached', 'reveal.limbo.missed',
   ],
@@ -122,15 +122,16 @@ export const reveal = {
       cap.textContent = ctx.text(armed ? 'reveal.limbo.climbing' : 'reveal.limbo.multiplier');
       mult.textContent = ''; out.textContent = ''; fiat.textContent = '';
     };
-    // Captions follow o.win only (comparison-free): with drawRule 'lose' an exact hit loses,
-    // so wording like "below target" could contradict the frame.
+    // Captions follow the server's verdict on the target (o.hit, else o.win; comparison-free):
+    // with drawRule 'lose' an exact hit loses, so wording like "below target" could contradict
+    // the frame. Money (tone, readout, fiat) follows o.win — the NET verdict.
     const finish = (o) => {
       const win = !!o.win;
       box.setAttribute('data-tone', win ? 'win' : 'loss');
       big.setAttribute('class', 'sca-limbo-big');
-      cap.textContent = ctx.text(win ? 'reveal.limbo.reached' : 'reveal.limbo.missed');
+      cap.textContent = ctx.text((o.hit ?? win) ? 'reveal.limbo.reached' : 'reveal.limbo.missed');
       mult.textContent = ctx.fmt.mult(o.multiplierBps);
-      out.textContent = win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+      out.textContent = win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
       fiat.textContent = (win && ctx.fmt.fiat(o.payoutLamports)) || '';
     };
     // Idle target: the game's minimum target (config echo), at least 2×.

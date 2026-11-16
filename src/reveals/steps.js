@@ -19,7 +19,7 @@
 export const reveal = {
   key: 'steps',
   mechanic: 'session',
-  strings: ['reveal.won', 'result.lost', 'reveal.steps.title', 'reveal.steps.rungs', 'reveal.steps.checkpoints', 'reveal.steps.lives', 'reveal.steps.start', 'reveal.steps.safe', 'reveal.steps.top', 'reveal.steps.result', 'reveal.steps.falls', 'reveal.steps.bust', 'reveal.steps.noLives', 'reveal.steps.busted', 'reveal.topReached', 'reveal.cashedOut'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.steps.title', 'reveal.steps.rungs', 'reveal.steps.checkpoints', 'reveal.steps.lives', 'reveal.steps.start', 'reveal.steps.safe', 'reveal.steps.top', 'reveal.steps.result', 'reveal.steps.falls', 'reveal.steps.bust', 'reveal.steps.noLives', 'reveal.steps.busted', 'reveal.topReached', 'reveal.cashedOut'],
 
   mount(root, ctx) {
     const C = 'sca-steps';
@@ -254,13 +254,13 @@ export const reveal = {
       box.classList.add(C + '-done', o.win ? C + '-win' : C + '-loss');
       const last = n ? p.moves[n - 1] : null;
       const rung = last ? last.to : 0;
-      if (o.win && rungs[rung]) rungs[rung].lab.classList.add(C + '-top');
+      if ((o.hit ?? o.win) && rungs[rung]) rungs[rung].lab.classList.add(C + '-top');
       run.textContent = ctx.fmt.mult(o.multiplierBps);
       multEl.textContent = ctx.fmt.mult(o.multiplierBps);
-      resEl.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+      resEl.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
       fiatEl.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
       const falls = p.moves.filter((m) => !m.survived && !m.bust).length;
-      subEl.textContent = o.win
+      subEl.textContent = (o.hit ?? o.win)
         ? ctx.text('reveal.steps.result', { rung, n: p.cfg.n, end: ctx.text(rung >= p.cfg.n ? 'reveal.topReached' : 'reveal.cashedOut') }) + (falls ? ' · ' + ctx.text('reveal.steps.falls', { n: falls }) : '')
         : ctx.text('reveal.steps.bust', { n: last ? last.target : 1, why: ctx.text(p.cfg.lives > 0 ? 'reveal.steps.noLives' : 'reveal.steps.busted') });
     }

@@ -26,7 +26,7 @@
 export const reveal = {
   key: 'slots-3x3',
   mechanic: 'single',
-  strings: ['reveal.won', 'result.lost', 'reveal.slots3.centre', 'reveal.slots3.triple', 'reveal.slots3.pair', 'reveal.slots3.none'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.slots3.centre', 'reveal.slots3.triple', 'reveal.slots3.pair', 'reveal.slots3.none'],
 
   mount(root, ctx) {
     const NS = 'http://www.w3.org/2000/svg';
@@ -247,7 +247,7 @@ export const reveal = {
       reels.forEach((reel, r) => reel.hi.classList.toggle(K + '-on', lit.indexOf(r) >= 0));
       kind.textContent = ctx.text(k === 'triple' ? 'reveal.slots3.triple' : k === 'pair' ? 'reveal.slots3.pair' : 'reveal.slots3.none');
       mult.textContent = ctx.fmt.mult(o.multiplierBps);
-      out.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+      out.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
       fiat.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
       box.dataset.tone = o.win ? 'win' : 'loss';
     };

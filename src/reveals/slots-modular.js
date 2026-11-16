@@ -40,7 +40,7 @@ export const reveal = {
   key: 'slots-modular',
   mechanic: 'single',
   strings: [
-    'reveal.won', 'result.lost', 'reveal.bet', 'reveal.more',
+    'reveal.won', 'result.lost', 'result.back', 'reveal.bet', 'reveal.more',
     'reveal.slotsm.paytable', 'reveal.slotsm.lines', 'reveal.slotsm.wilds', 'reveal.slotsm.scatters', 'reveal.slotsm.spin', 'reveal.slotsm.noLine',
     'reveal.slotsm.ways', 'reveal.slotsm.total', 'reveal.slotsm.grid',
     'reveal.slotsm.big', 'reveal.slotsm.mega', 'reveal.slotsm.epic',
@@ -545,13 +545,13 @@ export const reveal = {
       const win = !!o.win;
       box.setAttribute('data-tone', win ? 'win' : 'loss');
       mult.textContent = ctx.fmt.mult(amountBps == null ? o.multiplierBps : amountBps);
-      out.textContent = win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+      out.textContent = win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
       fiat.textContent = (win && ctx.fmt.fiat(o.payoutLamports)) || '';
       const st = tierOf(look, o.multiplierBps);
       if (st) { tier.textContent = ctx.text('reveal.slotsm.' + st.key); tier.setAttribute('data-tier', st.key); }
       else { tier.textContent = ''; tier.removeAttribute('data-tier'); }
       const entries = detailEntries(d);
-      const lines = entries.length ? packDetail(entries) : [win ? '' : ctx.text('reveal.slotsm.noLine')];
+      const lines = entries.length ? packDetail(entries) : [(o.hit ?? win) ? '' : ctx.text('reveal.slotsm.noLine')];
       det1.textContent = lines[0] || ''; det2.textContent = lines[1] || '';
     };
 

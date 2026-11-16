@@ -11,10 +11,12 @@ import type { RoundLog } from './SingleBetGame';
 import { MaxBetPick } from './BetLimitHint';
 import { FiatHint } from './FiatHint';
 import { useSound } from '@/lib/sounds';
+import { randomHexSeed } from '@/lib/seed';
 import { useT, type TFn } from '@/lib/i18n';
 import { RevealHost } from './RevealHost';
 import { hasReveal, type RevealPickOptions } from '@/lib/reveal';
 import { EMPTY_TRANSCRIPT, noteSessionStep, sessionOutcome, sessionStepCount, type SessionTranscript } from '@/lib/reveal-session';
+import { sessionTone } from '@/lib/outcome';
 
 /** Woher eine Server-Antwort kommt — entscheidet über den Ton nach dem Reveal. */
 type Antwort = 'start' | 'step' | 'cashout' | 'reconnect';
@@ -309,8 +311,10 @@ export function SessionGame({
         if (v.roundId) {
           onRound(v.proof.serverSeedHash, v.roundId);
           onLog({
-            betLamports: v.stakeLamports ?? '0',
-            win: v.status === 'cashed_out' && v.payoutLamports !== '0',
+            betLamports: v.stakeLamports ?? v.betLamports ?? '0',
+            // Netto entscheidet (lib/outcome.ts): eine Auszahlung unter Einsatz +
+            // Gebühren ist eine Teil-Rückzahlung, kein Gewinn.
+            win: sessionTone(v) === 'win',
             // Derselbe Rückfall wie im HUD — sonst stand im Verlauf NaN×.
             multiplierBps: v.multiplierBps ?? v.returnBps ?? 0,
             payoutLamports: v.payoutLamports ?? '0',
@@ -334,9 +338,12 @@ export function SessionGame({
   const pending = useRef<{ view: SessionView; outcome: unknown; kind: Antwort } | null>(null);
   const transcript = useRef<SessionTranscript>(EMPTY_TRANSCRIPT);
   const sfx = (v: SessionView, kind: Antwort) => {
-    if (kind === 'cashout') play('cashout');
-    else if (v.status === 'busted') play('lose');
-    else if (v.status !== 'active') play(v.payoutLamports && v.payoutLamports !== '0' ? 'win' : 'lose');
+    if (kind !== 'cashout' && v.status === 'active') return;
+    // Netto entscheidet (lib/outcome.ts): Kassenklang und Gewinnton nur über
+    // Einsatz + Gebühren; eine Teil-Rückzahlung bekommt einen leisen Klick.
+    const tone = sessionTone(v);
+    if (tone === 'win') play(kind === 'cashout' ? 'cashout' : 'win');
+    else play(tone === 'partial' ? 'click' : 'lose');
   };
   const deliver = (v: SessionView, kind: Antwort, betLamports?: string) => {
     if (!animated) {
@@ -466,6 +473,8 @@ export function SessionGame({
     const v = await call(`${apiBase}/session/start`, {
       playerWallet: wallet,
       betLamports: solToLamports(bet).toString(),
+      // Eigener Seed je Sitzung (siehe lib/seed.ts).
+      clientSeed: randomHexSeed(),
       // Pay-per-Spin-Handschlag: Der Server oeffnet eine Runde dieser Engines
       // nur, wenn der Client bestaetigt, dass er das Kostenmodell kennt. Das
       // darf er hier, weil die Kostenwarnung direkt darueber steht (sie haengt

@@ -174,6 +174,11 @@ export interface SessionView {
   mode: string;
   status: 'active' | 'busted' | 'cashed_out';
   potentialPayoutLamports: string;
+  /** Einsatz der Runde ohne Gebühren (klassische Sitzungen; seit 16.11.2026). */
+  betLamports?: string;
+  /** Was der Start abgebucht hat: Einsatz + Gebühren (klassische Sitzungen;
+   *  seit 16.11.2026). Grundlage der Netto-Einordnung in `lib/outcome.ts`. */
+  totalChargeLamports?: string;
   proof: { serverSeedHash: string; clientSeed: string; nonce: number };
   /** Aufgelöste Engine-Dimensionen (fehlt bei alten API-Ständen). */
   engine?: { mode: string; config: Record<string, number> };

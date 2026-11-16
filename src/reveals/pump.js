@@ -20,7 +20,7 @@
 export const reveal = {
   key: 'pump',
   mechanic: 'session',
-  strings: ['reveal.won', 'result.lost', 'reveal.pump.title', 'reveal.pump.pumps', 'reveal.pump.burstAt', 'reveal.pump.sub'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.pump.title', 'reveal.pump.pumps', 'reveal.pump.burstAt', 'reveal.pump.sub'],
 
   mount(root, ctx) {
     const C = 'sca-pump';
@@ -171,7 +171,7 @@ export const reveal = {
       setClass('popped', busted && t >= tPop);
       setClass('loss', busted && t >= tPop);
       if (busted && t >= tPop && !burstV.textContent) { burstL.textContent = ctx.text('reveal.pump.burstAt'); burstV.textContent = ctx.fmt.mult(tl.o.burstMultiplierBps); }
-      setClass('win', !busted && !live && t >= tRead);
+      setClass('win', tl.o.win === true && !busted && !live && t >= tRead);
       if (!live && t >= tRead && !multEl.textContent) fillReadout(tl.o);   // the readout enters the DOM only now
       setClass('done', !live && t >= tRead);
     }
@@ -192,7 +192,7 @@ export const reveal = {
     function fillReadout(o) {
       const n = Array.isArray(o.pumps) ? o.pumps.length : 0;
       multEl.textContent = ctx.fmt.mult(o.multiplierBps);
-      resEl.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+      resEl.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
       fiatEl.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
       subEl.textContent = ctx.text('reveal.pump.sub', { bet: ctx.fmt.sol(o.betLamports), n });
     }

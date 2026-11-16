@@ -36,11 +36,21 @@ export function History({
         {rounds.slice(0, max).map((r) => (
           <li key={r.roundId} className="grid grid-cols-[1fr_auto_1fr_auto] items-baseline gap-x-2 tabular-nums">
             <span className="text-white/60">{toSol(r.betLamports)} ◎</span>
-            <span className={`text-right ${r.win ? 'text-accent' : 'text-red-400'}`}>
+            {/* `win` ist netto (lib/outcome.ts): eine kleinere Auszahlung ist eine
+                Teil-Rückzahlung — ohne Plus und ohne Gewinnfarbe. */}
+            <span
+              className={`text-right ${
+                r.win ? 'text-accent' : r.payoutLamports !== '0' ? 'text-white/60' : 'text-red-400'
+              }`}
+            >
               {(r.multiplierBps / 10000).toFixed(2)}×
             </span>
-            <span className={`text-right ${r.win ? 'text-accent' : 'text-white/40'}`}>
-              {r.win ? `+${toSol(r.payoutLamports)} ◎` : t('verify.lost')}
+            <span className={`text-right ${r.win ? 'text-accent' : r.payoutLamports !== '0' ? 'text-white/60' : 'text-white/40'}`}>
+              {r.win
+                ? `+${toSol(r.payoutLamports)} ◎`
+                : r.payoutLamports !== '0'
+                  ? t('result.back', { amount: toSol(r.payoutLamports) })
+                  : t('verify.lost')}
             </span>
             <a
               href={verifyHref(verifierUrl, r.roundId)}

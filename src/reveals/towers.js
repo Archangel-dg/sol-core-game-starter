@@ -28,7 +28,7 @@
 export const reveal = {
   key: 'towers',
   mechanic: 'session',
-  strings: ['reveal.won', 'result.lost', 'reveal.towers.title', 'reveal.towers.floor', 'reveal.towers.shape', 'reveal.towers.mixed', 'reveal.towers.cleared', 'reveal.towers.bust', 'reveal.towers.bustShown', 'reveal.cashedOut', 'reveal.topReached', 'reveal.towers.tile'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.towers.title', 'reveal.towers.floor', 'reveal.towers.shape', 'reveal.towers.mixed', 'reveal.towers.cleared', 'reveal.towers.bust', 'reveal.towers.bustShown', 'reveal.cashedOut', 'reveal.topReached', 'reveal.towers.tile'],
 
   mount(root, ctx) {
     const C = 'sca-towers';
@@ -286,10 +286,10 @@ export const reveal = {
       if (top && floors[top.floor]) floors[top.floor].lab.classList.add(C + '-top');
       run.textContent = ctx.fmt.mult(o.multiplierBps);
       multEl.textContent = ctx.fmt.mult(o.multiplierBps);
-      resEl.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+      resEl.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
       fiatEl.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
       const bombs = p.cfg.floors[0].bombs;
-      subEl.textContent = o.win
+      subEl.textContent = (o.hit ?? o.win)
         ? ctx.text('reveal.towers.cleared', { n, end: ctx.text(n >= p.cfg.levels ? 'reveal.topReached' : 'reveal.cashedOut') })
         : p.cfg.uniform ? ctx.text('reveal.towers.bust', { n, bombs }) : ctx.text('reveal.towers.bustShown', { n });
     }

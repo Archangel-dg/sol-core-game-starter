@@ -112,7 +112,10 @@ payout-ready game — automatically.
     (`src/reveals/<engine>.js`, hosted by `components/RevealHost.tsx`) is a pure function of the
     server outcome and elapsed time: no `Math.random()`, no near-miss dressing, no slowing down
     beside the winning field, and the readout nodes stay EMPTY until the final frame. The flows
-    wait for that frame: HUD, sound, history, balance and win toast follow `onRevealed`. A result
+    wait for that frame: HUD, sound, history, balance and win toast follow `onRevealed`. And only
+    a net win is a win: `win` in the outcome means the payout exceeds stake plus fees
+    (`lib/outcome.ts`); a smaller payout is a partial return, shown calmly as "Back: …" — no win
+    sound, no win colour, no "Won" (`hit` carries what happened in the game). A result
     that leaks mid-animation — a highlighted tile, a settled balance, a multiplier in the DOM —
     is the same lie as a near-miss: it tells the player the animation was theatre. Every label in
     a module goes through `ctx.text(...)` (rule 12 holds inside the square too). And the board

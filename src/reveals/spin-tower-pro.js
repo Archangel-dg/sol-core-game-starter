@@ -20,7 +20,7 @@
 export const reveal = {
   key: 'spin-tower-pro',
   mechanic: 'session',
-  strings: ['reveal.won', 'result.lost', 'reveal.spinTower.title', 'reveal.spinTower.spin', 'reveal.spinTower.perSpin', 'reveal.spinTower.joker', 'reveal.spinTower.nothing', 'reveal.spinTower.fail', 'reveal.spinTower.pot', 'reveal.spinTower.secured', 'reveal.spinTower.reset', 'reveal.spinTower.stepdown', 'reveal.spinTower.busted', 'reveal.spinTower.capReached', 'reveal.spinTower.cashed', 'reveal.spinTower.sub', 'session.tower'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.spinTower.title', 'reveal.spinTower.spin', 'reveal.spinTower.perSpin', 'reveal.spinTower.joker', 'reveal.spinTower.nothing', 'reveal.spinTower.fail', 'reveal.spinTower.pot', 'reveal.spinTower.secured', 'reveal.spinTower.reset', 'reveal.spinTower.stepdown', 'reveal.spinTower.busted', 'reveal.spinTower.capReached', 'reveal.spinTower.cashed', 'reveal.spinTower.sub', 'session.tower'],
 
   mount(root, ctx) {
     const C = 'sca-spin-tower-pro';
@@ -288,7 +288,7 @@ export const reveal = {
 
     function fillReadout() {
       multEl.textContent = ctx.fmt.mult(P.pot + P.secured);
-      resEl.textContent = P.win ? ctx.fmt.won(P.payout) : ctx.fmt.lost();
+      resEl.textContent = P.win ? ctx.fmt.won(P.payout) : ctx.fmt.lost(P.payout);
       fiatEl.textContent = (P.win && ctx.fmt.fiat(P.payout)) || '';
       const status = ctx.text(P.status === 'busted' ? 'reveal.spinTower.busted' : P.capped ? 'reveal.spinTower.capReached' : 'reveal.spinTower.cashed');
       let staked = '0';

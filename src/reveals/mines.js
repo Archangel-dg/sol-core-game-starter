@@ -30,7 +30,7 @@
 export const reveal = {
   key: 'mines',
   mechanic: 'session',
-  strings: ['reveal.won', 'result.lost', 'reveal.mines.title', 'reveal.mines.board', 'reveal.mines.gems', 'reveal.mines.bust', 'reveal.mines.tile'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.mines.title', 'reveal.mines.board', 'reveal.mines.gems', 'reveal.mines.bust', 'reveal.mines.tile'],
 
   mount(root, ctx) {
     const C = 'sca-mines';              // class prefix — every rule is scoped with it
@@ -249,9 +249,9 @@ export const reveal = {
       place(p.cfg, true);                  // make room for the readout below the board
       run.textContent = ctx.fmt.mult(o.multiplierBps);
       multEl.textContent = ctx.fmt.mult(o.multiplierBps);
-      resEl.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+      resEl.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
       fiatEl.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
-      subEl.textContent = o.win
+      subEl.textContent = (o.hit ?? o.win)
         ? ctx.text('reveal.mines.gems', { n })
         : ctx.text('reveal.mines.bust', { n, mines: p.cfg.mineCount });
     }

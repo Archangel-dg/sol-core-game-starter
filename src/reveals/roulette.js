@@ -27,7 +27,7 @@ export const reveal = {
   mechanic: 'single',
   strings: [
     'reveal.won',
-    'result.lost',
+    'result.lost', 'result.back',
     'reveal.roulette.cap',
     'reveal.roulette.capUs',
     'reveal.roulette.sub',
@@ -298,7 +298,7 @@ export const reveal = {
         num.className = C + '-num ' + C + '-' + color;
         col.textContent = idx >= 0 || colorOk ? colorText(color) : '';
         outMult.textContent = ctx.fmt.mult(o.multiplierBps);
-        outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+        outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
         outFiat.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
         outSub.textContent = ctx.text('reveal.roulette.sub', { bet, pocket: idx >= 0 ? pocket + ' · ' + colorText(color) : '—' });
         wrap.classList.remove(C + '-playing');

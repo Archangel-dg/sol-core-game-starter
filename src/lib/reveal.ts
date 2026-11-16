@@ -23,6 +23,10 @@
  *     (Saldo, Ton, Verlauf, Gewinnmeldung).
  *  5. ERGEBNISSE NUR AUS DEM OUTCOME. `win`, `multiplierBps`, `payoutLamports`
  *     werden gelesen, nie aus einem Wurf neu berechnet — der Server entscheidet.
+ *     `win` ist das NETTO-Urteil (16.11.2026): wahr nur, wenn die Auszahlung
+ *     über Einsatz + Gebühren liegt (lib/outcome.ts). Nur `win` bekommt Jubel,
+ *     Gewinnfarbe und „Gewonnen". `hit` ist das Spielgeschehen (Treffer,
+ *     Auszahlung genommen) — dafür, was die Szene zeigt; fehlt es, gilt `win`.
  *
  * Und eine sechste, die das Kit betrifft: KEIN sichtbarer Text im Modul. Jede
  * Beschriftung läuft über `ctx.text(schlüssel)` durch den Sprachkatalog
@@ -41,8 +45,10 @@ export interface RevealFormat {
   sol(lamports: string | bigint | null | undefined): string;
   /** „Won +0.196 ◎" in der Sprache des Spielers */
   won(payoutLamports: string | bigint): string;
-  /** „Lost" in der Sprache des Spielers */
-  lost(): string;
+  /** „Lost" in der Sprache des Spielers — oder, wenn die Runde etwas
+   *  zurückgab, ohne netto zu gewinnen, „Back: 0.40 ◎". Module reichen deshalb
+   *  `outcome.payoutLamports` durch: `win ? fmt.won(p) : fmt.lost(p)`. */
+  lost(payoutLamports?: string | bigint | null): string;
   /** „≈ 17,40 €" — oder `null`, wenn die Näherung entfallen muss (Regel 15).
    *  Dann rendert das Modul NICHTS, keinen Platzhalter. */
   fiat(lamports: string | bigint): string | null;

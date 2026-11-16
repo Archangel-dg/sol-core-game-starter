@@ -100,7 +100,11 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, pending = f
         mult: (bps) => `${(Number(bps ?? 0) / 10000).toFixed(2)}×`,
         sol: (lamports) => (lamports == null ? '0' : toSol(lamports)),
         won: (payout) => live.current.t('reveal.won', { amount: toSol(payout) }),
-        lost: () => live.current.t('result.lost'),
+        // Teil-Rückzahlung (Auszahlung > 0, aber kein Netto-Gewinn): ruhig „Zurück: X".
+        lost: (payout) =>
+          payout != null && String(payout) !== '0' && String(payout) !== ''
+            ? live.current.t('result.back', { amount: toSol(payout) })
+            : live.current.t('result.lost'),
         fiat: (lamports) => live.current.format(lamports),
       },
     }),

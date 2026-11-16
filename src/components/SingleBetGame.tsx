@@ -16,6 +16,8 @@ import { RouletteBoard, spotKey, type RouletteSpot } from './RouletteBoard';
 import { MaxBetPick } from './BetLimitHint';
 import { FiatHint } from './FiatHint';
 import { useSound } from '@/lib/sounds';
+import { randomHexSeed } from '@/lib/seed';
+import { outcomeTone, type OutcomeTone } from '@/lib/outcome';
 
 export interface RoundLog {
   /** Einsatz in Lamports (Anzeige in der Runden-Historie). */
@@ -65,7 +67,12 @@ const REVEAL_BACKSTOP_MS = 5_000;
  *  Ergebnis plus Einsatz, Runden-ID und die Engine-Geometrie. */
 interface RoundOutcome {
   roundId: string;
+  /** Netto-Urteil (lib/outcome.ts): nur wahr, wenn die Auszahlung über
+   *  Einsatz + Gebühren liegt. Darauf hören Jubel, Gewinnfarbe und Ton. */
   win: boolean;
+  /** Spielgeschehen laut Server (`result.win` der API, je Spielart
+   *  verschieden) — für die Szene, nie für Jubel. */
+  hit: boolean;
   multiplierBps: number;
   payoutLamports: string;
   roll: number | null;
@@ -115,7 +122,7 @@ export function SingleBetGame({
    * (Runden-ID), damit eine Meldung immer IHRE Runde freigibt und nie „die
    * letzte" annimmt.
    */
-  const pendingReveal = useRef(new Map<string, { win: boolean; log: RoundLog }>());
+  const pendingReveal = useRef(new Map<string, { tone: OutcomeTone; log: RoundLog }>());
   /** Läuft gerade eine Animation? Solange ja, bleibt „Spielen" gesperrt: Die
    *  nächste Runde darf erst starten, wenn diese sichtbar entschieden ist. */
   const [revealing, setRevealing] = useState(false);
@@ -204,6 +211,9 @@ export function SingleBetGame({
         playerWallet: wallet,
         betLamports: betLamports.toString(),
         params,
+        // Eigener Seed je Runde: Der Spieler bestimmt das Ergebnis mit (Provably
+        // Fair), und nur so zählt eine Demo-Runde für die Echtgeld-Freischaltung.
+        clientSeed: randomHexSeed(),
       };
       const r = demo
         ? await fetch(`${apiBase}/play`, {
@@ -224,11 +234,16 @@ export function SingleBetGame({
       // Animation es zeigt. Der Saldo friert sofort ein (Backstop 10 s, siehe
       // freezeUntil), Ton und Verlaufseintrag warten in pendingReveal.
       freezeUntil(Date.now() + REVEAL_BACKSTOP_MS);
+      // Netto entscheidet (lib/outcome.ts): `result.win` heißt bei Slots, Keno
+      // und Rubbellos schon „Auszahlung > 0". Gefeiert wird erst über Einsatz +
+      // Gebühren; fehlt die Belastung (alter Server), zählt wenigstens der Einsatz.
+      const tone = outcomeTone(r.result.payoutLamports, r.fees?.totalChargeLamports ?? betLamports.toString());
+      const win = tone === 'win';
       pendingReveal.current.set(r.roundId, {
-        win: r.result.win,
+        tone,
         log: {
           betLamports: betLamports.toString(),
-          win: r.result.win,
+          win,
           multiplierBps: r.result.multiplierBps,
           payoutLamports: r.result.payoutLamports,
           roundId: r.roundId,
@@ -237,7 +252,8 @@ export function SingleBetGame({
       setRevealing(true);
       setResult({
         roundId: r.roundId,
-        win: r.result.win,
+        win,
+        hit: r.result.win === true,
         multiplierBps: r.result.multiplierBps,
         payoutLamports: r.result.payoutLamports,
         roll: r.result.roll,
@@ -265,7 +281,8 @@ export function SingleBetGame({
       setRevealing(false);
       release();
       if (!p) return;
-      sfx(p.win ? 'win' : 'lose');
+      // Teil-Rückzahlung: kein Gewinnton, nur ein leiser Abschluss-Klick.
+      sfx(p.tone === 'win' ? 'win' : p.tone === 'partial' ? 'click' : 'lose');
       onLog(p.log);
       if (demo) void refreshDemoBalance();
     },

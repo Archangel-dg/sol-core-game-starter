@@ -24,6 +24,11 @@ Frag im Creator-Dashboard oder beim Betreiber nach:
   auf Mainnet nicht),
 - ob dein Spiel für Echtgeld **freigeschaltet** ist (jede Engine wird einzeln
   freigegeben),
+- ob deine API schon **Echtgeld annimmt**: Neue APIs starten seit dem
+  14.11.2026 als Sandbox (nur Demo mit Spielgeld) und schalten sich **selbst
+  frei**, sobald 10 Demo-Runden jede Selbstprüfung bestanden haben. Was noch
+  fehlt, zeigt die Prüfliste auf der Seite der API in der Konsole. Danach gilt
+  sieben Tage lang der halbe Höchsteinsatz,
 - der **API-URL**, falls sie sich für Mainnet unterscheidet.
 
 ---
@@ -116,6 +121,7 @@ Der Faucet-Hinweis in der Oberfläche verschwindet automatisch, sobald
 - [ ] Alle vier Variablen in Vercel für **Production** gesetzt
 - [ ] **Neuer Build** ausgelöst (nicht nur Redeploy)
 - [ ] Deine Engine ist für Echtgeld freigeschaltet
+- [ ] 10 Demo-Runden gespielt — mit eigenem Spieler-Seed (die Vorlage schickt ihn seit dem 14.11.2026 mit), eine davon über die Prüfseite nachgeprüft, die Spieler-Anmeldung einmal getestet; die Prüfliste in der Konsole ist grün und die API hat sich selbst freigeschaltet
 - [ ] Mit **eigenem** Geld getestet: Einzahlung, eine Runde, Auszahlung
 - [ ] Das Netzwerk-Abzeichen in deinem Spiel zeigt „Mainnet"
 
@@ -134,7 +140,9 @@ scheitert, kostet dich das Vertrauen, das du gerade aufbaust.
 | Abzeichen zeigt „Devnet" trotz Mainnet-Werten | alter Build — neu bauen, nicht nur redeployen |
 | Einzahlung kommt nie an | falsche Programm-ID (Devnet-ID auf Mainnet) |
 | Sporadische RPC-Fehler unter Last | öffentlicher RPC-Endpunkt — eigenen einrichten |
-| Wetten werden abgelehnt | Engine nicht für Echtgeld freigeschaltet |
+| Wetten werden abgelehnt (`API-206`) | Engine nicht für Echtgeld freigeschaltet |
+| Wetten werden abgelehnt (`API-207`) | deine API ist noch in der Sandbox — die Prüfliste in der Konsole zeigt, was fehlt |
+| Demo-Runden zählen nicht für die Freischaltung | alte Vorlage ohne Spieler-Seed — `SingleBetGame.tsx`/`SessionGame.tsx` aktualisieren |
 
 Weiterführend: [`DEPLOY.md`](./DEPLOY.md) für das Deployment allgemein,
 [`API-REFERENCE.md`](./API-REFERENCE.md) für die Endpunkte,

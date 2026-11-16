@@ -212,6 +212,9 @@ export const STRINGS = {
     ru: 'Выигрыш! Выплата {amount} ◎',
   },
   'result.lost': { en: 'Lost', de: 'Verloren', fr: 'Perdu', ru: 'Проигрыш' },
+  // Teil-Rückzahlung (lib/outcome.ts): etwas kam zurück, aber weniger als die
+  // Runde gekostet hat — ruhig benannt, kein „Gewonnen".
+  'result.back': { en: 'Back: {amount} ◎', de: 'Zurück: {amount} ◎', fr: 'Retour : {amount} ◎', ru: 'Возврат: {amount} ◎' },
 
   // ── Reveal-Module (src/reveals/*.js) — gemeinsame Schlüssel ──────────────
   // Die Endbild-Zeile jeder Animation. Kurz, weil sie in ein Quadrat passen

@@ -53,18 +53,19 @@ function tone({ freq, freqTo = freq, dur, type = 'sine', attack = 0.005, gain = 
 }
 
 /** Mischt Töne an Startzeiten (Sekunden) zusammen. */
-function mix(parts, totalDur) {
+function mix(parts, totalDur, level = 0.8) {
   const n = Math.round(totalDur * RATE);
   const out = new Float64Array(n);
   for (const { at, buf } of parts) {
     const off = Math.round(at * RATE);
     for (let i = 0; i < buf.length && off + i < n; i++) out[off + i] += buf[i];
   }
-  // Normalisieren auf 0,8 und weich begrenzen — kein Clipping, egal wie viele
-  // Stimmen sich überlagern.
+  // Normalisieren auf `level` (Standard 0,8) und weich begrenzen — kein
+  // Clipping, egal wie viele Stimmen sich überlagern. Ein kleinerer `level`
+  // macht einen Klang leiser als die anderen (der Verlust, 16.11.2026).
   let peak = 0;
   for (const v of out) peak = Math.max(peak, Math.abs(v));
-  const k = peak > 0 ? 0.8 / peak : 1;
+  const k = peak > 0 ? level / peak : 1;
   for (let i = 0; i < n; i++) out[i] = Math.tanh(out[i] * k * 1.2) / Math.tanh(1.2);
   return out;
 }
@@ -122,14 +123,19 @@ const SOUNDS = {
       })),
       0.65,
     ),
-  // Verlust: zwei fallende Töne, etwas dumpf
+  // Verlust (16.11.2026): drei weiche, fallende Töne G5–D5–C5 — in derselben
+  // Lage wie der Gewinn und leiser als er. Ein verlorener Einsatz ist ein
+  // Ausgang, kein Fehler: nicht der tiefe, dumpfe Klang von früher, nichts
+  // Bestrafendes (Wissen: klang-semantik, gefuehl-verluste).
   lose: () =>
     mix(
       [
-        { at: 0, buf: tone({ freq: 330, freqTo: 250, dur: 0.22, type: 'triangle', decay: 1 }) },
-        { at: 0.2, buf: tone({ freq: 220, freqTo: 160, dur: 0.3, type: 'triangle', decay: 1 }) },
+        { at: 0, buf: tone({ freq: 783.99, dur: 0.16, type: 'sine', attack: 0.008, decay: 1.6, gain: 0.7 }) },
+        { at: 0.12, buf: tone({ freq: 587.33, dur: 0.18, type: 'sine', attack: 0.008, decay: 1.6, gain: 0.7 }) },
+        { at: 0.26, buf: tone({ freq: 523.25, dur: 0.34, type: 'sine', attack: 0.01, decay: 1.1, gain: 0.8 }) },
       ],
-      0.55,
+      0.62,
+      0.4,
     ),
   // Cashout: Kassenklang — zwei helle Töne plus Glitzer
   cashout: () =>

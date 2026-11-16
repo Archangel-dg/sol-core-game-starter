@@ -15,7 +15,7 @@
 export const reveal = {
   key: 'keno',
   mechanic: 'single',
-  strings: ['reveal.won', 'result.lost', 'reveal.keno.hits', 'reveal.keno.hint', 'reveal.keno.sub'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.keno.hits', 'reveal.keno.hint', 'reveal.keno.sub'],
 
   mount(root, ctx) {
     const C = 'sca-keno';
@@ -156,7 +156,7 @@ export const reveal = {
         for (let i = 0; i < drawn.length; i++) drawBall(drawn[i], isHit[i], 1);
         setHits(hitsFinal, picks.length, hitsFinal > 0);
         outMult.textContent = ctx.fmt.mult(o.multiplierBps);
-        outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+        outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
         outFiat.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
         outSub.textContent = ctx.text('reveal.keno.sub', { hits: hitsFinal, picks: picks.length, drawn: drawn.length });
         wrap.classList.add(o.win ? C + '-win' : C + '-loss');

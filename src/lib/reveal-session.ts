@@ -22,6 +22,7 @@
  */
 
 import type { SessionView, TournamentRunView } from '@/lib/solcore';
+import { outcomeTone, sessionCharge } from '@/lib/outcome';
 
 export interface SpinRecord {
   outcome: { kind: 'tower' | 'joker' | 'nothing' | 'fail'; tower?: number };
@@ -143,13 +144,17 @@ export function sessionOutcome(engineKey: string, view: SessionView, tr: Session
   const busted = view.status === 'busted';
   const payout = view.payoutLamports ?? '0';
   const h = (i: number): number => tr.history[i] ?? tr.history[tr.history.length - 1] ?? view.multiplierBps ?? 10000;
+  // Netto-Urteil (lib/outcome.ts): ein Gewinn erst über Einsatz + Gebühren.
+  const netWin = view.status !== 'active' && outcomeTone(payout, sessionCharge(view, tr.betLamports)) === 'win';
   const common = {
     sessionId: view.sessionId,
     betLamports: tr.betLamports,
     status: view.status,
     multiplierBps: view.multiplierBps ?? view.returnBps ?? 0,
     payoutLamports: payout,
-    win: view.status === 'cashed_out' && payout !== '0',
+    win: netWin,
+    // Spielgeschehen: Auszahlung genommen (Cashout oder Ziel erreicht).
+    hit: view.status === 'cashed_out' && payout !== '0',
     capped: view.capped === true,
   };
   switch (engineKey) {
@@ -243,8 +248,10 @@ export function sessionOutcome(engineKey: string, view: SessionView, tr: Session
         securedBps: view.securedBps ?? 0,
         multiplierBps: view.returnBps ?? 0,
         payoutLamports: payout,
-        // Gesichertes zahlt auch nach einem FAIL — „gewonnen" heißt hier: es kam Geld zurück.
-        win: view.status !== 'active' && payout !== '0',
+        // Gesichertes zahlt auch nach einem FAIL — gewonnen ist es aber erst, wenn
+        // es mehr ist, als alle Spins gekostet haben; sonst ruhig „Zurück".
+        win: netWin,
+        hit: view.status !== 'active' && payout !== '0',
       };
     default:
       return null;

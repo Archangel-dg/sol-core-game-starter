@@ -15,7 +15,7 @@
 export const reveal = {
   key: 'dice',
   mechanic: 'single',
-  strings: ['reveal.won', 'result.lost', 'reveal.dice.over', 'reveal.dice.under', 'reveal.dice.chance'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.dice.over', 'reveal.dice.under', 'reveal.dice.chance'],
 
   mount(root, ctx) {
     const NS = 'http://www.w3.org/2000/svg';
@@ -134,12 +134,13 @@ export const reveal = {
     // The readout is written only here — the needle has stopped.
     const finish = (o) => {
       const win = !!o.win;
+      const hit = o.hit ?? win; // Spielgeschehen: lag der Wurf in der Gewinnzone?
       box.setAttribute('data-tone', win ? 'win' : 'loss');
       big.setAttribute('class', 'sca-dice-big');
-      zoneWin.setAttribute('fill-opacity', win ? 0.8 : 0.1);
-      zoneLoss.setAttribute('fill-opacity', win ? 0 : 0.55);
+      zoneWin.setAttribute('fill-opacity', hit ? 0.8 : 0.1);
+      zoneLoss.setAttribute('fill-opacity', hit ? 0 : 0.55);
       mult.textContent = ctx.fmt.mult(o.multiplierBps);
-      out.textContent = win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+      out.textContent = win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
       fiat.textContent = (win && ctx.fmt.fiat(o.payoutLamports)) || '';
     };
     const idle = () => {

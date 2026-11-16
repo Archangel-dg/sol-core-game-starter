@@ -24,7 +24,7 @@ export const reveal = {
   mechanic: 'single',
   strings: [
     'reveal.won',
-    'result.lost',
+    'result.lost', 'result.back',
     'coinflip.you',
     'coinflip.idle',
     'coinflip.roll',
@@ -168,7 +168,7 @@ export const reveal = {
         apply(target, 0);
         // the readout is written only now — the coin has landed
         outMult.textContent = ctx.fmt.mult(o.multiplierBps);
-        outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+        outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
         outFiat.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
         const parts = [];
         if (typeof o.roll === 'number' && isFinite(o.roll)) parts.push(ctx.text('coinflip.roll', { roll: o.roll.toFixed(2) }));

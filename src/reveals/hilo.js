@@ -19,7 +19,7 @@
 export const reveal = {
   key: 'hilo',
   mechanic: 'session',
-  strings: ['reveal.won', 'result.lost', 'reveal.hilo.title', 'reveal.hilo.idle', 'reveal.step', 'reveal.tie', 'reveal.equal', 'reveal.bustedStep', 'reveal.cashedSteps', 'reveal.capped', 'session.higher', 'session.lower'],
+  strings: ['reveal.won', 'result.lost', 'result.back', 'reveal.hilo.title', 'reveal.hilo.idle', 'reveal.step', 'reveal.tie', 'reveal.equal', 'reveal.bustedStep', 'reveal.cashedSteps', 'reveal.capped', 'session.higher', 'session.lower'],
 
   mount(root, ctx) {
     const C = 'sca-hilo';
@@ -194,9 +194,9 @@ export const reveal = {
     };
     const fillReadout = (o, n) => {
       outMult.textContent = ctx.fmt.mult(o.multiplierBps);
-      outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost();
+      outRes.textContent = o.win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
       outFiat.textContent = (o.win && ctx.fmt.fiat(o.payoutLamports)) || '';
-      outNote.textContent = o.win
+      outNote.textContent = (o.hit ?? o.win)
         ? ctx.text('reveal.cashedSteps', { n }) + (o.capped ? ' · ' + ctx.text('reveal.capped') : '')
         : ctx.text('reveal.bustedStep', { n: Math.max(1, n) });
     };

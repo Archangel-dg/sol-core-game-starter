@@ -210,9 +210,9 @@ export const samples = [
     },
   },
   {
-    name: 'Reel strips · stacked win',
+    name: 'Reel strips · stacked line, 0.8× back',
     outcome: {
-      win: true, multiplierBps: 8000, payoutLamports: '80000000', roll: null, betLamports: '100000000',
+      win: false, hit: true, multiplierBps: 8000, payoutLamports: '80000000', roll: null, betLamports: '100000000',
       engineConfig: cfgStrips,
       details: { grid: gridStrips, lineWins: [{ line: 1, symbol: 'ace', count: 3, payBps: 8000 }], scatterCount: 0, scatterPayBps: 0 },
     },

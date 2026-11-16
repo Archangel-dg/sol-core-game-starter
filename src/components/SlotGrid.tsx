@@ -190,11 +190,20 @@ export function SlotGrid({
         )}
       </div>
       <div className="mt-3 text-center">
-        <div className={`text-2xl font-bold tabular-nums ${win ? 'text-accent' : 'text-red-400'}`}>
+        {/* `win` ist netto (lib/outcome.ts): eine kleinere Auszahlung heißt ruhig „Zurück". */}
+        <div
+          className={`text-2xl font-bold tabular-nums ${
+            win ? 'text-accent' : payoutLamports && payoutLamports !== '0' ? 'text-white/80' : 'text-red-400'
+          }`}
+        >
           {((multiplierBps ?? 0) / 10000).toFixed(2)}×
         </div>
         <div className="mt-0.5 text-sm text-white/70">
-          {win ? t('result.won', { amount: toSol(payoutLamports ?? '0') }) : t('result.lost')}
+          {win
+            ? t('result.won', { amount: toSol(payoutLamports ?? '0') })
+            : payoutLamports && payoutLamports !== '0'
+              ? t('result.back', { amount: toSol(payoutLamports) })
+              : t('result.lost')}
         </div>
         {(lineWins.length > 0 || wayWins.length > 0 || sumWins.length > 0 || scatterPayBps > 0) && (
           <div className="mt-1 text-xs text-white/40">

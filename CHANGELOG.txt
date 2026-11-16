@@ -1,6 +1,44 @@
 CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
+2026-11-16 — Only a net win is a win; a calmer loss sound
+- `win` in every outcome is now the NET verdict: true only when the payout exceeds stake plus
+  fees (`src/lib/outcome.ts`). The API's own `result.win` means different things per engine
+  (slots, keno, scratch: already when anything is paid; plinko, wheel: from 1×), so a round that
+  paid back 0.18× used to play the win sound, say "Won +…" and turn green — a loss disguised as
+  a win. Now such a partial return reads "Back: 0.018 ◎" (`result.back`, four languages), gets a
+  quiet click instead of the win sound, no win colour and no win toast. Sessions too: an early
+  cash-out below the total charge no longer plays the cash register.
+- New field `hit` = what happened in the game (the server's `result.win`, a taken cash-out).
+  Reveal modules use it for the scene — scratch prize row, "cashed out at step N" notes, dice win
+  zone, limbo caption — and `win` for money: readout, colour, fiat, count-up. `ctx.fmt.lost(payout)`
+  writes "Back" by itself; all 17 modules pass the payout, fixtures cover the partial returns.
+- Sessions read `totalChargeLamports` (classic sessions, API since 16.11.2026) or
+  `totalChargePerSpinLamports × spins` (spin-tower-pro); the history shows the real stake.
+- Loss sound: three soft falling notes G5–D5–C5 in the same register as the win, about 8 dB
+  quieter — no longer the low, dull tones. `npm run generate-sounds` rebuilds it (`mix()` takes a
+  level now).
+- Update your copy: `src/lib/outcome.ts` (new), `SingleBetGame.tsx`, `SessionGame.tsx`,
+  `lib/reveal-session.ts`, `RevealHost.tsx`, `ResultView.tsx`, `SlotGrid.tsx`, `History.tsx`,
+  `lib/strings.ts`, `lib/reveal.ts`, your reveal modules, `public/sounds/lose.wav`.
+2026-11-14 — Client seed on every round; real money switches on automatically
+- Single bets (`/play`) and session starts (`/session/start`) now always send a fresh
+  client seed from the browser (`src/lib/seed.ts`), in demo and with real money. The player
+  helps decide the result (provably fair) instead of the server filling in a seed.
+- Why it matters: since 14.11.2026 a sandbox API switches on real money by itself once
+  10 demo rounds have passed every self-check, and a round only counts when it carries a client
+  seed from the game, a different one each time. Older copies of the template play fine but
+  never collect those 10 rounds — update `SingleBetGame.tsx` and `SessionGame.tsx`.
+- `docs/mainnet-migration.md`: the checklist and troubleshooting table describe the automatic
+  switch-on (10 checked demo rounds, one of them checked on the verify page, player sign-in tested
+  once) and the 7-day ramp-up with half the max bet.
+
+2026-11-14 — Docs: real money per API (sandbox until switched on in the console)
+- `docs/mainnet-migration.md`: new APIs start as a sandbox (demo with play money only) since
+  14.11.2026; the checklist now includes "play a demo round and switch on real money for your
+  API in the console", and the troubleshooting table tells `API-206` (engine not cleared) apart
+  from `API-207` (API still in the sandbox).
+
 
 2026-10-26 — Slot reveal: optional line numbers next to the reels
 - `slots-modular` draws the numbered payline badges left and right of the reels ONLY when the

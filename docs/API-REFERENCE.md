@@ -87,8 +87,16 @@ on `usePlayer().demo` and use `moneyFetch` only on the real-money path.
 `POST /api/game/bet` (X-API-Key + `Authorization: Bearer <player token>`)
 ```json
 { "gameId": "<uuid>", "playerWallet": "<base58>", "betLamports": "100000000",
-  "params": { …per engine, see ENGINES.md… }, "clientSeed": "optional" }
+  "params": { …per engine, see ENGINES.md… }, "clientSeed": "optional",
+  "idempotencyKey": "optional, 8–64 chars [A-Za-z0-9_-]" }
 ```
+**Retries — `idempotencyKey`.** Send a fresh key with every bet (a UUID per click) and the SAME key when you
+retry that bet after a timeout, a network error or `API-500`. Sol-Core then never books a second round: a
+finished bet returns the same response, a bet whose outcome stayed open is settled with the same nonce exactly
+once, and while the first attempt is still running you get `API-316` (wait a moment, retry with the same key).
+Reusing a key for a different bet (other `betLamports` or `params`) is refused with `API-317`. Keys are kept
+for 24 hours. **Without a key every request is a new bet** — never retry blindly; check the round first.
+The template does all of this in `SingleBetGame` (`openBet`) and `app/api/play/route.ts`.
 Response:
 ```json
 { "roundId": "…",
@@ -340,7 +348,9 @@ them knew the crash block (API-820…827). The table below is the overview, not 
 | API-402 | 401 | player token missing/invalid/expired | reconnect wallet |
 | API-310 | 423 | withdrawals paused (nothing was debited) | notice |
 | API-311 | 400 | below minimum withdrawal (full balance always allowed) | notice |
-| API-500 | 5xx | server error | retry |
+| API-316 | 409 | this bet (`idempotencyKey`) is still being settled | wait, retry with the SAME key |
+| API-317 | 422 | `idempotencyKey` belongs to a different bet | new key, place the bet again |
+| API-500 | 5xx | server error — the outcome may be open | retry with the SAME `idempotencyKey` (never without one) |
 
 PvP-specific (API-7xx): `API-700` lobby not found / not a member · `API-701` lobby full ·
 `API-702` lobby expired · `API-703` wrong PIN · `API-704` already in another lobby (details

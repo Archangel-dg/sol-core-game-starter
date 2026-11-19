@@ -12,6 +12,7 @@ export async function POST(req: Request) {
       betLamports?: string;
       params?: Record<string, unknown>;
       clientSeed?: string;
+      idempotencyKey?: string;
     };
     if (!body.playerWallet || !body.betLamports) {
       return NextResponse.json({ error: { code: 'API-204' } }, { status: 400 });
@@ -25,6 +26,8 @@ export async function POST(req: Request) {
         betLamports: body.betLamports,
         params: body.params ?? {},
         clientSeed: body.clientSeed,
+        // Wiederholungsschutz: unverändert durchreichen — dieselbe Wette, derselbe Schlüssel.
+        ...(typeof body.idempotencyKey === 'string' ? { idempotencyKey: body.idempotencyKey } : {}),
       },
       playerTokenFrom(req),
     );

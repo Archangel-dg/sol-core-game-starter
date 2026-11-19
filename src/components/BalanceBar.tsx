@@ -9,7 +9,6 @@ import { toSol, solToLamports } from '@/lib/lamports';
 import { useBalanceFreeze } from '@/lib/balance-freeze';
 import { usePlayerAuth } from '@/lib/player-auth';
 import { txFehlerText } from '@/lib/tx-fehler';
-import { PLAYER_PROFILE_URL } from '@/lib/links';
 import { Popover } from './Popover';
 import { useFiat } from '@/lib/fiat';
 import { FiatSwitch } from './FiatSwitch';
@@ -196,15 +195,8 @@ export function BalanceBar({ devMock }: { devMock: boolean }) {
           </button>
         </div>
         {msg && <p className="text-xs text-white/60">{msg}</p>}
-        <a
-          href={PLAYER_PROFILE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs text-white/70 hover:border-accent/40 hover:text-white"
-        >
-          <span>{t('menu.history')}</span>
-          <span aria-hidden>↗</span>
-        </a>
+        {/* Bis 19.11.2026 stand hier ein Link „History" auf das Spieler-Profil von sol-win.net. Die Seite gibt
+            es nicht mehr; die Runden dieses Spiels zeigt das Spiel selbst. */}
       </div>
     </Popover>
   );

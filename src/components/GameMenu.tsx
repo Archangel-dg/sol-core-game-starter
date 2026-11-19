@@ -209,7 +209,7 @@ export function GameMenu({ history, serverSeedHash, roundId, verifierUrl }: Game
             )}
           </div>
 
-          {/* Zur Plattform — alle Spiele, ein Konto je Wallet. */}
+          {/* Zum Game Index — die Bibliothek aller Spiele auf Sol-Core (bis 19.11.2026: sol-win.net). */}
           <div className={sectionCls}>
             <a
               href={PLATFORM_URL}

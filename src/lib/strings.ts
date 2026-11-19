@@ -1197,7 +1197,7 @@ export const STRINGS = {
     en: 'Heads or tails — 50/50 with a house edge.',
     de: 'Kopf oder Zahl — 50/50 mit House-Edge.',
     fr: 'Pile ou face — 50/50 avec avantage de la maison.',
-    ru: 'Орёл или решка — 50/50 с преимуществом казино.',
+    ru: 'Орёл или решка — 50/50 с преимуществом заведения.',
   },
   'engine.coin-flip.inputs': {
     en: 'Pick heads or tails, set your stake — one click.',
@@ -1750,7 +1750,7 @@ export const STRINGS = {
     en: 'Player vs player: a coin flip for the whole pot — 50/50, no house edge.',
     de: 'Spieler gegen Spieler: Münzwurf um den ganzen Pot — 50/50, kein House-Edge.',
     fr: 'Joueur contre joueur : pile ou face pour tout le pot — 50/50, sans avantage de la maison.',
-    ru: 'Игрок против игрока: подбрасывание монеты за весь банк — 50/50, без преимущества казино.',
+    ru: 'Игрок против игрока: подбрасывание монеты за весь банк — 50/50, без преимущества заведения.',
   },
   'engine.pvp-coinflip.inputs': {
     en: 'Create a lobby with a stake (optionally PIN-locked) or join an open lobby. Both press “Ready”; the server then flips the coin.',

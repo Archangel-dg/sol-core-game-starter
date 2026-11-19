@@ -1,6 +1,16 @@
 CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
+2026-11-19 — Retrying a bet never books it twice
+- A single bet now carries an `idempotencyKey` (new per bet, the SAME on a retry). If the answer got lost
+  (network, `API-500`), the next click with the same stake and choices sends the same key and seed, and Sol-Core
+  returns that round instead of booking a second one (`SingleBetGame`, `openBet`; `lib/seed.ts` `newBetKey`).
+- `app/api/play/route.ts` and `lib/solcore.ts` pass the key through unchanged.
+- New codes `API-316` (still being settled — wait, retry with the same key) and `API-317` (key belongs to another
+  bet). `API-500` now says: retry only with the same key. docs/API-REFERENCE.md, section “Single bet”.
+- The error catalogue snapshot (`lib/error-catalog.generated.ts`) is regenerated from the server.
+- The game menu’s “Explore more games” opens the Game Index (sol-core.com/game-index); the “History” link to the
+  sol-win.net profile is gone — sol-win.net now redirects to score.rip.
 2026-11-16 — Only a net win is a win; a calmer loss sound
 - `win` in every outcome is now the NET verdict: true only when the payout exceeds stake plus
   fees (`src/lib/outcome.ts`). The API's own `result.win` means different things per engine

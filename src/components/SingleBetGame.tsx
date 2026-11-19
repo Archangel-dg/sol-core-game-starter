@@ -16,7 +16,7 @@ import { RouletteBoard, spotKey, type RouletteSpot } from './RouletteBoard';
 import { MaxBetPick } from './BetLimitHint';
 import { FiatHint } from './FiatHint';
 import { useSound } from '@/lib/sounds';
-import { randomHexSeed } from '@/lib/seed';
+import { newBetKey, randomHexSeed } from '@/lib/seed';
 import { outcomeTone, type OutcomeTone } from '@/lib/outcome';
 
 export interface RoundLog {
@@ -123,6 +123,10 @@ export function SingleBetGame({
    * letzte" annimmt.
    */
   const pendingReveal = useRef(new Map<string, { tone: OutcomeTone; log: RoundLog }>());
+  // Wiederholungsschutz (19.11.2026): die Echtgeld-Wette, deren Ausgang noch offen ist (Netz weg, Serverfehler,
+  // API-316). Der nächste Klick mit DENSELBEN Eingaben schickt denselben Schlüssel und Seed — Sol-Core gibt dann die
+  // Runde zurück, die vielleicht schon abgerechnet war, statt eine zweite zu buchen.
+  const openBet = useRef<{ key: string; bet: string; params: string; clientSeed: string } | null>(null);
   /** Läuft gerade eine Animation? Solange ja, bleibt „Spielen" gesperrt: Die
    *  nächste Runde darf erst starten, wenn diese sichtbar entschieden ist. */
   const [revealing, setRevealing] = useState(false);
@@ -207,13 +211,24 @@ export function SingleBetGame({
       } else {
         params = engine.buildSingleParams ? engine.buildSingleParams(values) : {};
       }
+      const betText = betLamports.toString();
+      const paramsText = JSON.stringify(params);
+      const open = openBet.current;
+      // Nur mit Echtgeld; dieselben Eingaben wie die offene Wette ⇒ dieselbe Wette.
+      const thisBet = demo
+        ? null
+        : open && open.bet === betText && open.params === paramsText
+          ? open
+          : { key: newBetKey(), bet: betText, params: paramsText, clientSeed: randomHexSeed() };
+      openBet.current = thisBet;
       const payload = {
         playerWallet: wallet,
-        betLamports: betLamports.toString(),
+        betLamports: betText,
         params,
         // Eigener Seed je Runde: Der Spieler bestimmt das Ergebnis mit (Provably
         // Fair), und nur so zählt eine Demo-Runde für die Echtgeld-Freischaltung.
-        clientSeed: randomHexSeed(),
+        clientSeed: thisBet?.clientSeed ?? randomHexSeed(),
+        ...(thisBet ? { idempotencyKey: thisBet.key } : {}),
       };
       const r = demo
         ? await fetch(`${apiBase}/play`, {
@@ -222,6 +237,10 @@ export function SingleBetGame({
             body: JSON.stringify(payload),
           }).then((x) => x.json())
         : await moneyFetch(`${apiBase}/play`, payload);
+      // Ausgang klar (Ergebnis oder klare Absage) ⇒ der Schlüssel ist verbraucht. Offen bleibt er nur nach einem
+      // Serverfehler (API-500) oder solange die erste Anfrage noch läuft (API-316); ein Netzfehler landet unten im catch
+      // und lässt ihn ebenfalls stehen.
+      if (!(r.error && (r.error.code === 'API-500' || r.error.code === 'API-316'))) openBet.current = null;
       if (r.error) {
         const details = r.error.details as Record<string, unknown> | undefined;
         const reason = typeof details?.reason === 'string' ? details.reason : undefined;

@@ -16,3 +16,12 @@ export function randomHexSeed(): string {
   crypto.getRandomValues(b);
   return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 }
+
+/**
+ * Schlüssel einer Wette für den Wiederholungsschutz (`idempotencyKey`, seit 19.11.2026): je Wette neu, bei einer
+ * Wiederholung DERSELBE — dann gibt Sol-Core die Runde zurück, statt eine zweite zu buchen. 32 Hex-Zeichen passen zur
+ * Form, die der Server verlangt (8–64 Zeichen aus A–Z, a–z, 0–9, `_`, `-`).
+ */
+export function newBetKey(): string {
+  return randomHexSeed();
+}

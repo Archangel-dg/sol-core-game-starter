@@ -140,6 +140,8 @@ export function placeBet(
     betLamports: string;
     params: Record<string, unknown>;
     clientSeed?: string;
+    /** Wiederholungsschutz: je Wette neu, bei einer Wiederholung derselbe (docs/API-REFERENCE.md, „Single bet"). */
+    idempotencyKey?: string;
   },
   playerToken?: string,
 ): Promise<BetResult> {

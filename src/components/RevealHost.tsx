@@ -6,7 +6,14 @@ import type { StringKey } from '@/lib/strings';
 import { toSol } from '@/lib/lamports';
 import { useFiat } from '@/lib/fiat';
 import { isReducedMotion, useMotion } from '@/lib/motion';
-import { loadReveal, type RevealContext, type RevealController, type RevealModule, type RevealPickOptions } from '@/lib/reveal';
+import {
+  loadReveal,
+  type RevealContext,
+  type RevealController,
+  type RevealHoldOptions,
+  type RevealModule,
+  type RevealPickOptions,
+} from '@/lib/reveal';
 
 /**
  * ██ GESTALTUNGSZONE ██ — hängt das Reveal-Modul einer Engine ins Spielfeld.
@@ -24,6 +31,7 @@ import { loadReveal, type RevealContext, type RevealController, type RevealModul
  *  5. reicht die Feld-Auswahl (`pick`) an Module weiter, die einen Rückkanal
  *     anbieten, und meldet über `onPickSupport`, OB dieses Modul einen hat —
  *     daran entscheidet der Flow, ob er seine eigene Ersatz-Auswahl zeigt.
+ *     Dasselbe für die Halte-Auswahl von video-poker (`holds`/`onHoldSupport`).
  *
  * Zu 5. gehört eine Ehrlichkeit, die leicht verlorengeht: `onPickSupport(false)`
  * kommt auch dann, wenn das Modul gar nicht erst geladen hat (Netzfehler,
@@ -66,12 +74,20 @@ export interface RevealHostProps {
    * Ausbau. `false` heißt: der Aufrufer muss seine eigene Auswahl zeigen.
    */
   onPickSupport?: (supported: boolean) => void;
+  /**
+   * Halte-Auswahl auf dem Brett (video-poker) — nur Module mit `setHolds`
+   * verwenden sie. Wie `pick`: darf bei jedem Render neu entstehen, weiter-
+   * gereicht wird nur ein geänderter INHALT (`enabled` + gehaltene Stellen).
+   */
+  holds?: RevealHoldOptions | null;
+  /** Kann dieses Modul Karten halten lassen? `false` ⇒ der Flow zeigt eigene Knöpfe. */
+  onHoldSupport?: (supported: boolean) => void;
   /** Übersetzte Kurzbeschreibung der Engine für den Leerlauf (siehe RevealContext.hint). */
   hint?: string | null;
   className?: string;
 }
 
-export function RevealHost({ engineKey, engineConfig, outcome, from, pending = false, onRevealed, pick = null, onPickSupport, hint = null, className = '' }: RevealHostProps) {
+export function RevealHost({ engineKey, engineConfig, outcome, from, pending = false, onRevealed, pick = null, onPickSupport, holds = null, onHoldSupport, hint = null, className = '' }: RevealHostProps) {
   const t = useT();
   const { format } = useFiat();
   const { enabled: motionOn } = useMotion();
@@ -84,8 +100,8 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, pending = f
   // Alles Lebendige in einem Ref: Das Modul hält den Kontext einmal, ruft
   // aber `ctx.text(...)` erst beim Schreiben — so trifft ein Sprachwechsel
   // auch Beschriftungen, die nach dem Einbau entstehen.
-  const live = useRef({ t, format, engineConfig: engineConfig ?? null, onRevealed, hint, pick, onPickSupport });
-  live.current = { t, format, engineConfig: engineConfig ?? null, onRevealed, hint, pick, onPickSupport };
+  const live = useRef({ t, format, engineConfig: engineConfig ?? null, onRevealed, hint, pick, onPickSupport, holds, onHoldSupport });
+  live.current = { t, format, engineConfig: engineConfig ?? null, onRevealed, hint, pick, onPickSupport, holds, onHoldSupport };
 
   const ctx = useMemo<RevealContext>(
     () => ({
@@ -136,9 +152,11 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, pending = f
     // Kann dieses Modul bedient werden? Der Flow braucht die Antwort, BEVOR er
     // entscheidet, ob er seine Ersatz-Auswahl zeigt.
     live.current.onPickSupport?.(typeof ctl.setPick === 'function');
+    live.current.onHoldSupport?.(typeof ctl.setHolds === 'function');
     return () => {
       ctlRef.current = null;
       live.current.onPickSupport?.(false); // ausgebaut ⇒ nichts ist mehr bedienbar
+      live.current.onHoldSupport?.(false);
       ctl.destroy();
       // Nicht jedes Modul räumt seine Knoten selbst weg — der Host tut es
       // immer, sonst stapeln sich im Dev-Strict-Mode zwei Bretter übereinander.
@@ -208,6 +226,28 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, pending = f
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickKey, mounted]);
+
+  // 3d. Halte-Kanal (video-poker) — dieselbe Signatur-Regel wie beim Rückkanal.
+  //     Läuft NACH dem Abspiel-Effekt: Kommt das Ergebnis des Ziehens im selben
+  //     Render wie das Abschalten der Auswahl, steht im Modul schon das Ergebnis
+  //     und `setHolds(null)` lässt dessen Marken stehen.
+  const holdsKey = holds ? `${holds.enabled}|${[...holds.held].sort((a, b) => a - b).join(',')}` : '';
+  useEffect(() => {
+    const ctl = ctlRef.current;
+    if (!ctl?.setHolds) return;
+    const h = live.current.holds;
+    if (!h) {
+      ctl.setHolds(null);
+      return;
+    }
+    ctl.setHolds({
+      enabled: h.enabled,
+      held: [...h.held],
+      // Frischer Handler aus dem Ref — die Auswahl ändert sich zwischen zwei Tipps.
+      onToggle: (i) => live.current.holds?.onToggle(i),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdsKey, mounted]);
 
   // 4. Sprachwechsel im Leerlauf: Beschriftungen neu zeichnen. Während einer
   //    Runde nicht — ein Neustart mitten im Flug wäre schlimmer als ein

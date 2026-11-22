@@ -14,9 +14,11 @@ import { useSound } from '@/lib/sounds';
 import { randomHexSeed } from '@/lib/seed';
 import { useT, type TFn } from '@/lib/i18n';
 import { RevealHost } from './RevealHost';
-import { hasReveal, type RevealPickOptions } from '@/lib/reveal';
+import { hasReveal, type RevealHoldOptions, type RevealPickOptions } from '@/lib/reveal';
 import { EMPTY_TRANSCRIPT, noteSessionStep, sessionOutcome, sessionStepCount, type SessionTranscript } from '@/lib/reveal-session';
 import { sessionTone } from '@/lib/outcome';
+import { handLabel, videoPokerRound, videoPokerTable } from '@/lib/video-poker';
+import { VideoPokerHoldCards, VideoPokerPaytable } from './VideoPokerParts';
 
 /** Woher eine Server-Antwort kommt — entscheidet über den Ton nach dem Reveal. */
 type Antwort = 'start' | 'step' | 'cashout' | 'reconnect';
@@ -256,6 +258,14 @@ function spinTowerInfo(
  * die Einsatz-Sperre ab dem ersten Spin (Feld wird read-only), der
  * Spin-Zähler gegen `maxSpins` und vor allem Pot (verlierbar) und Gesichertes
  * (FAIL-immun, zahlt erst am Rundenende) als ZWEI getrennte Zahlen.
+ *
+ * Halte-Schritte (`step.kind === 'holds'`, video-poker) haben genau EINEN Zug:
+ * Karten halten (reine Auswahl der Oberfläche, beliebig oft änderbar), dann
+ * „Ziehen" — der Server ersetzt den Rest und rechnet ab. Deshalb gibt es dort
+ * keinen Cashout-Knopf (der Server lehnt ihn ab), dafür die Auszahltabelle
+ * aus dem Engine-Echo mit der Hand, die gerade liegt. Gehalten wird auf dem
+ * Brett (Halte-Kanal des Moduls); ohne ein solches Modul zeigt das Bedienfeld
+ * das Blatt als eigene Knöpfe.
  */
 export function SessionGame({
   engine,
@@ -298,6 +308,13 @@ export function SessionGame({
   // Engines ohne Bedarf (mines) ignorieren den Parameter.
   const cfg = view?.engine?.config ?? engineConfig ?? null;
   const idxStep = sess.step.kind === 'index' ? sess.step : null;
+  // Halte-Schritt (video-poker): die Auswahl gehört der Oberfläche, bis
+  // „Ziehen" sie abschickt — sie ist kein Server-Zustand und wird deshalb mit
+  // jeder neuen Runde geleert (start/reconnect), nicht erst nach dem Austeilen:
+  // sonst stünde für einen Render die alte Auswahl auf dem neuen Blatt.
+  const holdStep = sess.step.kind === 'holds' ? sess.step : null;
+  const [held, setHeld] = useState<number[]>([]);
+  const [holdSupported, setHoldSupported] = useState(false);
   const bounds =
     idxStep &&
     (cfg && idxStep.boundsFrom ? idxStep.boundsFrom(cfg, view?.steps) : { min: idxStep.min, max: idxStep.max });
@@ -364,6 +381,7 @@ export function SessionGame({
       // nach — aber nur, wenn das Brett diese Session noch nicht zeigt. Läuft die
       // Abfrage mitten in einer bekannten Runde, wäre eine Wiederholung von vorn
       // ein Bruch im Spiel.
+      if (view?.sessionId !== v.sessionId) setHeld([]);
       pending.current = null;
       setView(v);
       finishIfEnded(v);
@@ -470,6 +488,7 @@ export function SessionGame({
   const start = async () => {
     if (!wallet) return;
     play('bet');
+    setHeld([]);
     const v = await call(`${apiBase}/session/start`, {
       playerWallet: wallet,
       betLamports: solToLamports(bet).toString(),
@@ -487,11 +506,17 @@ export function SessionGame({
     }
   };
 
-  const step = async (arg: { value?: number; guess?: GuessOption }) => {
+  const step = async (arg: { value?: number; guess?: GuessOption; holds?: readonly number[] }) => {
     if (!view) return;
     play('click');
     const v = await call(`${apiBase}/session/${view.sessionId}/step`, sess.buildStep(arg));
     if (v) deliver(v, 'step');
+  };
+
+  // Halten/Lösen einer Karte — nur Zustand der Oberfläche, kein Server-Aufruf.
+  const toggleHold = (i: number) => {
+    play('click');
+    setHeld((h) => (h.includes(i) ? h.filter((x) => x !== i) : [...h, i].sort((a, b) => a - b)));
   };
 
   const cashout = async () => {
@@ -541,6 +566,22 @@ export function SessionGame({
   // steps: Cashout erst ab Stufe 1 sinnvoll (der Server lehnt am Boden ohnehin
   // ab — nach einem Fall wäre `view.steps ≥ 1`, aber die Auszahlung 0).
   const cashoutBlocked = steps ? steps.rung < 1 : false;
+
+  // ── Halte-Schritt (video-poker) ────────────────────────────────────────────
+  // Tabelle und Paar-Schwelle 1:1 aus dem Engine-Echo; Blatt, Hand-Art und
+  // Auszahlung aus der Server-Sicht (`view` wird erst nach `onRevealed`
+  // gesetzt — die Hervorhebung in der Tabelle verrät also nichts vorab).
+  const vpTable = holdStep ? videoPokerTable(cfg) : null;
+  const vpRound = holdStep && view ? videoPokerRound(view.progress) : null;
+  const vpName = vpRound?.category && vpTable ? handLabel(vpRound.category, vpTable.minPairRank) : null;
+  const vpHandText = vpName ? t(vpName.key, vpName.vars) : '';
+  // Die Auswahl auf dem Brett: offen nur, solange die Runde läuft und weder
+  // eine Anfrage noch die Animation unterwegs ist (sonst ginge ein zweiter Zug
+  // gegen denselben Stand los).
+  const holdOpts: RevealHoldOptions | null =
+    animated && holdStep && view && view.status === 'active'
+      ? { enabled: !busy && !revealing, held, onToggle: toggleHold }
+      : null;
 
   // ── Engines mit Kosten je Schritt (spin-tower-pro) ────────────────────────
   // Alles hier ist an `sess.costPerStep` gehängt, nicht an einem Engine-Key:
@@ -708,9 +749,23 @@ export function SessionGame({
           max: maxSpins !== null ? `/${maxSpins}` : '',
           amount: toSol(view.potentialPayoutLamports),
         })}
+      {/* Halte-Schritt: kein „Schritt n · möglich X" — es gibt genau einen Zug.
+          Offen steht, was ausgeteilt liegt (mit Modul sagt das schon das Brett,
+          und die Tabelle hebt die Hand hervor); nach dem Ziehen die Endhand. */}
+      {active && holdStep && !animated &&
+        (vpRound?.category && vpRound.category !== 'none'
+          ? t('session.vp.dealt', { hand: vpHandText })
+          : t('session.vp.holdHint'))}
+      {ended && holdStep &&
+        `${vpHandText} · ${((view.multiplierBps ?? 0) / 10000).toFixed(2)}× · ${
+          view.payoutLamports && view.payoutLamports !== '0'
+            ? t('session.vp.paid', { amount: toSol(view.payoutLamports) })
+            : t('result.lost')
+        }`}
       {active &&
         !steps &&
         !costPerStep &&
+        !holdStep &&
         t('session.step', {
           // `steps` ist bei spin-tower-pro nicht gesetzt; dieser Zweig
           // laeuft ohnehin nur ohne costPerStep, der Rueckfall haelt
@@ -726,10 +781,13 @@ export function SessionGame({
             ? ` · ${t('session.failSecuredPaid', { amount: toSol(view.payoutLamports) })}`
             : ''
         }`}
-      {view.status === 'busted' && !costPerStep && t('session.busted')}
-      {view.status === 'cashed_out' &&
+      {view.status === 'busted' && !costPerStep && !holdStep && t('session.busted')}
+      {view.status === 'cashed_out' && !holdStep &&
         t('session.cashedOut', { amount: toSol(view.payoutLamports ?? '0') })}
     </div>
+    {ended && holdStep && vpRound?.autoDraw && (
+      <div className="mt-1 text-[11px] text-amber-300/80">{t('session.vp.autoDraw')}</div>
+    )}
     {active && steps?.lastFall && (
       <div className="mt-1 text-[11px] text-amber-300/80">
         {t('session.fell', { from: steps.lastFall.from, to: steps.lastFall.to })}
@@ -768,6 +826,8 @@ export function SessionGame({
               onRevealed={onRevealed}
               pick={pick}
               onPickSupport={setPickSupported}
+              holds={holdOpts}
+              onHoldSupport={setHoldSupported}
               hint={t(engine.blurb)}
             />
           ) : view ? (
@@ -837,6 +897,19 @@ export function SessionGame({
           // Start-Ansicht
           <>
             {towerBoard && <div className="mb-3">{towerBoard}</div>}
+            {/* Video Poker: die Tabelle steht VOR dem Austeilen — der Spieler
+                sieht, was zahlt, bevor er setzt. Nach der Runde ist die
+                Endhand hervorgehoben. */}
+            {vpTable?.table && (
+              <div className="mb-3">
+                <VideoPokerPaytable
+                  table={vpTable.table}
+                  minPairRank={vpTable.minPairRank}
+                  current={ended ? (vpRound?.category ?? null) : null}
+                  final={!!ended}
+                />
+              </div>
+            )}
             <label className="block text-xs text-white/50">
               {/* Hoechsteinsatz AM Feld (Systemvertrag — nie entfernen). */}
               <span className="flex items-baseline justify-between gap-2">
@@ -889,15 +962,53 @@ export function SessionGame({
                 ? t('common.connectWallet')
                 : busy
                   ? t('bet.running')
-                  : ended
-                    ? t('session.newRound')
-                    : t('session.start')}
+                  : holdStep
+                    ? t('session.vp.deal')
+                    : ended
+                      ? t('session.newRound')
+                      : t('session.start')}
             </button>
           </>
         ) : (
           // Aktive Session: Schritt-Controls + Cashout
           <div className="space-y-3">
-            <p className="text-xs text-white/40">{t(sess.hint)}</p>
+            {/* Beim Halte-Schritt sagen Brett und Statuszeile schon, was zu tun
+                ist — der Platz gehört dort der Tabelle (Telefon!). */}
+            {!holdStep && <p className="text-xs text-white/40">{t(sess.hint)}</p>}
+            {holdStep && (
+              // Video Poker: Tabelle (die ausgeteilte Hand hervorgehoben), das
+              // Blatt als Knöpfe NUR als Rückfall ohne Halte-Kanal des Moduls,
+              // dann der EINE Zug. Kein Cashout — das Ziehen rechnet ab.
+              <>
+                {vpTable?.table && (
+                  <VideoPokerPaytable
+                    table={vpTable.table}
+                    minPairRank={vpTable.minPairRank}
+                    current={vpRound?.category ?? null}
+                  />
+                )}
+                {!holdSupported && vpRound?.hand && (
+                  <VideoPokerHoldCards
+                    cards={vpRound.hand}
+                    held={held}
+                    enabled={!busy && !revealing}
+                    onToggle={toggleHold}
+                  />
+                )}
+                <button
+                  type="button"
+                  disabled={busy || revealing}
+                  onClick={() => void step({ holds: held })}
+                  className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
+                >
+                  {busy ? t('bet.running') : t(holdStep.label)}
+                  <span className="ml-1.5 text-xs font-normal opacity-70">
+                    {t('session.vp.holdInfo', { held: held.length, draw: holdStep.cards - held.length })}
+                  </span>
+                </button>
+                <p className="text-[10px] leading-snug text-white/35">{t('session.vp.idleWarn')}</p>
+              </>
+            )}
             {costPerStep && (
               // Kosten-Kopf der laufenden Runde: Preis je Spin, der GESPERRTE
               // Einsatz als read-only Feld und der Spin-Zähler gegen den Deckel.
@@ -1066,14 +1177,16 @@ export function SessionGame({
                 className="w-full rounded-lg border border-white/15 py-2 text-sm disabled:opacity-40">{t(sess.step.label)}
                 {costPerStep ? t('session.stepCosts', { amount: spinCostText ?? bet }) : ''}</button>
             )}
-            <button
-              type="button"
-              onClick={() => void cashout()}
-              disabled={busy || revealing || stepsTaken < 1 || cashoutBlocked}
-              className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
-            >
-              {t('session.cashoutShort')} {stepsTaken >= 1 && !cashoutBlocked ? `(${toSol(view.potentialPayoutLamports)} ◎)` : ''}
-            </button>
+            {!holdStep && (
+              <button
+                type="button"
+                onClick={() => void cashout()}
+                disabled={busy || revealing || stepsTaken < 1 || cashoutBlocked}
+                className="w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-2.5 font-semibold text-night disabled:opacity-40"
+              >
+                {t('session.cashoutShort')} {stepsTaken >= 1 && !cashoutBlocked ? `(${toSol(view.potentialPayoutLamports)} ◎)` : ''}
+              </button>
+            )}
           </div>
         )}
 

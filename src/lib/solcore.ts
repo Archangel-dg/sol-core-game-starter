@@ -221,6 +221,70 @@ export interface SessionView {
   capped?: boolean;
 }
 
+// ── Video Poker (`video-poker`, 22.11.2026) — Formen in der SessionView ────
+//
+// Ablauf: `session/start` teilt fünf Karten aus (`progress.hand`), EIN Schritt
+// `{ holds: number[] }` hält die genannten Stellen und ersetzt den Rest vom
+// Nachziehstapel — danach ist die Runde abgerechnet (`cashed_out` bei einer
+// Auszahlung > 0, auch 1× „Einsatz zurück", sonst `busted`). Es gibt keinen
+// Cashout (`API-204 mode_has_no_cashout`); fehlt `holds`, antwortet der Server
+// `API-204 holds_required`. Wer 15 Minuten nicht zieht, dem spielt der Server
+// die Runde mit dem mathematisch besten Halten zu Ende (`progress.autoDraw`) —
+// eine Erstattung gibt es nicht (das offene Blatt wäre sonst ein Gratis-Blick).
+//
+// Karten sind Zahlen 0..51: Rang `k % 13 + 1` (1 = Ass, 11 = Bube, 12 = Dame,
+// 13 = König), Farbe `⌊k / 13⌋` (0 ♠, 1 ♥, 2 ♦, 3 ♣). Das Ass zählt hoch und in
+// A-2-3-4-5 auch tief.
+
+/** Die zahlenden Hände, stärkste zuerst — zugleich die Reihenfolge der Auszahltabelle. */
+export const VIDEO_POKER_HANDS = [
+  'royalFlush',
+  'straightFlush',
+  'fourOfAKind',
+  'fullHouse',
+  'flush',
+  'straight',
+  'threeOfAKind',
+  'twoPair',
+  'highPair',
+] as const;
+export type VideoPokerHand = (typeof VIDEO_POKER_HANDS)[number];
+/** Was fünf Karten sind: eine zahlende Hand oder `'none'`. */
+export type VideoPokerCategory = VideoPokerHand | 'none';
+
+/** Engine-Config-Echo (`SessionView.engine.config`, `/api/meta → engineConfig`). */
+export interface VideoPokerEngineConfig {
+  engineVersion: number;
+  variant: 'jacks-or-better';
+  /** Ab welchem Paar `highPair` zahlt: 2..14 (11 = Bube, 12 = Dame, 13 = König, 14 = Ass). */
+  minPairRank: number;
+  /** Je Hand der Multiplikator des Einsatzes in bps (10000 = 1×, Einsatz zurück). */
+  paytableBps: Record<VideoPokerHand, number>;
+  /** Höchster Eintrag der Tabelle (der Royal Flush). */
+  maxMultiplierBps: number;
+}
+
+/** `SessionView.progress` einer video-poker-Runde. */
+export interface VideoPokerProgress {
+  /** Die fünf Karten, die gerade liegen: erst das Blatt, nach dem Ziehen die Endhand. */
+  hand: number[];
+  /** Das ausgeteilte Blatt, unverändert. */
+  dealtHand: number[];
+  /** Was `hand` gerade ist. Beim Austeilen: was das Blatt zahlt, wenn alle fünf bleiben. */
+  handCategory: VideoPokerCategory;
+  /** Nach dem Ziehen: die gehaltenen Stellen (aufsteigend). */
+  holds?: number[];
+  /** Nach dem Ziehen: die neuen Karten, in der Reihenfolge der ersetzten Stellen. */
+  drawn?: number[];
+  /** true, wenn der Server die Runde nach Ablauf mit dem besten Halten beendet hat. */
+  autoDraw?: boolean;
+}
+
+/** `SessionView.reveal` nach dem Ziehen: alle zehn Karten (0–4 Blatt, 5–9 Nachziehstapel von oben). */
+export interface VideoPokerReveal {
+  deck: number[];
+}
+
 /**
  * Pay-per-Spin-Handschlag (`spin-tower-pro`).
  *

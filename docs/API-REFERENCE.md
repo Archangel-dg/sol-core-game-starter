@@ -143,6 +143,11 @@ Rules the UI MUST reflect:
 - Hi-Lo: impossible guess → `API-204 impossible_guess`; the chain ends after 20 steps.
 - **15 min inactivity** → the server settles automatically (≥1 step = auto-cashout, 0 steps = full
   refund). Warn about this in the UI.
+- **Video Poker** (`video-poker`) has exactly one step, `{ holds: number[] }` (positions 0–4 to
+  keep; `[]` discards all five). It settles the round — there is no cash-out (`API-204
+  mode_has_no_cashout`), a missing `holds` is `API-204 holds_required`. Inactivity never refunds
+  here: after 15 min the server draws with the mathematically best hold (`progress.autoDraw`).
+  Details and the view fields in ENGINES.md → Video Poker.
 
 ## Tournament layer (gauntlet)
 

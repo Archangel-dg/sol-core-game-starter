@@ -79,9 +79,18 @@ export interface EngineDef {
            * Parameter einfach. */
           boundsFrom?: (cfg: EngineConfig, currentStep?: number) => { min: number; max: number };
         }
-      | { kind: 'action'; label: StringKey }; // pump
+      | { kind: 'action'; label: StringKey } // pump
+      | {
+          // video-poker (22.11.2026): ausgeteilt sind `cards` Karten; der
+          // Spieler HÄLT beliebig viele davon (Stellen 0..cards-1) und zieht
+          // EINMAL — dieser eine Schritt rechnet die Runde ab. Es gibt deshalb
+          // keinen Cashout (der Server antwortet `mode_has_no_cashout`); wer
+          // das Blatt behalten will, hält alle Karten. Die Halte-Auswahl ist
+          // reiner Zustand der Oberfläche, bis `label` (Ziehen) sie abschickt.
+          kind: 'holds'; label: StringKey; cards: number;
+        };
     /** Baut den Step-Body. */
-    buildStep: (input: { value?: number; guess?: GuessOption }) => Record<string, unknown>;
+    buildStep: (input: { value?: number; guess?: GuessOption; holds?: readonly number[] }) => Record<string, unknown>;
     /**
      * Nur gesetzt, wenn JEDER Schritt erneut den Einsatz kostet (spin-tower-pro).
      * Alle anderen Session-Engines buchen den Einsatz EINMAL beim Start; jeder
@@ -471,6 +480,33 @@ export const ENGINES: EngineDef[] = [
       buildStep: () => ({}),
       costPerStep: true,
       hint: 'engine.spin-tower-pro.hint',
+    },
+  },
+  {
+    key: 'video-poker',
+    label: 'Video Poker',
+    category: 'Table',
+    // NUR Session: austeilen (start) → halten + EINMAL ziehen (der eine
+    // Schritt) → abgerechnet. Kein Cashout (`kind: 'holds'`, siehe oben).
+    mechanics: ['session'],
+    blurb: 'engine.video-poker.blurb',
+    playerFacts: {
+      inputs: 'engine.video-poker.inputs',
+      outcomes: 'engine.video-poker.outcomes',
+    },
+    session: {
+      // Body `{ holds: number[] }`: die gehaltenen Stellen 0..4, jede
+      // höchstens einmal; `[]` legt alle fünf ab, `[0,1,2,3,4]` bleibt stehen.
+      // Jede abgelegte Stelle bekommt — von links nach rechts — die nächste
+      // Karte des beim Austeilen festgelegten Nachziehstapels. Die
+      // Auszahltabelle (`paytableBps`), ab welchem Paar gezahlt wird
+      // (`minPairRank`) und der Höchstgewinn (`maxMultiplierBps`) kommen als
+      // Server-Echo in der Engine-Config.
+      step: { kind: 'holds', label: 'engine.video-poker.step', cards: 5 },
+      buildStep: (i) => ({
+        holds: [...new Set(i.holds ?? [])].filter((n) => Number.isInteger(n) && n >= 0 && n <= 4).sort((a, b) => a - b),
+      }),
+      hint: 'engine.video-poker.hint',
     },
   },
   {

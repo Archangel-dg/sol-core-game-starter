@@ -132,6 +132,39 @@ export interface RevealPickOptions {
   onPick(index: number): void;
 }
 
+/**
+ * ██ HALTE-KANAL ██ — der Spieler hält Karten auf dem Brett (video-poker).
+ *
+ * Verwandt mit dem Rückkanal oben, aber kein Zug: Halten ist eine AUSWAHL, die
+ * der Spieler beliebig oft ändert, bevor EIN Schritt („Ziehen") sie abschickt.
+ * Den Zustand der Auswahl führt der Flow (`held`), nicht das Modul — sonst
+ * stünden zwei Wahrheiten darüber nebeneinander, und „Ziehen" schickte eine
+ * andere Auswahl ab als die, die auf dem Brett markiert ist.
+ *
+ *  1. EIN TIPP ZEICHNET NICHTS. `onToggle` meldet nur nach oben; die
+ *     HALTEN-Marke erscheint, wenn der Flow mit dem neuen `held` antwortet
+ *     (nächstes `setHolds`). So kann das Brett nie etwas anderes zeigen als
+ *     das, was abgeschickt wird.
+ *  2. NUR DAS OFFENE BLATT IST BEDIENBAR. Im Leerlauf, während des Austeilens
+ *     und nach dem Ziehen ist keine Karte antippbar — auch nicht mit
+ *     `enabled: true`. Nach dem Ziehen zeigen die Marken, was gehalten WURDE
+ *     (aus dem Ergebnis), nicht mehr die Auswahl.
+ *  3. WÄHREND DER ANIMATION IST ZU (`enabled: false`), wie beim Rückkanal.
+ *  4. DIE BEDIENUNG ÜBERLEBT DEN AUSFALL. Ohne ein Modul mit `setHolds` zeigt
+ *     der Flow das Blatt als eigene Kartenknöpfe (`onHoldSupport`).
+ *
+ * Die Marken verraten nichts: sie zeigen ausschließlich die Wahl des Spielers.
+ * Was die nächsten Karten sind, steht bis zum Ziehen nur im Server.
+ */
+export interface RevealHoldOptions {
+  /** `false` ⇒ keine Karte ist antippbar (Anfrage unterwegs, Animation läuft). */
+  enabled: boolean;
+  /** Die Stellen 0..4, die der Spieler gerade hält — Zustand des Flows. */
+  held: readonly number[];
+  /** Der Spieler hat Karte `index` angetippt. Das Modul zeichnet daraufhin nichts. */
+  onToggle(index: number): void;
+}
+
 export interface RevealController {
   /**
    * Animiert VOM AKTUELLEN BILD zum Endbild; löst auf, sobald es steht. Das
@@ -164,6 +197,13 @@ export interface RevealController {
    * am fehlenden `setPick` und zeigt weiter seine eigene Auswahl.
    */
   setPick?(opts: RevealPickOptions | null): void;
+  /**
+   * Optional — HALTE-KANAL (video-poker). Macht die Karten des offenen Blatts
+   * antippbar und zeichnet die HALTEN-Marken aus `opts.held` (siehe
+   * `RevealHoldOptions`). `null` schaltet die Bedienung ab; Marken eines
+   * fertigen Ergebnisses bleiben stehen.
+   */
+  setHolds?(opts: RevealHoldOptions | null): void;
   /** Zurück zum Leerlauf — synchron. Stellung der Walzen/Figuren bleibt, nur
    *  Ergebnis, Markierungen und ein laufender Vorlauf gehen. */
   reset(): void;
@@ -214,6 +254,9 @@ const LOADERS: Record<string, Loader> = {
   steps: () => import('@/reveals/steps'),
   pump: () => import('@/reveals/pump'),
   'spin-tower-pro': () => import('@/reveals/spin-tower-pro'),
+  // Video Poker: Austeilen und Ziehen sind die zwei Schritte des Protokolls;
+  // gehalten wird auf dem Brett (Halte-Kanal `setHolds`).
+  'video-poker': () => import('@/reveals/video-poker'),
   // Turnier: der Lauf-Verlauf (`history`) ist das Protokoll.
   gauntlet: () => import('@/reveals/gauntlet'),
 };

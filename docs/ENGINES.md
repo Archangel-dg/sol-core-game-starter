@@ -52,6 +52,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `dice-ladder` | chain | | ✓ | — (session) |
 | `steps` | chain | | ✓ | — (session) |
 | `spin-tower-pro` | chain | | ✓ | — (session; **every spin costs the stake again**) |
+| `video-poker` | table | | ✓ | — (session; deal → hold → **one** draw settles the round, no cash-out) |
 | `pump` | curve | | ✓ | — (session) |
 | `gauntlet` | tournament | | | — (tournament) |
 | `live-odds` | live | | | — (live; outcomes/odds from `/live/state`) |
@@ -70,6 +71,49 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `pump` | `{}` (just pump again) |
 | `steps` | `{}` (just climb again) |
 | `spin-tower-pro` | `{}` (just spin again) — **but this step is charged**, see below |
+| `video-poker` | `{ holds: number[] }` — the positions 0–4 to keep, each at most once (`[]` discards all five, `[0,1,2,3,4]` stands pat). This ONE step ends the round, see [Video Poker](#video-poker) |
+
+<a id="video-poker"></a>
+## Video Poker (`video-poker`) — deal, hold, one draw
+
+A round has exactly two moments. `POST …/session/start` deals five cards; the one step
+`POST …/session/:id/step` with `{ holds }` keeps the given positions and replaces every other
+position — left to right — with the next card of the draw pile. That step settles the round:
+`status` is `cashed_out` when the final hand pays anything (including 1× = stake back) and
+`busted` when it pays nothing. There is **no cash-out** (`…/cashout` answers
+`API-204 mode_has_no_cashout`); a missing or invalid `holds` answers `API-204 holds_required`.
+
+- **Cards** are integers 0–51: rank `k % 13 + 1` (1 = ace, 11 = jack, 12 = queen, 13 = king), suit
+  `⌊k / 13⌋` (0 ♠, 1 ♥, 2 ♦, 3 ♣). The ace counts high, and low in A-2-3-4-5.
+- **While the round is open** the view carries `progress.hand` / `progress.dealtHand` (the five
+  dealt cards, left to right), `progress.handCategory` (what the dealt hand pays if all five are
+  held: `none`, `highPair`, `twoPair`, `threeOfAKind`, `straight`, `flush`, `fullHouse`,
+  `fourOfAKind`, `straightFlush`, `royalFlush`) and `multiplierBps` (that value, often 0).
+- **After the draw:** `progress.holds`, `progress.drawn` (the new cards in the order of the
+  replaced positions), `progress.hand` (the final five), `progress.handCategory` (the final
+  hand), `multiplierBps`, `payoutLamports`, `serverSeed`, `roundId`, `reveal.deck` (all ten
+  cards: 0–4 the dealt hand, 5–9 the draw pile in order — including the cards nobody drew) and,
+  at the game's payout cap, `capped: true` (then `multiplierBps` is the capped value; the hand
+  stays what it is).
+- **The pay table is the server's**: `engine.config` echoes `minPairRank` (the lowest pair that
+  pays `highPair`: 11 = jacks or better, 10 = tens or better …), `paytableBps` (all nine hands,
+  in bps of the stake, never increasing from royal flush down to the pair) and
+  `maxMultiplierBps`. Show exactly that table — never a hard-coded "9/6".
+- **15 minutes without a draw:** the server finishes the round itself with the mathematically best
+  hold (`progress.autoDraw: true`). There is never a refund — the dealt hand has already been
+  seen. Tell the player (the template does, under the draw button).
+- **RTP** is the exact return with the best possible hold on every one of the 2,598,960 deals —
+  a player who holds worse gets less, nobody gets more. The template never computes it.
+- **Provably fair:** the ten cards come from `deriveRolls(serverSeed, clientSeed, nonce, 80)`,
+  card *i* with its own 8-roll window picking a place in the ascending rest of the deck; the
+  verify params are `{ holds }`. The Sol-Core Scanner re-computes cards, draw and payout in the
+  browser.
+
+In the template the board is the input: the reveal module turns the five cards into buttons
+(`setHolds`, the hold channel in `src/lib/reveal.ts`), a tap toggles HELD, and **Draw** sends the
+selection. Without a module that offers `setHolds`, `SessionGame` shows the hand as its own card
+buttons instead — the round always stays playable. The pay table under it highlights the hand
+that is on the table (dealt, then final).
 
 <a id="pay-per-spin-spin-tower-pro"></a>
 ## Pay-per-spin (`spin-tower-pro`) — read this before you re-skin it
@@ -294,6 +338,7 @@ in `lib/engines.ts`). Never hardcode the old fixed values (0–100, 1–13, unif
 | `keno` | number picker | `[1, config.pool ?? 40]` instead of the old fixed 1–40 |
 | `roulette` | straight-bet value picker | `[0, pocketCount − 1]`, where `pocketCount` is 37 (european) or 38 (american) from `config.wheelType` |
 | `plinko` | ball-count select (`params.balls`) | options are filtered to what's ≤ `config.maxBalls` (1/3/10/100); the whole control is hidden when `maxBalls` is 1 (the default) |
+| `video-poker` | pay table, pair threshold, hand names | `config.paytableBps` (nine hands, bps of the stake) and `config.minPairRank` — the table on screen is the server echo, the highlighted row is `progress.handCategory` from the server; the template evaluates no hand itself |
 | `towers` | per-floor column buttons (session step) | **per-step**, not a single constant: `floors[currentStep].columns` when the game has a `floors` array (per-floor Pro config), else the legacy uniform `columns` — see `boundsFrom(cfg, currentStep)` in `lib/engines.ts` |
 
 All of these are **display/UX conveniences only** — the server re-validates every param/step against
@@ -329,6 +374,7 @@ shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
 | `dice-ladder` | higher/lower on the next dice sum | sums are **not** uniform (2d6: a 7 is six times likelier than a 2), so the same guess pays differently on every sum; right guess grows the multiplier, tie/wrong = loss | `config.maxWinBps` (chain ceiling, default 100×) — guesses that would overshoot it are rejected, the payout is never truncated |
 | `pump` | pump again or cash out | each pump grows the multiplier; burst = loss | `growth^maxPumps` |
 | `spin-tower-pro` | spin again or cash out — **each spin costs the stake again**, and the stake is locked from spin 1 | one outcome per spin: a tower climbs, a maxed tower pays its top multiplier as **secured** (FAIL-immune, paid at round end), joker climbs/secures everything, nothing, or FAIL (all levels to 0 and the round ends, or one level down and it continues). Cash-out from spin 1 pays **pot + secured**; the round ends at the latest at `maxSpins` | session return cap (`maxSessionReturnBps`) — the cap ends the round and pays out in full |
+| `video-poker` | which of the five dealt cards to hold, then one draw | the final hand pays by the game's pay table (from the lowest paying pair up to a royal flush, 1× = stake back); no paying hand = loss; no cash-out — the draw settles the round; no draw within 15 min ⇒ the server plays the best hold | the royal-flush entry of the pay table (`maxMultiplierBps`) |
 | `gauntlet` | a risk tier per step, bank in time | entry feeds the pot; bust zeroes the run; best score per wallet ranks — top ranks split the pot at cycle end | pot share of rank 1 |
 
 ## Roulette `betType`

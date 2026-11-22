@@ -103,7 +103,7 @@ result away moves before the animation has ended.
 Want the coin to be a card, the plinko board to be a rocket track? Replace the module file. The
 contract is in `src/lib/reveal.ts` (`RevealModule`) and it is small: `mount(root, ctx)` returns
 `{ play(outcome, { reducedMotion, from }), reset(), destroy() }` plus, optionally,
-`arm({ reducedMotion })` / `disarm()` and `setPick(opts)`. `ctx.engineConfig` carries the
+`arm({ reducedMotion })` / `disarm()`, `setPick(opts)` and `setHolds(opts)`. `ctx.engineConfig` carries the
 game's real dimensions (rows, grid size, pockets, ladder …) — draw the idle board from it; the
 outcome carries the round's own details. `ctx.text(key)` reads the catalog (four languages),
 `ctx.fmt` formats money exactly like the rest of the interface. Fixtures with the exact server
@@ -153,6 +153,17 @@ Binding rules (rule 16 in `docs/RULES.md`):
    A module without `setPick` loses nothing: `RevealHost` reports that through
    `onPickSupport`, and the flow shows its own number list. That fallback is what keeps a
    round playable when a module fails to load, so never route the input around it.
+9. **Holding cards is a selection, not a move** (`video-poker`, `setHolds(opts)`). The player
+   taps the cards to keep, as often as they like, and ONE draw sends the selection. The flow
+   owns that selection (`opts.held`); the module only draws it:
+   - a tap only calls `opts.onToggle(index)` — the HELD marker appears with the flow's next
+     `setHolds`, so the board can never show a selection other than the one the draw sends;
+   - only the open hand of a running round is tappable: not in idle, not while dealing or
+     drawing, not after the round (`enabled: false` / `null` close it as well). After the draw
+     the markers show what WAS held — from the outcome, not from `opts`;
+   - a held card's marker says HELD (`ctx.text('session.vp.held')`) and nothing else; the cards
+     are real `<button>`s labelled with their position.
+   Without `setHolds` the flow shows the hand as its own card buttons (`onHoldSupport`).
 
 Session engines play their transcript STEP BY STEP: `play(o, { from })` says how many steps
 already stand on the board; the module sets those instantly and animates only the new step.

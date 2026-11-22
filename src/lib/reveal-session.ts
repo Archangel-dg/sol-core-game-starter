@@ -23,6 +23,7 @@
 
 import type { SessionView, TournamentRunView } from '@/lib/solcore';
 import { outcomeTone, sessionCharge } from '@/lib/outcome';
+import { videoPokerRound, videoPokerTable } from '@/lib/video-poker';
 
 export interface SpinRecord {
   outcome: { kind: 'tower' | 'joker' | 'nothing' | 'fail'; tower?: number };
@@ -67,6 +68,11 @@ export function sessionStepCount(engineKey: string, view: SessionView | null | u
       return Math.max(0, arr(p.stepHistory).length - 1);
     case 'spin-tower-pro':
       return view.spins ?? arr(view.outcomes).length;
+    case 'video-poker':
+      // Zwei Schritte im Protokoll: das Austeilen (1) und das Ziehen (2). So
+      // steht beim Ziehen `from = 1` — das Modul lässt das Blatt liegen und
+      // bewegt nur die ersetzten Karten, statt neu auszuteilen.
+      return Array.isArray(p.holds) ? 2 : Array.isArray(p.hand) ? 1 : 0;
     default:
       return view.steps ?? 0;
   }
@@ -236,6 +242,23 @@ export function sessionOutcome(engineKey: string, view: SessionView, tr: Session
         pumps: tr.history.slice(0, view.steps ?? 0).map((multiplierBps) => ({ multiplierBps })),
         burstMultiplierBps: num(reveal.burstMultiplierBps),
       };
+    case 'video-poker': {
+      // Austeilen (Runde offen) oder Austeilen + Ziehen (abgerechnet). Hand-Art
+      // und Multiplikator kommen vom Server; hier wird nichts gewertet.
+      const r = videoPokerRound(p);
+      const ended = view.status !== 'active';
+      return {
+        ...common,
+        minPairRank: videoPokerTable(cfg).minPairRank,
+        dealt: r.dealt ?? [],
+        // Nach dem Ziehen: was gehalten wurde und die Endhand. Vorher `null` —
+        // die Auswahl des Spielers ist Zustand des Flows, kein Ergebnis.
+        holds: ended ? (r.holds ?? []) : null,
+        hand: ended ? (r.hand ?? r.dealt ?? []) : (r.dealt ?? []),
+        category: r.category ?? 'none',
+        autoDraw: r.autoDraw,
+      };
+    }
     case 'spin-tower-pro':
       return {
         sessionId: view.sessionId,

@@ -54,7 +54,7 @@ For a real game, register at [sol-core.com](https://sol-core.com), create a game
 ## What you may and may not touch
 
 - **Design zone (edit freely):** `src/app/page.tsx`, `src/app/globals.css`, `tailwind.config.ts`,
-  and the components `ResultView`, `SingleBetGame`, `SessionGame`, `EngineControls`,
+  and the components `ResultView`, `SingleBetGame`, `SessionGame`, `HoldemDealerGame`, `EngineControls`,
   `FairnessPanel`, `History`, `BalanceBar`, `HeaderBar`, `GameMenu`, `DemoBar`, `Popover`.
 - **System contract (do not edit):** `src/app/api/*`, `src/lib/{solcore,config,lamports,errors,engines,player-program}.ts`,
   `src/components/Providers.tsx`. These carry a do-not-edit / system-contract marker and preserve

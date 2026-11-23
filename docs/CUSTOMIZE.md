@@ -10,6 +10,10 @@ result animation.
 - `src/reveals/<engine>.js` — the reveal animation of each engine (see below); `src/components/ResultView.tsx` —
   the plain fallback for an engine without a module.
 - `src/components/SingleBetGame.tsx` / `SessionGame.tsx` — play area / HUD.
+  `HoldemDealerGame.tsx` (+ `HoldemDealerParts.tsx`) is the same for Hold'em vs Dealer — its own
+  flow, because that engine answers in its own format and its one decision can cost a second
+  stake (see `docs/ENGINES.md` → Hold'em vs Dealer). Restyle it freely; keep the handshake, the
+  call's price on the button and the note before the deal (`check:contract` section 8b).
 - `src/components/EngineControls.tsx` — the look of the inputs.
 - `src/components/FairnessPanel.tsx`, `History.tsx`, `BalanceBar.tsx`, `HeaderBar.tsx`, `GameMenu.tsx`,
   `DemoBar.tsx`, `Popover.tsx`, and the sound set (`src/lib/sounds.ts`, `public/sounds/*.wav`,
@@ -96,7 +100,7 @@ and the kit's `scripts/check-mobile.mjs` measures them in a real Chromium over t
 Every engine that plays a round has a reveal module: plain browser JavaScript, no framework,
 drawn into the square play field. `RevealHost` mounts it, hands it the outcome and the
 translations, and tells the flow when the final frame stands. The flows (`SingleBetGame`,
-`SessionGame`, `TournamentGame`) WAIT for that moment: the multiplier in the HUD, the sound, the
+`SessionGame`, `TournamentGame`, `HoldemDealerGame`) WAIT for that moment: the multiplier in the HUD, the sound, the
 round history, the balance and the win toast all follow `onRevealed` — nothing that gives the
 result away moves before the animation has ended.
 
@@ -164,6 +168,16 @@ Binding rules (rule 16 in `docs/RULES.md`):
    - a held card's marker says HELD (`ctx.text('session.vp.held')`) and nothing else; the cards
      are real `<button>`s labelled with their position.
    Without `setHolds` the flow shows the hand as its own card buttons (`onHoldSupport`).
+10. **What was not played stays unseen** (`holdem-dealer`). After a fold the server's answer
+   still carries all nine cards — for the proof page. The table shows only what was played: the
+   player's two cards and the flop; turn, river and the dealer's cards stay face down, and the
+   hand on show is the hand with the flop (`flopHand`) with "Folded — ante lost" — never a
+   seven-card hand, never the dealer's hand or qualification. "What would have come" is a near
+   miss (rule 3), the same as video poker's undrawn cards. The transcript from
+   `holdemDealerOutcome` already leaves those cards out; the module must ignore them anyway
+   (`o.action !== 'call'` ⇒ read no `turn`, `river`, `dealer`, `playerHand`, `dealerHand`). The
+   kit's check plays every fold fixture with and without them (`blind`) and wants the same DOM,
+   and scans the whole animation for the `unplayed` faces. After a call everything is revealed.
 
 Session engines play their transcript STEP BY STEP: `play(o, { from })` says how many steps
 already stand on the board; the module sets those instantly and animates only the new step.

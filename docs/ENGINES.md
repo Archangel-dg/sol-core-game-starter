@@ -12,7 +12,9 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
   every step after that is free. **One exception: `spin-tower-pro`, where every step costs the
   stake again** — see [Pay-per-spin](#pay-per-spin-spin-tower-pro) below. It is still the `session`
   mechanic (same routes, same flow); the engine definition just carries
-  `session.costPerStep: true`.
+  `session.costPerStep: true`. **And one engine runs its own flow on the same routes:
+  `holdem-dealer`, whose one decision can cost a second stake (the call, 2 × the ante)** — see
+  [Hold'em vs Dealer](#holdem-dealer).
 - **tournament** — pot-based highscore runs (`/api/game/tournament/*`): a fixed entry fee per run
   goes into the cycle pot; the run itself pays nothing. Players collect a score (all rolls are
   pre-committed at enter, provably-fair); at cycle end the pot is paid out 100% to the top ranks.
@@ -53,6 +55,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `steps` | chain | | ✓ | — (session) |
 | `spin-tower-pro` | chain | | ✓ | — (session; **every spin costs the stake again**) |
 | `video-poker` | table | | ✓ | — (session; deal → hold → **one** draw settles the round, no cash-out) |
+| `holdem-dealer` | table | | ✓ | — (session, **own flow**: ante → flop → **one** decision — fold, or call = **a second stake of 2 × ante**; no cash-out) |
 | `pump` | curve | | ✓ | — (session) |
 | `gauntlet` | tournament | | | — (tournament) |
 | `live-odds` | live | | | — (live; outcomes/odds from `/live/state`) |
@@ -72,6 +75,7 @@ Set `NEXT_PUBLIC_ENGINE` + `NEXT_PUBLIC_MECHANIC` in `.env`. The combination is 
 | `steps` | `{}` (just climb again) |
 | `spin-tower-pro` | `{}` (just spin again) — **but this step is charged**, see below |
 | `video-poker` | `{ holds: number[] }` — the positions 0–4 to keep, each at most once (`[]` discards all five, `[0,1,2,3,4]` stands pat). This ONE step ends the round, see [Video Poker](#video-poker) |
+| `holdem-dealer` | `{ aktion: "call"\|"fold", schritt: 0 }` — ONE decision, `schritt` = `view.schritt` (replay guard). **`call` debits 2 × the ante again** (price in `kosten.call`); the start needs `protocol: "holdem-dealer/1"`. Own answer (`HoldemDealerView`), see [Hold'em vs Dealer](#holdem-dealer) |
 
 <a id="video-poker"></a>
 ## Video Poker (`video-poker`) — deal, hold, one draw
@@ -114,6 +118,83 @@ In the template the board is the input: the reveal module turns the five cards i
 selection. Without a module that offers `setHolds`, `SessionGame` shows the hand as its own card
 buttons instead — the round always stays playable. The pay table under it highlights the hand
 that is on the table (dealt, then final).
+
+<a id="holdem-dealer"></a>
+## Hold'em vs Dealer (`holdem-dealer`) — ante, flop, one decision
+
+Texas Hold'em against the dealer. Same routes as the session layer, but **its own flow and its
+own answer**: the server runs it on a separate money path (like blackjack) and every response is
+a `HoldemDealerView` (`lib/solcore.ts`), not a `SessionView` — no `progress`, no `steps`, no
+`potentialPayoutLamports`; `status` is `active` or `settled`. The template therefore plays it in
+`components/HoldemDealerGame.tsx`, not in `SessionGame` (`app/page.tsx` routes the step kind
+`decision` there).
+
+1. `POST …/session/start` with `{ playerWallet, betLamports, clientSeed?, protocol: "holdem-dealer/1" }`.
+   `betLamports` is the **ante** (the maximum bet applies to it). **Without the handshake the server
+   refuses** (`API-204 protocol_handshake_required`): a client that does not know the call is a
+   second stake opens no round. The ante (+ fees) is debited, then the cards are dealt: two for the
+   player, two face down for the dealer, the flop.
+2. ONE step `POST …/session/:id/step` with `{ aktion: "call" | "fold", schritt: 0 }` (`schritt` is
+   `view.schritt`, the replay guard). `fold` costs nothing more — the ante is lost. **`call` is a
+   second debit of 2 × the ante + fees**, priced in advance in `kosten.call` (`einsatzLamports`,
+   and `gesamtLamports` = exactly what is taken). The step settles the round; there is no cash-out
+   (`…/cashout` answers `API-972`).
+3. After a call come turn and river, then the dealer's best five of seven. The dealer qualifies with
+   a **pair of fours or better**. Not qualified: the ante pays by the table, the call comes back.
+   Qualified: the better hand wins — the ante by the table plus the call 1:1; the dealer's better
+   hand takes both; a tie returns both.
+
+- **Cards** are 0–51 like video poker (rank `k % 13 + 1`, suit `⌊k / 13⌋`); nine per round from one
+  deck, all fixed at the deal: 0–1 player, 2–3 dealer, 4–6 flop, 7 turn, 8 river. The decision
+  changes no card, only whether turn, river and the dealer count.
+- **While the round is open:** `spieler.karten` (two), `spieler.kategorieFlop` (what the two cards
+  and the flop are: `highCard`, `pair`, `twoPair`, `threeOfAKind`, `straight`, `flush`,
+  `fullHouse`, `fourOfAKind`, `straightFlush`, `royalFlush`), `brett.flop` (three),
+  `dealer.karten` = `[null, null]`, `brett.turn` / `brett.river` = `null`, `erlaubt`
+  (`["call","fold"]`), `kosten.call`, `anteLamports`, `einsatzSummeLamports`,
+  `belastungSummeLamports` (every debit incl. fees — the basis of the net verdict), `schritt`.
+- **When settled:** all nine cards, `ende` (`aktion`, `ergebnis` = `ausgestiegen` |
+  `dealer_nicht_qualifiziert` | `gewonnen` | `verloren` | `unentschieden`, `spielerKategorie`,
+  `dealerKategorie`, `dealerQualifiziert`, `anteGewinnBps`, `rueckflussBps`, `spielerWert`,
+  `dealerWert`), `payoutLamports` (= ante × return; at the game's payout cap with `capped: true`),
+  `roundId`, `serverSeed`; when they apply `zeitAbgelaufen`, `gehalten` (the payout is under a
+  short review and follows) and `zugOffen` (a paid call is not confirmed yet — the next step
+  plays it, so the template offers only "Call" then).
+- **Return per ante** in bps: fold 0 · dealer not qualified 10 000 + ante win + 20 000 · win
+  10 000 + ante win + 40 000 · tie 30 000 · loss 0. **The round's multiplier is payout ÷ total
+  stake** (ante + call) — what the round history and the Scanner show, never "per ante".
+- **The ante table is the server's**: `engine.config` echoes `anteBps` (ten hands, bps of the
+  ante), `callFaktor` (2), `maxRueckflussBps` and `rtpBps`. Two checked tables: `standard` (royal
+  flush 100:1, straight flush 20:1, quads 10:1, full house 3:1, flush 2:1, straight and lower 1:1;
+  RTP 97.84 % per ante, at most 105× the ante) and `einsteiger` (royal flush 90:1, at most 95×).
+  Show the echo — never a hard-coded table. `dealerQualifiziertAb` is machine-readable
+  (`{ kategorie: 'pair', rang: 4 }`: the weakest qualifying hand, rank 2 … 14); the wording of the
+  rule stands in the catalog (`session.hd.rules`).
+- **15 minutes without a decision:** the server folds (`zeitAbgelaufen: true`) and the ante is
+  lost — never a refund (hand and flop were seen) and **never a call without the player's tap**.
+  Tell the player (the template does, under the buttons).
+- **`API-970`** — `schritt` does not match (a second tab, a double click). The server puts the
+  current state into `details.runde`; the template's routes do not forward `details`, so
+  `HoldemDealerGame` reloads the round (`GET …/session/:id`) and shows it. **`API-971`** — another
+  step of this round is still running. Repeating the same move after the end returns the result;
+  no money moves twice.
+- **After a fold the table shows only what was played** (docs/RULES.md, rule 16): the player's two
+  cards and the flop. Turn, river and the dealer's cards stay face down, and the hand shown is
+  `spieler.kategorieFlop` with "Folded — ante lost" — never `ende.spielerKategorie` /
+  `ende.dealerKategorie` (both computed with turn and river). The answer carries all nine cards
+  for the proof page; "what would have come" is a near miss, the same rule as video poker's
+  undrawn cards. After a call everything is revealed. In the template `holdemTable`
+  (`lib/holdem-dealer.ts`) is the one place that applies the rule — flow, text fallback and the
+  reveal transcript all read the table from there.
+- **Provably fair:** the nine cards come from `deriveRolls(serverSeed, clientSeed, nonce, 72)` —
+  the first nine cards of video poker's draw with the same seeds; the verify params are
+  `{ aktionen }`. The Sol-Core Scanner re-computes cards, decision and payout.
+
+In the template the board is the reveal module `src/reveals/holdem-dealer.js` (deal, then the
+decision: turn, river and the dealer's flip after a call; nothing more after a fold); the two
+buttons live in the control panel, the call's price with fees ON the button. Before the deal the
+panel says what a call will cost (2 × the ante + fees) — the handshake promises the server that
+the player was told.
 
 <a id="pay-per-spin-spin-tower-pro"></a>
 ## Pay-per-spin (`spin-tower-pro`) — read this before you re-skin it
@@ -339,6 +420,7 @@ in `lib/engines.ts`). Never hardcode the old fixed values (0–100, 1–13, unif
 | `roulette` | straight-bet value picker | `[0, pocketCount − 1]`, where `pocketCount` is 37 (european) or 38 (american) from `config.wheelType` |
 | `plinko` | ball-count select (`params.balls`) | options are filtered to what's ≤ `config.maxBalls` (1/3/10/100); the whole control is hidden when `maxBalls` is 1 (the default) |
 | `video-poker` | pay table, pair threshold, hand names | `config.paytableBps` (nine hands, bps of the stake) and `config.minPairRank` — the table on screen is the server echo, the highlighted row is `progress.handCategory` from the server; the template evaluates no hand itself |
+| `holdem-dealer` | ante table, the call's price | `config.anteBps` (ten hands, bps of the ante) — the table on screen is the server echo; the call's price is `kosten.call` of the running round (2 × ante + fees, exactly what is debited), never computed from the table; hands and result only from `spieler.kategorieFlop` / `ende` |
 | `towers` | per-floor column buttons (session step) | **per-step**, not a single constant: `floors[currentStep].columns` when the game has a `floors` array (per-floor Pro config), else the legacy uniform `columns` — see `boundsFrom(cfg, currentStep)` in `lib/engines.ts` |
 
 All of these are **display/UX conveniences only** — the server re-validates every param/step against
@@ -375,6 +457,7 @@ shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
 | `pump` | pump again or cash out | each pump grows the multiplier; burst = loss | `growth^maxPumps` |
 | `spin-tower-pro` | spin again or cash out — **each spin costs the stake again**, and the stake is locked from spin 1 | one outcome per spin: a tower climbs, a maxed tower pays its top multiplier as **secured** (FAIL-immune, paid at round end), joker climbs/secures everything, nothing, or FAIL (all levels to 0 and the round ends, or one level down and it continues). Cash-out from spin 1 pays **pot + secured**; the round ends at the latest at `maxSpins` | session return cap (`maxSessionReturnBps`) — the cap ends the round and pays out in full |
 | `video-poker` | which of the five dealt cards to hold, then one draw | the final hand pays by the game's pay table (from the lowest paying pair up to a royal flush, 1× = stake back); no paying hand = loss; no cash-out — the draw settles the round; no draw within 15 min ⇒ the server plays the best hold | the royal-flush entry of the pay table (`maxMultiplierBps`) |
+| `holdem-dealer` | the ante, then ONE decision after the flop: fold, or call — **the call costs 2 × the ante again** | fold: the ante is lost; after a call the dealer needs a pair of fours — not qualified: ante by the table, call back; qualified: the better hand wins ante (table) + call 1:1, a tie returns both, the worse hand loses both; no cash-out; no decision within 15 min ⇒ fold (never a call) | royal flush against a qualified dealer: `maxRueckflussBps` per ante (105× `standard`, 95× `einsteiger`) |
 | `gauntlet` | a risk tier per step, bank in time | entry feeds the pot; bust zeroes the run; best score per wallet ranks — top ranks split the pot at cycle end | pot share of rank 1 |
 
 ## Roulette `betType`
@@ -442,7 +525,9 @@ from the server's `details.grid`; the column stagger is a pure reveal animation,
 - **Multiplier** in basis points: `10000 = 1×`.
 - **Money** always as lamport-strings (1 SOL = 1e9).
 - **The stake is charged once per round — except `spin-tower-pro`, where every spin is charged.**
-  Detect it via `engine.session?.costPerStep`, never by hardcoding the engine key.
+  Detect it via `engine.session?.costPerStep`, never by hardcoding the engine key. **And
+  `holdem-dealer`, whose call is a second debit of 2 × the ante** (step kind `decision`, priced
+  in `kosten.call` of the round).
 - Session rules (bust, auto-cashout, 15-minute timeout) — see `API-REFERENCE.md`.
 - Which engine your game runs is fixed by the **creator when the game is registered** — the `.env`
   here must match it.

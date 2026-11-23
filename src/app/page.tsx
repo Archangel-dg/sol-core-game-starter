@@ -7,6 +7,7 @@ import { HeaderBar } from '@/components/HeaderBar';
 import { DemoProvider, useDemo } from '@/components/DemoProvider';
 import { SingleBetGame, type RoundLog } from '@/components/SingleBetGame';
 import { SessionGame } from '@/components/SessionGame';
+import { HoldemDealerGame } from '@/components/HoldemDealerGame';
 import { TournamentGame } from '@/components/TournamentGame';
 import { DemoTournamentGame } from '@/components/DemoTournamentGame';
 import { LiveGame } from '@/components/LiveGame';
@@ -247,13 +248,26 @@ function HomeInner({ meta }: { meta: Meta | null }) {
                 <TournamentGame engine={engine} verifierUrl={meta.verifierUrl} />
               )
             ) : meta.mechanic === 'session' ? (
-              <SessionGame
-                engine={engine}
-                gameId={meta.gameId}
-                engineConfig={meta.engineConfig}
-                onRound={onRound}
-                onLog={onLog}
-              />
+              engine.session?.step.kind === 'decision' ? (
+                // Hold'em gegen den Dealer: dieselben Session-Routen, aber eigener
+                // Geldweg und eigene Antwortform (der Call ist ein zweiter Einsatz)
+                // — darum ein eigener Flow statt SessionGame.
+                <HoldemDealerGame
+                  engine={engine}
+                  gameId={meta.gameId}
+                  engineConfig={meta.engineConfig}
+                  onRound={onRound}
+                  onLog={onLog}
+                />
+              ) : (
+                <SessionGame
+                  engine={engine}
+                  gameId={meta.gameId}
+                  engineConfig={meta.engineConfig}
+                  onRound={onRound}
+                  onLog={onLog}
+                />
+              )
             ) : (
               <SingleBetGame
                 engine={engine}

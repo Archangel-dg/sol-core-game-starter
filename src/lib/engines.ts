@@ -88,9 +88,31 @@ export interface EngineDef {
           // das Blatt behalten will, hält alle Karten. Die Halte-Auswahl ist
           // reiner Zustand der Oberfläche, bis `label` (Ziehen) sie abschickt.
           kind: 'holds'; label: StringKey; cards: number;
+        }
+      | {
+          // holdem-dealer (23.11.2026): EINE Entscheidung zwischen festen
+          // Zügen (`actions`) — beim Hold'em mitgehen (`call`, kostet 2 × Ante:
+          // eine ZWEITE Abbuchung mitten in der Runde) oder aussteigen
+          // (`fold`). Der Zug rechnet die Runde ab, einen Cashout gibt es
+          // nicht. Jeder Zug trägt `schritt` (Wiederholschutz: `view.schritt`
+          // des Servers); der Start braucht den Handschlag
+          // `HOLDEM_DEALER_PROTOCOL` (lib/solcore.ts — wie bei spin-tower-pro
+          // steht er dort und nicht hier: diese Datei bleibt ohne Importe).
+          // Eigener Geldweg und eigene Antwortform (`HoldemDealerView`, nicht
+          // `SessionView`) — darum spielt diese Art `HoldemDealerGame`, nicht
+          // SessionGame (app/page.tsx verzweigt an `kind`).
+          kind: 'decision';
+          actions: readonly { value: string; label: StringKey }[];
         };
     /** Baut den Step-Body. */
-    buildStep: (input: { value?: number; guess?: GuessOption; holds?: readonly number[] }) => Record<string, unknown>;
+    buildStep: (input: {
+      value?: number;
+      guess?: GuessOption;
+      holds?: readonly number[];
+      /** `decision`: der gewählte Zug (`actions[].value`) und `view.schritt`. */
+      action?: string;
+      schritt?: number;
+    }) => Record<string, unknown>;
     /**
      * Nur gesetzt, wenn JEDER Schritt erneut den Einsatz kostet (spin-tower-pro).
      * Alle anderen Session-Engines buchen den Einsatz EINMAL beim Start; jeder
@@ -507,6 +529,41 @@ export const ENGINES: EngineDef[] = [
         holds: [...new Set(i.holds ?? [])].filter((n) => Number.isInteger(n) && n >= 0 && n <= 4).sort((a, b) => a - b),
       }),
       hint: 'engine.video-poker.hint',
+    },
+  },
+  {
+    key: 'holdem-dealer',
+    label: "Hold'em vs Dealer",
+    category: 'Table',
+    // NUR Session, aber mit EIGENEM Geldweg (auf dem Server wie Blackjack):
+    // der Start bucht das Ante und teilt aus, dann EIN Zug — mitgehen (der
+    // Call kostet 2 × Ante, eine zweite Abbuchung) oder aussteigen —, danach
+    // ist abgerechnet. Kein Cashout (`kind: 'decision'`, siehe oben).
+    mechanics: ['session'],
+    blurb: 'engine.holdem-dealer.blurb',
+    playerFacts: {
+      inputs: 'engine.holdem-dealer.inputs',
+      outcomes: 'engine.holdem-dealer.outcomes',
+    },
+    session: {
+      // Body `{ aktion: 'call' | 'fold', schritt }`, `schritt` = `view.schritt`
+      // (0 — es gibt genau einen Zug). Fehlt die Aktion, geht sie bewusst
+      // NICHT als stilles `fold` raus: der Server lehnt den leeren Zug ab.
+      // Die Ante-Tabelle (`anteBps`), der Call-Faktor und der Höchstrückfluss
+      // kommen als Server-Echo in der Engine-Config, der Preis des Calls in
+      // `kosten.call` der laufenden Runde.
+      step: {
+        kind: 'decision',
+        actions: [
+          { value: 'call', label: 'engine.holdem-dealer.call' },
+          { value: 'fold', label: 'engine.holdem-dealer.fold' },
+        ],
+      },
+      buildStep: (i) => ({
+        aktion: i.action === 'call' || i.action === 'fold' ? i.action : undefined,
+        schritt: Number.isInteger(i.schritt) && (i.schritt ?? 0) >= 0 ? i.schritt : 0,
+      }),
+      hint: 'engine.holdem-dealer.hint',
     },
   },
   {

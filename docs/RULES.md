@@ -117,7 +117,10 @@ payout-ready game — automatically.
     (`lib/outcome.ts`); a smaller payout is a partial return, shown calmly as "Back: …" — no win
     sound, no win colour, no "Won" (`hit` carries what happened in the game). A result
     that leaks mid-animation — a highlighted tile, a settled balance, a multiplier in the DOM —
-    is the same lie as a near-miss: it tells the player the animation was theatre. Every label in
+    is the same lie as a near-miss: it tells the player the animation was theatre. So is showing
+    what was NOT played: the cards nobody drew in video poker (`reveal.deck`), and after a Hold'em
+    fold the turn, the river and the dealer's cards (and every hand computed with them) — the
+    answer carries them for the proof page, the table never shows them. Every label in
     a module goes through `ctx.text(...)` (rule 12 holds inside the square too). And the board
     never snaps: a round starts from the picture on screen — the reels turn out of the position
     the last result left them in, never from a reset idle board — and a module that pre-rolls

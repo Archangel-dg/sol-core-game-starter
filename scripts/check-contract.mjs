@@ -23,6 +23,7 @@
  *   6. VERIFY-LINK auf den Sol-Core Scanner — nicht auf rohes JSON.
  *   7. HERKUNFT — „Powered by Sol-Core Engine" am Fuß jeder Seite.
  *   8. PAY-PER-SPIN — Kosten sagen UND anmelden.
+ *  8b. HOLD'EM — der Call ist ein zweiter Einsatz: Preis zeigen UND anmelden.
  *   9. REVEAL — die Animation zeigt nichts, bevor sie steht; jedes Modul
  *      ohne Zufall, ohne Netzwerk, mit Texten aus dem Katalog.
  *  10. TAB-ICON — ein Favicon liegt neben dem Layout; ein leerer Tab sieht
@@ -220,7 +221,7 @@ console.log('\n4) Demo-Modus — risikofrei ausprobieren, bevor Geld fliesst');
     // Jede Spiel-Komponente, die echtes Geld bewegt, muss den Demo-Zweig
     // kennen — sonst spielt der Uebungsmodus stillschweigend mit echtem Geld
     // oder gar nicht.
-    const geldSpiele = ['SingleBetGame', 'SessionGame'];
+    const geldSpiele = ['SingleBetGame', 'SessionGame', 'HoldemDealerGame'];
     const ohneZweig = geldSpiele.filter((n) => {
       const p = join(WURZEL, `src/components/${n}.tsx`);
       if (!existsSync(p)) return false;
@@ -484,6 +485,50 @@ pruef(dateiDa('src/components/PoweredBy.tsx'), 'Herkunftszeile vorhanden (Powere
   }
 }
 
+// ── 8b. Hold'em gegen den Dealer ────────────────────────────────────────────
+{
+  // Gilt nur, wenn diese Kopie den Hold'em-Flow hat. Der Call kostet 2 × Ante —
+  // eine ZWEITE Abbuchung mitten in der Runde. Der Server öffnet eine Runde nur
+  // mit dem Handschlag `holdem-dealer/1` (sonst API-204
+  // protocol_handshake_required), und der Handschlag ist ein Versprechen: der
+  // Spieler hat den Preis gesehen — vor dem Austeilen und auf dem Knopf.
+  const hd = existsSync(join(WURZEL, 'src/components/HoldemDealerGame.tsx'))
+    ? readFileSync(join(WURZEL, 'src/components/HoldemDealerGame.tsx'), 'utf8')
+    : '';
+  if (hd) {
+    console.log("\n8b) Hold'em — der Call ist ein zweiter Einsatz: Preis zeigen UND anmelden");
+    const startCall = hd.slice(hd.indexOf('/session/start`'), hd.indexOf('/session/start`') + 700);
+    pruef(
+      hd.includes('/session/start`') &&
+        /protocol:\s*(HOLDEM_DEALER_PROTOCOL|['"`]holdem-dealer\/1['"`])/.test(startCall),
+      'Der Handschlag wird beim Rundenstart mitgeschickt',
+      'HoldemDealerGame startet ohne `protocol` — der Server lehnt jede Runde mit ' +
+        'API-204 protocol_handshake_required ab.',
+    );
+    for (const rel of ['src/app/api/session/start/route.ts', 'src/app/api/demo/session/start/route.ts']) {
+      const p2 = join(WURZEL, rel);
+      if (!existsSync(p2)) continue;
+      pruef(
+        /protocol/.test(readFileSync(p2, 'utf8')),
+        `Die Route reicht ihn weiter: ${rel.replace('src/app/api/', '')}`,
+        `${rel} liest \`protocol\` nicht aus dem Body — der Handschlag geht auf dem Weg zum Server verloren.`,
+      );
+    }
+    pruef(
+      /session\.hd\.callCosts(Note|Generic)/.test(hd),
+      'Vor dem Austeilen steht, dass der Call 2 × Ante kostet',
+      'Kein Hinweis vor dem Start. Der Handschlag behauptet, der Spieler kenne den ' +
+        'zweiten Einsatz — das darf er nur, wenn es vor dem ersten Klick dasteht.',
+    );
+    pruef(
+      /session\.hd\.callFor/.test(hd) && /callCost\(/.test(hd),
+      'Der Call-Knopf nennt seinen Preis (kosten.call des Servers, mit Gebühren)',
+      'Der Knopf bucht 2 × Ante + Gebühren ab — ohne den Betrag darauf ist er ein ' +
+        'Klick ins Ungewisse.',
+    );
+  }
+}
+
 // ── 9. Reveal-Animationen ───────────────────────────────────────────────────
 // Die Module unter src/reveals/*.js zeigen ein Ergebnis erst, wenn die
 // Animation steht (docs/RULES.md, Regel 16). Was sich statisch prüfen lässt,
@@ -532,7 +577,10 @@ console.log('\n9) Reveal — die Animation zeigt nichts, bevor sie steht');
     ['src/components/SingleBetGame.tsx', 'Einzelwette'],
     ['src/components/SessionGame.tsx', 'Session'],
     ['src/components/TournamentGame.tsx', 'Turnier'],
+    ['src/components/HoldemDealerGame.tsx', "Hold'em"],
   ]) {
+    // Ein Flow, den diese Kopie nicht (mehr) hat, ist kein Bruch.
+    if (rel.includes('HoldemDealerGame') && !INHALT.has(join(WURZEL, rel))) continue;
     const t = INHALT.get(join(WURZEL, rel)) ?? '';
     pruef(
       /<RevealHost[\s\S]*onRevealed=\{onRevealed\}/.test(t),

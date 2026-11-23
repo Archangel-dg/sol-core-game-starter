@@ -121,6 +121,11 @@ via `serverSeedHash`.
     template sends it from `SessionGame` whenever `engine.session.costPerStep` is set, and both
     `app/api/session/start` and `app/api/demo/session/start` forward it. It is a promise that the
     player was TOLD every spin costs — so keep the cost warning if you keep the handshake.
+  - **Hold'em vs Dealer (`holdem-dealer`) must send `protocol: "holdem-dealer/1"`** — the same
+    refusal without it. Here the promise is that the player was told the call is a second stake
+    (2 × the ante); the template sends it from `HoldemDealerGame` and states the price before the
+    deal and on the call button. Every answer of this engine is a `HoldemDealerView` (own flow,
+    not the SessionView below) — see ENGINES.md → Hold'em vs Dealer.
 - `GET /api/game/session/:id` — current state (**reconnect after reload!**)
 - `POST /api/game/session/:id/step` — body per engine (see ENGINES.md)
 - `POST /api/game/session/:id/cashout`
@@ -148,6 +153,16 @@ Rules the UI MUST reflect:
   mode_has_no_cashout`), a missing `holds` is `API-204 holds_required`. Inactivity never refunds
   here: after 15 min the server draws with the mathematically best hold (`progress.autoDraw`).
   Details and the view fields in ENGINES.md → Video Poker.
+- **Hold'em vs Dealer** (`holdem-dealer`) answers on these routes with its own `HoldemDealerView`
+  (`status: "active"|"settled"`, no `progress`). Exactly one step, `{ aktion: "call"|"fold",
+  schritt }` with `schritt = view.schritt`: `fold` costs nothing more (the ante is lost), **`call`
+  debits 2 × the ante + fees** — the price stands in `kosten.call` before the click. The step
+  settles the round; no cash-out (`API-972`). A stale `schritt` answers `API-970` (the current
+  state is in `details.runde` — the template's routes drop `details`, so reload the round with
+  `GET /session/:id`); `API-971` = another step of this round is running. After 15 min without a
+  decision the server folds (`zeitAbgelaufen`) — never a refund, never a call without a tap.
+  After a fold show only what was played (turn, river and the dealer's cards stay face down).
+  Details in ENGINES.md → Hold'em vs Dealer.
 
 ## Tournament layer (gauntlet)
 

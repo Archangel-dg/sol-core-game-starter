@@ -1,6 +1,41 @@
 CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
+2026-11-23 — New engine: Hold'em vs Dealer (`holdem-dealer`, session, own flow)
+- Texas Hold'em against the dealer: ante → two cards for the player, two face down for the dealer, the flop → ONE
+  decision. Fold: the ante is lost. Call: a SECOND stake of 2 × the ante (+ fees), then turn and river; the dealer
+  needs a pair of fours (not qualified: ante by the table, call back; qualified: the better hand wins ante + call 1:1,
+  a tie returns both). No cash-out. 15 minutes without a decision ⇒ the server folds, never a call without a tap.
+- Same `/session/*` routes, but its own answer (`HoldemDealerView`, not `SessionView`) — so its own flow
+  `components/HoldemDealerGame.tsx` instead of a third set of special cases in `SessionGame`. `app/page.tsx` routes the
+  new session step kind `decision` (`lib/engines.ts`: fixed actions call/fold, body `{ aktion, schritt }`) there.
+- The start sends the handshake `protocol: "holdem-dealer/1"` (`HOLDEM_DEALER_PROTOCOL`, `lib/solcore.ts`). Before the
+  deal the panel says what a call will cost; in the decision the call button carries the exact price with fees
+  (`kosten.call` of the round) and a breakdown below it; the 15-minute note under the buttons.
+- `API-970` (the round already moved on — second tab, double click): the flow reloads the round with
+  `GET /session/:id` and shows it (the routes do not forward `details.runde`). A pending, possibly paid call
+  (`zugOffen`) leaves only "Call" active — the server plays a paid call first.
+- The decision settles the round in the same request, so the balance freezes from the click until the reveal shows the
+  result (as in `SingleBetGame`); sound, history and win toast follow `onRevealed`. History: total stake (ante + call)
+  and the round's multiplier = payout ÷ total stake, the same figure as the server's round record.
+- House rule — after a fold only what was played: turn, river and the dealer's cards stay face down, the hand shown is
+  the one with the flop (`spieler.kategorieFlop`) and "Folded — ante lost"; `ende.spielerKategorie`/`dealerKategorie`
+  (computed with turn and river) are never shown then. The answer carries all nine cards for the proof page. One place
+  applies it: `holdemTable` in `lib/holdem-dealer.ts` (flow, text fallback, reveal transcript).
+- Reveal module `src/reveals/holdem-dealer.js`: you, dealer, you, dealer, flop; after a call turn, river, then the
+  dealer turns over; after a fold your cards are laid aside and nothing else moves. Fixtures in
+  `src/reveals/samples/holdem-dealer.js` (every hand checked against the server's evaluator); fold fixtures carry
+  `blind` (the same round without the unplayed cards) and `unplayed` (their faces).
+- `scripts/check-reveals.mjs` (kit): new check "only what was played" — a fold renders the same DOM with and without
+  turn/river/dealer in the transcript (direct and step by step), and no unplayed card face appears at any moment.
+- `scripts/check-contract.mjs`: section 8b (handshake sent and forwarded, price before the deal and on the call
+  button); `HoldemDealerGame` added to the demo-branch check (4) and the reveal-gating check (9).
+- `scripts/check.mjs` sends the handshake when `NEXT_PUBLIC_ENGINE=holdem-dealer`.
+- `lib/reveal-session.ts`: `holdemDealerStepCount`, `holdemDealerOutcome`. `lib/solcore.ts`: `HoldemDealerView` and
+  friends. Parts: `components/HoldemDealerParts.tsx` (ante table from the echo `anteBps`, text table without module).
+- New texts (four languages): `engine.holdem-dealer.*`, `hd.hand.*`, `session.hd.*`, `reveal.holdem.*`.
+- Docs: ENGINES.md (overview, step body, “Hold'em vs Dealer” section, bounds, player facts), API-REFERENCE.md (session
+  layer), CUSTOMIZE.md (design zone, rule 10), RULES.md (rule 16: what was not played stays unseen), `.env.example`.
 2026-11-22 — New engine: Video Poker (`video-poker`, session)
 - Five cards are dealt, the player holds any of them and draws ONCE — that one step settles the round.
   New session step kind `holds` in `lib/engines.ts` (body `{ holds: number[] }`, positions 0–4; `[]` discards

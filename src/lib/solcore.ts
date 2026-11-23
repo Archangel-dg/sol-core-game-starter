@@ -285,6 +285,145 @@ export interface VideoPokerReveal {
   deck: number[];
 }
 
+// ── Hold'em gegen den Dealer (`holdem-dealer`, 23.11.2026) — EIGENE Antwortform ──
+//
+// Läuft über dieselben Routen wie die Session-Schicht (`/session/start`, `/session/:id`,
+// `/session/:id/step`, Spielgeld unter `/demo/…`), aber mit EIGENEM Geldweg — wie Blackjack auf dem
+// Server — und eigener Antwort: `HoldemDealerView`, NICHT `SessionView` (kein `progress`, kein
+// `steps`, kein `potentialPayoutLamports`, Status `active` | `settled`).
+//
+// Ablauf: der Start bucht das Ante (`betLamports`) und teilt aus — zwei Karten für den Spieler, zwei
+// verdeckt für den Dealer, der Flop. Dann EIN Zug `{ aktion: 'call' | 'fold', schritt }`: `fold`
+// kostet nichts mehr (das Ante ist verloren), `call` kostet 2 × Ante — eine ZWEITE Abbuchung mitten
+// in der Runde, ihr Preis mit Gebühren steht vorher in `kosten.call`. Der Zug rechnet die Runde ab;
+// einen Cashout gibt es nicht (API-972). Ohne Handschlag `protocol: HOLDEM_DEALER_PROTOCOL` öffnet
+// der Server keine Runde (API-204 `protocol_handshake_required`). `schritt` ist der Wiederholschutz:
+// genau `view.schritt` (0); passt er nicht, antwortet der Server API-970 (der Stand liegt in
+// `details.runde`, die Route reicht ihn nicht durch — der Client holt ihn mit GET `/session/:id`).
+// 15 Minuten ohne Entscheidung: der Server steigt aus (`zeitAbgelaufen`), nie ein Call ohne Klick.
+//
+// Karten sind Zahlen 0..51 wie bei Video Poker: Rang `k % 13 + 1` (1 = Ass … 13 = König), Farbe
+// `⌊k / 13⌋` (0 ♠, 1 ♥, 2 ♦, 3 ♣). Neun Karten je Runde: 0–1 Spieler, 2–3 Dealer, 4–6 Flop, 7 Turn,
+// 8 River. Die fertige Antwort enthält alle neun — auch nach dem Aussteigen, für den Nachweis.
+// Gezeigt wird dann nur, was gespielt wurde (`lib/holdem-dealer.ts`, `holdemTable`).
+
+/** Pflicht-Handschlag beim Start: der Client weiß, dass der Call ein zweiter Einsatz ist. */
+export const HOLDEM_DEALER_PROTOCOL = 'holdem-dealer/1';
+
+/** Die Hand-Kategorien (beste fünf aus sieben), SCHWÄCHSTE zuerst — Reihenfolge der Ante-Tabelle des Servers. */
+export const HOLDEM_DEALER_HANDS = [
+  'highCard',
+  'pair',
+  'twoPair',
+  'threeOfAKind',
+  'straight',
+  'flush',
+  'fullHouse',
+  'fourOfAKind',
+  'straightFlush',
+  'royalFlush',
+] as const;
+export type HoldemDealerCategory = (typeof HOLDEM_DEALER_HANDS)[number];
+
+export type HoldemDealerAction = 'call' | 'fold';
+
+/** Wie die Runde ausging — die Werte des Servers. */
+export type HoldemDealerResultCode =
+  | 'ausgestiegen'
+  | 'dealer_nicht_qualifiziert'
+  | 'gewonnen'
+  | 'verloren'
+  | 'unentschieden';
+
+export interface HoldemDealerCard {
+  /** 0..51 (Rang = code % 13 + 1, Farbe = ⌊code / 13⌋). */
+  code: number;
+  rang: number;
+  farbe: number;
+}
+
+/** `HoldemDealerView.ende` — erst nach dem Zug. */
+export interface HoldemDealerEnd {
+  aktion: HoldemDealerAction;
+  ergebnis: HoldemDealerResultCode;
+  /** Rückfluss je Ante in bps: aussteigen 0 · nicht qualifiziert 10000 + Ante-Gewinn + 20000 ·
+   *  gewonnen 10000 + Ante-Gewinn + 40000 · gleich 30000 · verloren 0. */
+  rueckflussBps: number;
+  /** Vergleichbare Hand-Werte (größer = besser) — mit Turn und River gerechnet. */
+  spielerWert: number;
+  dealerWert: number;
+  /** Beste fünf aus sieben — MIT Turn und River. Nach dem Aussteigen nicht zeigen (Hausregel). */
+  spielerKategorie: HoldemDealerCategory;
+  dealerKategorie: HoldemDealerCategory;
+  /** Paar Vieren oder besser. */
+  dealerQualifiziert: boolean;
+  /** Ante-Gewinn laut Tabelle in bps (0, wenn das Ante nicht gewinnt). */
+  anteGewinnBps: number;
+}
+
+/** Engine-Config-Echo (`HoldemDealerView.engine.config`, `/api/meta → engineConfig`). */
+export interface HoldemDealerEngineConfig {
+  engineVersion: number;
+  /** Welche geprüfte Ante-Tabelle gilt (`standard`: Royal 100:1, `einsteiger`: 90:1). */
+  tabelle: string;
+  /** Ante-Gewinn je Hand in bps des Antes (10000 = 1:1). */
+  anteBps: Record<HoldemDealerCategory, number>;
+  /** Der Call kostet so viele Ante (2). */
+  callFaktor: number;
+  /**
+   * Die schwächste Hand, mit der sich der Dealer qualifiziert — maschinenlesbar: Kategorie wie `ende.dealerKategorie`, Rang
+   * 2 … 14 (4 = Vieren, 14 = Ass). Heute immer `{ kategorie: 'pair', rang: 4 }`; den Text dazu bringt der Katalog mit.
+   */
+  dealerQualifiziertAb: { kategorie: HoldemDealerCategory; rang: number };
+  /** Höchster Rückfluss je Ante (Royal Flush gegen einen qualifizierten Dealer). */
+  maxRueckflussBps: number;
+  /** Exakte RTP je Ante bei bestem Spiel. */
+  rtpBps: number;
+}
+
+export interface HoldemDealerView {
+  sessionId: string;
+  gameId: string;
+  mode: string;
+  protocol: string;
+  status: 'active' | 'settled';
+  phase: 'entscheidung' | 'fertig';
+  /** Zahl der gespielten Züge (0 oder 1) — der Zug schickt genau diese Zahl mit. */
+  schritt: number;
+  spieler: { karten: HoldemDealerCard[]; kategorieFlop: HoldemDealerCategory };
+  /** Beide `null`, bis die Runde fertig ist. */
+  dealer: { karten: Array<HoldemDealerCard | null> };
+  brett: { flop: HoldemDealerCard[]; turn: HoldemDealerCard | null; river: HoldemDealerCard | null };
+  /** Was jetzt erlaubt ist (`['call', 'fold']` oder `[]`). */
+  erlaubt: HoldemDealerAction[];
+  /** Preis des Calls, solange er erlaubt ist — Einsatz (2 × Ante) und mit Gebühren (das, was abgebucht wird). */
+  kosten: { call?: { einsatzLamports: string; gesamtLamports: string } };
+  anteLamports: string;
+  /** Σ aller gebuchten Einsätze ohne Gebühren (Ante, nach einem Call Ante + Call). */
+  einsatzSummeLamports: string;
+  /** Σ aller Abbuchungen mit Gebühren — Grundlage der Netto-Einordnung (`lib/outcome.ts`). */
+  belastungSummeLamports: string;
+  proof: { serverSeedHash: string; clientSeed: string; nonce: number };
+  engine: { mode: string; config: Record<string, unknown> };
+  // nur bei Ende:
+  ende?: HoldemDealerEnd;
+  rueckflussBps?: number;
+  roundId?: string;
+  /** Ante × Rückfluss (am Auszahl-Deckel des Spiels gekappt, dann `capped`). */
+  payoutLamports?: string;
+  serverSeed?: string;
+  /** Die Auszahlung liegt kurz in Prüfung und kommt danach. */
+  gehalten?: boolean;
+  capped?: boolean;
+  /** Nach 15 Minuten ohne Entscheidung ausgestiegen. */
+  zeitAbgelaufen?: boolean;
+  /** Ein bezahlter Call ist noch nicht bestätigt — der nächste Zug löst ihn auf (bezahlt ⇒ er wird gespielt). */
+  zugOffen?: boolean;
+  /** Nur Hausspiele des Betreibers (SCC) — Creator-Spiele laufen in SOL. */
+  waehrung?: 'scc';
+  kursLamportsJeScc?: string;
+}
+
 /**
  * Pay-per-Spin-Handschlag (`spin-tower-pro`).
  *
@@ -306,7 +445,8 @@ export function sessionStart(
     playerWallet: string;
     betLamports: string;
     clientSeed?: string;
-    /** Nur `spin-tower-pro`: siehe SPIN_TOWER_PROTOCOL. */
+    /** `spin-tower-pro`: SPIN_TOWER_PROTOCOL · `holdem-dealer`: HOLDEM_DEALER_PROTOCOL
+     *  (dann ist die Antwort eine `HoldemDealerView`). */
     protocol?: string;
   },
   playerToken?: string,

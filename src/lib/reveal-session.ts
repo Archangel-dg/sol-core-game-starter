@@ -19,11 +19,16 @@
  * Multiplikator — die Zahl, die das Modul dann zeigt, kommt weiterhin vom
  * Server, nur nicht schrittgenau. Das Endergebnis (win, payout, status) wird
  * immer 1:1 aus der Sicht gelesen.
+ *
+ * Hold'em gegen den Dealer hat eine EIGENE Sicht (`HoldemDealerView`, eigener
+ * Geldweg) — sein Protokoll bauen `holdemDealerStepCount`/`holdemDealerOutcome`
+ * am Ende dieser Datei, nicht die Weichen für `SessionView`.
  */
 
-import type { SessionView, TournamentRunView } from '@/lib/solcore';
+import type { HoldemDealerView, SessionView, TournamentRunView } from '@/lib/solcore';
 import { outcomeTone, sessionCharge } from '@/lib/outcome';
 import { videoPokerRound, videoPokerTable } from '@/lib/video-poker';
+import { holdemTable, roundMultiplierBps } from '@/lib/holdem-dealer';
 
 export interface SpinRecord {
   outcome: { kind: 'tower' | 'joker' | 'nothing' | 'fail'; tower?: number };
@@ -279,6 +284,54 @@ export function sessionOutcome(engineKey: string, view: SessionView, tr: Session
     default:
       return null;
   }
+}
+
+/**
+ * Hold'em gegen den Dealer: zwei Schritte im Protokoll — das Austeilen (1) und
+ * die Entscheidung (2). So steht bei der Entscheidung `from = 1`: das Modul
+ * lässt den ausgeteilten Tisch liegen und bewegt nur, was danach kommt.
+ */
+export function holdemDealerStepCount(view: HoldemDealerView | null | undefined): number {
+  if (!view) return 0;
+  return view.status === 'settled' ? 2 : 1;
+}
+
+/**
+ * Das Protokoll einer Hold'em-Runde für das Modul `src/reveals/holdem-dealer.js`.
+ * Es enthält NUR, was am Tisch liegen darf (`holdemTable`, Hausregel): nach dem
+ * Aussteigen fehlen Turn, River, die Karten des Dealers und die Wertungen mit
+ * sieben Karten — die Antwort trägt sie nur für den Nachweis. Hände, Ergebnis
+ * und Auszahlung kommen vom Server; `multiplierBps` ist Auszahlung ÷
+ * Gesamteinsatz (wie `creator_rounds`), `win` das Netto-Urteil gegen Ante +
+ * Call + Gebühren (`belastungSummeLamports`).
+ */
+export function holdemDealerOutcome(view: HoldemDealerView): Record<string, unknown> {
+  const tisch = holdemTable(view)!;
+  const settled = view.status === 'settled';
+  const payout = settled ? (view.payoutLamports ?? '0') : '0';
+  return {
+    sessionId: view.sessionId,
+    betLamports: view.anteLamports,
+    status: settled ? 'settled' : 'active',
+    player: tisch.player,
+    flop: tisch.flop,
+    turn: tisch.turn,
+    river: tisch.river,
+    dealer: tisch.dealer,
+    flopHand: tisch.flopHand,
+    action: tisch.action,
+    result: tisch.result,
+    playerHand: tisch.playerHand,
+    dealerHand: tisch.dealerHand,
+    dealerQualified: tisch.dealerQualified,
+    multiplierBps: settled ? roundMultiplierBps(view) : 0,
+    payoutLamports: payout,
+    win: settled && outcomeTone(payout, view.belastungSummeLamports) === 'win',
+    // Spielgeschehen: etwas kam zurück (auch der Gleichstand, der beide Einsätze zurückgibt).
+    hit: settled && payout !== '0',
+    capped: view.capped === true,
+    timedOut: tisch.timedOut,
+  };
 }
 
 /** Das Protokoll eines Turnierlaufs (gauntlet): der Verlauf IST die Geschichte. */

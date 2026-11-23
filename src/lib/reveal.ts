@@ -32,6 +32,13 @@
  * Beschriftung läuft über `ctx.text(schlüssel)` durch den Sprachkatalog
  * (`lib/strings.ts`, vier Sprachen) — ein Modul, das „Won" hart schreibt,
  * spricht in einem französischen Spiel plötzlich Englisch.
+ *
+ * Zu 3. gehört auch: WAS NICHT GESPIELT WURDE, BLEIBT UNGESEHEN. Nach dem
+ * Aussteigen beim Hold'em liegen Turn, River und die Karten des Dealers in der
+ * Antwort (für den Nachweis), am Tisch erscheinen sie nicht — „was wäre
+ * gekommen" ist ein Beinahe-Gewinn, wie die nicht gezogenen Karten bei Video
+ * Poker. Der Prüfstand spielt jedes Aussteigen mit und ohne diese Karten und
+ * verlangt dasselbe Bild.
  */
 
 export type RevealMechanic = 'single' | 'session' | 'tournament' | 'pvp';
@@ -257,6 +264,10 @@ const LOADERS: Record<string, Loader> = {
   // Video Poker: Austeilen und Ziehen sind die zwei Schritte des Protokolls;
   // gehalten wird auf dem Brett (Halte-Kanal `setHolds`).
   'video-poker': () => import('@/reveals/video-poker'),
+  // Hold'em gegen den Dealer: eigene Sicht und eigener Flow (HoldemDealerGame),
+  // das Protokoll baut `holdemDealerOutcome` — Austeilen, dann die Entscheidung.
+  // Nach dem Aussteigen zeichnet das Modul nur, was gespielt wurde.
+  'holdem-dealer': () => import('@/reveals/holdem-dealer'),
   // Turnier: der Lauf-Verlauf (`history`) ist das Protokoll.
   gauntlet: () => import('@/reveals/gauntlet'),
 };

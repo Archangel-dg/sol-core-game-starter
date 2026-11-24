@@ -31,7 +31,10 @@ import {
  *  5. reicht die Feld-Auswahl (`pick`) an Module weiter, die einen Rückkanal
  *     anbieten, und meldet über `onPickSupport`, OB dieses Modul einen hat —
  *     daran entscheidet der Flow, ob er seine eigene Ersatz-Auswahl zeigt.
- *     Dasselbe für die Halte-Auswahl von video-poker (`holds`/`onHoldSupport`).
+ *     Dasselbe für die Halte-Auswahl von video-poker (`holds`/`onHoldSupport`);
+ *  6. lässt Runden überlappen, wenn der Flow es will (`multi`) und das Modul es
+ *     kann (`drop`, plinko: mehrere Kugeln zugleich) — und sagt über
+ *     `onMultiSupport`, ob es das kann.
  *
  * Zu 5. gehört eine Ehrlichkeit, die leicht verlorengeht: `onPickSupport(false)`
  * kommt auch dann, wenn das Modul gar nicht erst geladen hat (Netzfehler,
@@ -82,12 +85,26 @@ export interface RevealHostProps {
   holds?: RevealHoldOptions | null;
   /** Kann dieses Modul Karten halten lassen? `false` ⇒ der Flow zeigt eigene Knöpfe. */
   onHoldSupport?: (supported: boolean) => void;
+  /**
+   * MEHRERE RUNDEN ZUGLEICH (plinko, 25.11.2026). Mit `multi` und einem Modul,
+   * das `drop` anbietet, fällt jede NEUE Runde aus `outcomes` neben den
+   * laufenden — keine löst eine andere ab, jede meldet sich selbst über
+   * `onRevealed`, sobald SIE liegt. Eine Liste statt eines Werts, weil zwei
+   * Antworten im selben Render ankommen können: Ein einzelnes `outcome` sähe
+   * dann nur die zweite. Ohne `drop` (oder ohne `multi`) gilt `outcome` wie
+   * immer — eine Runde zur Zeit.
+   */
+  multi?: boolean;
+  /** Die Runden für `multi` — der Aufrufer hängt jede neue an (neues Objekt je Runde); jede fällt genau einmal. */
+  outcomes?: readonly unknown[];
+  /** Kann dieses Modul Runden überlappen lassen (`drop`)? Kommt nach jedem Ein- und Ausbau. */
+  onMultiSupport?: (supported: boolean) => void;
   /** Übersetzte Kurzbeschreibung der Engine für den Leerlauf (siehe RevealContext.hint). */
   hint?: string | null;
   className?: string;
 }
 
-export function RevealHost({ engineKey, engineConfig, outcome, from, pending = false, onRevealed, pick = null, onPickSupport, holds = null, onHoldSupport, hint = null, className = '' }: RevealHostProps) {
+export function RevealHost({ engineKey, engineConfig, outcome, from, pending = false, onRevealed, pick = null, onPickSupport, holds = null, onHoldSupport, multi = false, outcomes, onMultiSupport, hint = null, className = '' }: RevealHostProps) {
   const t = useT();
   const { format } = useFiat();
   const { enabled: motionOn } = useMotion();
@@ -100,8 +117,12 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, pending = f
   // Alles Lebendige in einem Ref: Das Modul hält den Kontext einmal, ruft
   // aber `ctx.text(...)` erst beim Schreiben — so trifft ein Sprachwechsel
   // auch Beschriftungen, die nach dem Einbau entstehen.
-  const live = useRef({ t, format, engineConfig: engineConfig ?? null, onRevealed, hint, pick, onPickSupport, holds, onHoldSupport });
-  live.current = { t, format, engineConfig: engineConfig ?? null, onRevealed, hint, pick, onPickSupport, holds, onHoldSupport };
+  const live = useRef({ t, format, engineConfig: engineConfig ?? null, onRevealed, hint, pick, onPickSupport, holds, onHoldSupport, onMultiSupport });
+  live.current = { t, format, engineConfig: engineConfig ?? null, onRevealed, hint, pick, onPickSupport, holds, onHoldSupport, onMultiSupport };
+  /** Mehrere Runden zugleich: die Meldungen der Runden, die noch fallen — beim Abbau gelten sie als gezeigt. */
+  const offen = useRef(new Set<() => void>());
+  /** Mehrere Runden zugleich: was schon gefallen ist (jede Runde genau einmal, auch über einen Neu-Einbau hinweg). */
+  const gefallen = useRef(new WeakSet<object>());
 
   const ctx = useMemo<RevealContext>(
     () => ({
@@ -153,10 +174,15 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, pending = f
     // entscheidet, ob er seine Ersatz-Auswahl zeigt.
     live.current.onPickSupport?.(typeof ctl.setPick === 'function');
     live.current.onHoldSupport?.(typeof ctl.setHolds === 'function');
+    live.current.onMultiSupport?.(typeof ctl.drop === 'function');
     return () => {
       ctlRef.current = null;
       live.current.onPickSupport?.(false); // ausgebaut ⇒ nichts ist mehr bedienbar
       live.current.onHoldSupport?.(false);
+      live.current.onMultiSupport?.(false);
+      // Runden, die noch fielen, haben stattgefunden — sie gelten als gezeigt (Verlauf, Saldo).
+      for (const melde of [...offen.current]) melde();
+      offen.current.clear();
       ctl.destroy();
       // Nicht jedes Modul räumt seine Knoten selbst weg — der Host tut es
       // immer, sonst stapeln sich im Dev-Strict-Mode zwei Bretter übereinander.
@@ -190,6 +216,29 @@ export function RevealHost({ engineKey, engineConfig, outcome, from, pending = f
     // liest isReducedMotion() beim Start ohnehin frisch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outcome, from, mounted]);
+
+  // 3a. Mehrere Runden zugleich (`multi` + `drop`): Jede NEUE Runde aus `outcomes` fällt neben den laufenden. Keine
+  //     löst eine andere ab — jede meldet sich, wenn SIE liegt; nur der Abbau meldet die übrigen (Einbau-Effekt).
+  useEffect(() => {
+    const ctl = ctlRef.current;
+    if (!ctl || !multi || !ctl.drop || !outcomes) return;
+    for (const o of outcomes) {
+      if (o === null || typeof o !== 'object' || gefallen.current.has(o)) continue;
+      gefallen.current.add(o);
+      let settled = false;
+      const notify = () => {
+        if (settled) return;
+        settled = true;
+        offen.current.delete(notify);
+        live.current.onRevealed?.(o);
+      };
+      offen.current.add(notify);
+      void ctl
+        .drop(o, { reducedMotion: isReducedMotion() })
+        .then(notify)
+        .catch(() => notify()); // ein Fehler in der Animation darf nichts zurückhalten
+    }
+  }, [outcomes, multi, mounted]);
 
   // 3b. Vorlauf. Läuft NACH dem Abspiel-Effekt: Kommen Ergebnis und Ende der
   //     Anfrage im selben Render, hat `play()` den Vorlauf schon übernommen und

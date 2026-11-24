@@ -107,7 +107,7 @@ result away moves before the animation has ended.
 Want the coin to be a card, the plinko board to be a rocket track? Replace the module file. The
 contract is in `src/lib/reveal.ts` (`RevealModule`) and it is small: `mount(root, ctx)` returns
 `{ play(outcome, { reducedMotion, from }), reset(), destroy() }` plus, optionally,
-`arm({ reducedMotion })` / `disarm()`, `setPick(opts)` and `setHolds(opts)`. `ctx.engineConfig` carries the
+`arm({ reducedMotion })` / `disarm()`, `setPick(opts)`, `setHolds(opts)` and `drop(outcome, opts)`. `ctx.engineConfig` carries the
 game's real dimensions (rows, grid size, pockets, ladder …) — draw the idle board from it; the
 outcome carries the round's own details. `ctx.text(key)` reads the catalog (four languages),
 `ctx.fmt` formats money exactly like the rest of the interface. Fixtures with the exact server
@@ -178,6 +178,22 @@ Binding rules (rule 16 in `docs/RULES.md`):
    (`o.action !== 'call'` ⇒ read no `turn`, `river`, `dealer`, `playerHand`, `dealerHand`). The
    kit's check plays every fold fixture with and without them (`blind`) and wants the same DOM,
    and scans the whole animation for the `unplayed` faces. After a call everything is revealed.
+11. **Several rounds at once** (`plinko`, `drop(outcome, opts)`, 25.11.2026). A module that
+   offers `drop` lets rounds overlap: every tap on Play is its own bet, and while balls are still
+   falling the next one drops next to them. `SingleBetGame` keeps Play enabled then — at most
+   ten rounds at once (requests in flight included) and at most 25 taps per 10 s, below the
+   engine's limit of 30 bets per player and game in 10 s (`API-304`). What is binding:
+   - each dropped round has its own ball and its own clock, and resolves when IT has landed —
+     in landing order; the others never wait, slow down or jump;
+   - rules 1–5 hold per round: its path only from its outcome, the readout shows only rounds
+     that have landed (the one that landed last), nothing of a falling ball shows early;
+   - `play()`, `reset()` and `destroy()` end every dropped round too and resolve their promises —
+     those rounds took place, history and balance need them.
+   The flow hands every new round to `RevealHost` in a list (`outcomes`), not one value: two
+   answers can arrive in the same render, and a single `outcome` would only see the second.
+   History, sound and win toast follow `onRevealed` per round; the balance stays frozen until
+   the last ball has landed (the server's balance already holds the payouts of balls still
+   falling). Without `drop` nothing changes: one round, then the next.
 
 Session engines play their transcript STEP BY STEP: `play(o, { from })` says how many steps
 already stand on the board; the module sets those instantly and animates only the new step.

@@ -124,7 +124,9 @@ payout-ready game — automatically.
     a module goes through `ctx.text(...)` (rule 12 holds inside the square too). And the board
     never snaps: a round starts from the picture on screen — the reels turn out of the position
     the last result left them in, never from a reset idle board — and a module that pre-rolls
-    while the outcome is on its way (`arm`/`disarm`) shows nothing it does not know. `npm run
+    while the outcome is on its way (`arm`/`disarm`) shows nothing it does not know. Where rounds
+    may overlap (`drop`, plinko: several balls at once) all of this holds PER ROUND: each ball
+    shows its result only once IT has landed, and the balance waits for the last ball. `npm run
     check:contract` checks the static half (section 9); the kit's browser check plays every module
     against fixtures and reads the DOM mid-flight.
 

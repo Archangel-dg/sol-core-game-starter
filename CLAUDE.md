@@ -84,7 +84,9 @@ them only if the user explicitly asks and you are certain the contract with the 
     `TournamentGame`, `HoldemDealerGame`, the PvP dice boards) wait for `onRevealed` before HUD, sound, history,
     balance and toast move. A round starts from the picture on screen — never a snap back to
     idle between rounds; the optional `arm()`/`disarm()` pre-roll while the outcome is on its way
-    (`pending` on `RevealHost`) knows no result and shows none. `check:contract` section 9 checks
+    (`pending` on `RevealHost`) knows no result and shows none. A module with the optional
+    `drop()` (plinko) lets rounds overlap — several balls at once, each its own bet; every rule
+    holds per round, and the balance waits for the last ball. `check:contract` section 9 checks
     the static half.
 
 ## Tasks that are safe

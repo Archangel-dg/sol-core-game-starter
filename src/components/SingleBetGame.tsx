@@ -63,6 +63,19 @@ function plinkoControls(engine: EngineDef, engineConfig?: Record<string, number>
  */
 const REVEAL_BACKSTOP_MS = 5_000;
 
+/**
+ * MEHRERE RUNDEN ZUGLEICH (plinko, 25.11.2026: „mehrere Kugeln durch mehrfaches
+ * Antippen“). Bietet das Reveal-Modul `drop` (lib/reveal.ts), bleibt „Spielen“
+ * frei, solange Runden fallen — jede bleibt eine eigene Wette mit eigenem Seed,
+ * eigenem Nachweis und eigenem Verlaufseintrag. Höchstens `MULTI_MAX` zugleich
+ * (die noch unterwegs zum Server mitgezählt) und höchstens `MULTI_PER_WINDOW`
+ * je `MULTI_WINDOW_MS`: Sol-Core nimmt je Spieler und Spiel 30 Wetten in 10 s
+ * an (darüber API-304) — 25 lassen Luft.
+ */
+const MULTI_MAX = 10;
+const MULTI_WINDOW_MS = 10_000;
+const MULTI_PER_WINDOW = 25;
+
 /** Das Ergebnis einer Runde, so wie es ins Reveal-Modul geht: das Server-
  *  Ergebnis plus Einsatz, Runden-ID und die Engine-Geometrie. */
 interface RoundOutcome {
@@ -116,6 +129,8 @@ export function SingleBetGame({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RoundOutcome | null>(null);
+  /** Mehrere Runden zugleich: die jüngsten Runden für den Host (jede fällt dort genau einmal, siehe RevealHost `outcomes`). */
+  const [dropped, setDropped] = useState<readonly RoundOutcome[]>([]);
   /**
    * Was erst mit der Landung sichtbar werden darf: Ton, Verlaufseintrag,
    * Saldo. Bis dahin liegt es hier und NICHT in der Oberfläche — je Runde
@@ -128,8 +143,19 @@ export function SingleBetGame({
   // Runde zurück, die vielleicht schon abgerechnet war, statt eine zweite zu buchen.
   const openBet = useRef<{ key: string; bet: string; params: string; clientSeed: string } | null>(null);
   /** Läuft gerade eine Animation? Solange ja, bleibt „Spielen" gesperrt: Die
-   *  nächste Runde darf erst starten, wenn diese sichtbar entschieden ist. */
+   *  nächste Runde darf erst starten, wenn diese sichtbar entschieden ist —
+   *  außer das Modul lässt Runden überlappen (`multi`, siehe MULTI_MAX). */
   const [revealing, setRevealing] = useState(false);
+  /** Kann das Reveal-Modul Runden überlappen lassen (`drop`)? Meldet der Host nach jedem Einbau. */
+  const [multi, setMulti] = useState(false);
+  /** Anfragen unterwegs — als Ref für den Klick (genau), als Zustand für den Knopf. */
+  const requestsNow = useRef(0);
+  const [requests, setRequests] = useState(0);
+  /** Runden mit Ergebnis, deren Animation noch läuft (Größe von `pendingReveal`, für den Knopf). */
+  const [unrevealed, setUnrevealed] = useState(0);
+  /** Mehrere Runden: die Zeitpunkte der letzten Klicks (Drossel) und ob sie gerade voll ist. */
+  const recentPlays = useRef<number[]>([]);
+  const [throttled, setThrottled] = useState(false);
 
   // Render-Grenzen aus der Server-Config — ändert NICHT die params-Struktur
   // (buildSingleParams bleibt unverändert), nur die angezeigten Controls.
@@ -162,6 +188,21 @@ export function SingleBetGame({
 
   const play = async () => {
     if (!wallet) return;
+    if (multi) {
+      // Mehrere Runden zugleich: höchstens MULTI_MAX im Spiel, höchstens MULTI_PER_WINDOW je MULTI_WINDOW_MS.
+      if (requestsNow.current + pendingReveal.current.size >= MULTI_MAX) return;
+      const now = Date.now();
+      recentPlays.current = recentPlays.current.filter((t0) => now - t0 < MULTI_WINDOW_MS);
+      if (recentPlays.current.length >= MULTI_PER_WINDOW) return;
+      recentPlays.current.push(now);
+      if (recentPlays.current.length >= MULTI_PER_WINDOW) {
+        // Voll: Der Knopf wartet, bis der älteste Klick aus dem Fenster fällt.
+        setThrottled(true);
+        setTimeout(() => setThrottled(false), recentPlays.current[0]! + MULTI_WINDOW_MS - now + 20);
+      }
+    }
+    requestsNow.current += 1;
+    setRequests(requestsNow.current);
     setBusy(true);
     setError(null);
     // Das letzte Ergebnis bleibt bewusst stehen: Das Reveal-Modul startet aus
@@ -169,14 +210,15 @@ export function SingleBetGame({
     // leert die Ergebnis-Knoten selbst; `pending` am Host lässt es vorlaufen.
     // Ein `setResult(null)` hier hieße Sprung in den Leerlauf vor jeder Runde.
     sfx('bet');
+    /** Die Echtgeld-Wette dieses Klicks (Schlüssel + Seed) — auch im catch bekannt, falls ihr Ausgang offen bleibt. */
+    let thisBet: { key: string; bet: string; params: string; clientSeed: string } | null = null;
     try {
       const betLamports = solToLamports(bet);
       let params: Record<string, unknown>;
       if (isRoulette) {
         if (rouletteSpots.length === 0) {
           setError(t('bet.pickField'));
-          setBusy(false);
-          return;
+          return; // `finally` zählt die Anfrage wieder ab
         }
         if (roulettePro) {
           // Gesamteinsatz gleichmäßig auf die Chips verteilen — der Rest (in
@@ -186,8 +228,7 @@ export function SingleBetGame({
           const base = betLamports / n;
           if (base <= 0n) {
             setError(t('bet.stakeTooSmall'));
-            setBusy(false);
-            return;
+            return; // `finally` zählt die Anfrage wieder ab
           }
           let rem = betLamports - base * n;
           params = {
@@ -215,12 +256,14 @@ export function SingleBetGame({
       const paramsText = JSON.stringify(params);
       const open = openBet.current;
       // Nur mit Echtgeld; dieselben Eingaben wie die offene Wette ⇒ dieselbe Wette.
-      const thisBet = demo
+      thisBet = demo
         ? null
         : open && open.bet === betText && open.params === paramsText
           ? open
           : { key: newBetKey(), bet: betText, params: paramsText, clientSeed: randomHexSeed() };
-      openBet.current = thisBet;
+      // Offen heißt: AUSGANG offen (siehe unten), nicht „noch unterwegs“. Ein zweiter Klick, während diese Wette läuft,
+      // ist eine NEUE Wette (mehrere Runden zugleich) — mit demselben Schlüssel bekäme er API-316.
+      if (thisBet === open) openBet.current = null;
       const payload = {
         playerWallet: wallet,
         betLamports: betText,
@@ -238,9 +281,9 @@ export function SingleBetGame({
           }).then((x) => x.json())
         : await moneyFetch(`${apiBase}/play`, payload);
       // Ausgang klar (Ergebnis oder klare Absage) ⇒ der Schlüssel ist verbraucht. Offen bleibt er nur nach einem
-      // Serverfehler (API-500) oder solange die erste Anfrage noch läuft (API-316); ein Netzfehler landet unten im catch
-      // und lässt ihn ebenfalls stehen.
-      if (!(r.error && (r.error.code === 'API-500' || r.error.code === 'API-316'))) openBet.current = null;
+      // Serverfehler (API-500) oder solange die erste Anfrage noch läuft (API-316) — dann wiederholt der nächste Klick
+      // mit denselben Eingaben genau diese Wette; ein Netzfehler landet unten im catch und merkt sie ebenso.
+      if (r.error && (r.error.code === 'API-500' || r.error.code === 'API-316')) openBet.current = thisBet;
       if (r.error) {
         const details = r.error.details as Record<string, unknown> | undefined;
         const reason = typeof details?.reason === 'string' ? details.reason : undefined;
@@ -268,8 +311,9 @@ export function SingleBetGame({
           roundId: r.roundId,
         },
       });
+      setUnrevealed(pendingReveal.current.size);
       setRevealing(true);
-      setResult({
+      const round: RoundOutcome = {
         roundId: r.roundId,
         win,
         hit: r.result.win === true,
@@ -279,15 +323,27 @@ export function SingleBetGame({
         details: r.result.details ?? null,
         betLamports: betLamports.toString(),
         engineConfig: engineConfig ?? null,
-      });
+      };
+      // Mehrere Runden zugleich: anhängen statt ersetzen — zwei Antworten im selben Render fallen so beide.
+      if (multi) setDropped((alt) => [...alt.slice(-2 * MULTI_MAX), round]);
+      else setResult(round);
       // Der Seed-Hash gehört zur Runde, nicht zum Ausgang — er verrät nichts
       // und bleibt deshalb sofort erreichbar (Nachprüfbarkeit, Regel 6).
       onRound(r.proof.serverSeedHash, r.roundId);
     } catch (e) {
+      // Netz weg: Ob die Wette ankam, ist offen — derselbe nächste Klick wiederholt sie (siehe openBet).
+      if (thisBet) openBet.current = thisBet;
       setError((e as Error).message);
       sfx('error');
     } finally {
-      setBusy(false);
+      requestsNow.current -= 1;
+      setRequests(requestsNow.current);
+      setBusy(requestsNow.current > 0);
+      // Kam keine Runde mehr zustande und fällt nichts mehr, taut der Saldo auf (mehrere Runden: erst dann).
+      if (requestsNow.current === 0 && pendingReveal.current.size === 0) {
+        release();
+        if (demo) void refreshDemoBalance();
+      }
     }
   };
 
@@ -297,13 +353,17 @@ export function SingleBetGame({
       const roundId = (outcome as RoundOutcome | null)?.roundId;
       const p = roundId ? pendingReveal.current.get(roundId) : undefined;
       if (roundId) pendingReveal.current.delete(roundId);
-      setRevealing(false);
-      release();
+      setUnrevealed(pendingReveal.current.size);
+      setRevealing(pendingReveal.current.size > 0);
+      // Der Saldo taut erst auf, wenn KEINE Runde mehr fällt und keine Anfrage mehr unterwegs ist: Der Server-Stand
+      // enthält die Gewinne aller Runden — auch der Kugeln, die noch fallen (mehrere Runden zugleich).
+      const allesGezeigt = pendingReveal.current.size === 0 && requestsNow.current === 0;
+      if (allesGezeigt) release();
       if (!p) return;
       // Teil-Rückzahlung: kein Gewinnton, nur ein leiser Abschluss-Klick.
       sfx(p.tone === 'win' ? 'win' : p.tone === 'partial' ? 'click' : 'lose');
       onLog(p.log);
-      if (demo) void refreshDemoBalance();
+      if (demo && allesGezeigt) void refreshDemoBalance();
     },
     [release, sfx, onLog, demo, refreshDemoBalance],
   );
@@ -331,6 +391,10 @@ export function SingleBetGame({
             outcome={result}
             pending={busy}
             onRevealed={onRevealed}
+            // Mehrere Runden zugleich, wenn das Modul es kann (plinko: `drop`) — der Host sagt es über onMultiSupport.
+            multi
+            outcomes={dropped}
+            onMultiSupport={setMulti}
             hint={t(engine.blurb)}
           />
         ) : result ? (
@@ -399,11 +463,17 @@ export function SingleBetGame({
           onClick={() => void play()}
           // Gesperrt, solange die Animation läuft: Die nächste Runde darf erst
           // starten, wenn diese sichtbar entschieden ist — sonst stünde ein
-          // Ergebnis im Verlauf, das nie zu sehen war.
-          disabled={busy || revealing || !connected}
+          // Ergebnis im Verlauf, das nie zu sehen war. Ausnahme: Module, die
+          // Runden überlappen lassen (plinko, `drop`) — dort fällt jede Runde
+          // als eigene Kugel und hat ihren eigenen Verlaufseintrag; gesperrt
+          // erst bei MULTI_MAX zugleich oder voller Drossel.
+          disabled={
+            !connected ||
+            (multi ? requests + unrevealed >= MULTI_MAX || throttled : busy || revealing)
+          }
           className="mt-4 w-full rounded-xl bg-gradient-to-r from-accent to-accent-soft py-3 font-semibold text-night disabled:opacity-40"
         >
-          {!connected ? t('common.connectWallet') : busy ? t('bet.running') : t('common.play')}
+          {!connected ? t('common.connectWallet') : busy && !multi ? t('bet.running') : t('common.play')}
         </button>
 
         {error && <p className="mt-3 text-sm text-red-400">{error}</p>}

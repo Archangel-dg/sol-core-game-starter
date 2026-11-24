@@ -211,6 +211,22 @@ export interface RevealController {
    * fertigen Ergebnisses bleiben stehen.
    */
   setHolds?(opts: RevealHoldOptions | null): void;
+  /**
+   * Optional — MEHRERE RUNDEN ZUGLEICH (plinko, 25.11.2026: „mehrere Kugeln
+   * durch mehrfaches Antippen“). Spielt EINE Runde mehr ab, NEBEN denen, die
+   * schon laufen: eine weitere Kugel fällt, die anderen fallen ungestört
+   * weiter. Löst auf, sobald DIESE Runde ihr Endbild hat (ihre Kugel liegt) —
+   * jede Runde für sich, in der Reihenfolge ihrer Landung, nicht ihres Starts.
+   *
+   * Dieselben fünf Regeln wie `play()`, je Runde: ihr Weg allein aus ihrem
+   * Ergebnis, ihre Ergebnis-Knoten bleiben leer, bis SIE liegt, kein
+   * Near-Miss. Ein Modul mit `drop` sagt damit: Runden dürfen sich bei mir
+   * überlappen. Der Flow lässt „Spielen“ dann frei, solange Runden fallen
+   * (höchstens zehn zugleich, siehe SingleBetGame); ohne `drop` bleibt alles
+   * wie bisher — eine Runde, dann die nächste. `play()`, `reset()` und
+   * `destroy()` beenden auch alle Runden, die über `drop` laufen.
+   */
+  drop?(outcome: unknown, opts: RevealPlayOptions): Promise<void>;
   /** Zurück zum Leerlauf — synchron. Stellung der Walzen/Figuren bleibt, nur
    *  Ergebnis, Markierungen und ein laufender Vorlauf gehen. */
   reset(): void;

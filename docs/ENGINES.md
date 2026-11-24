@@ -444,7 +444,7 @@ shown in the game's empty state). Loss is always **0× (bet lost)**; max win:
 | `dice` | target + over/under | riskier pick = higher multiplier | `(1−edge)/winChance` |
 | `limbo` | a target multiplier | hit pays exactly the target | your target (level cap) |
 | `scratch` | — (buy a ticket) | prize table from blank to jackpot | top prize of the paytable |
-| `plinko` | — (drop the ball) | slot decides; edges pay big | edge slot of the paytable |
+| `plinko` | — (drop the ball; tap again while it falls for another ball, each its own bet) | slot decides; edges pay big | edge slot of the paytable |
 | `wheel` | — (spin) | one segment wins | top segment of the paytable |
 | `mines` | one safe tile per move (session) | each safe pick grows the multiplier; mine = loss; cash out after every pick | compounds per pick |
 | `hilo` | higher/lower on the dealt card (session) | right guess grows the multiplier; tie/wrong = loss; chain ends after the configured steps | compounds per step |
@@ -529,6 +529,12 @@ from the server's `details.grid`; the column stagger is a pure reveal animation,
   `holdem-dealer`, whose call is a second debit of 2 × the ante** (step kind `decision`, priced
   in `kosten.call` of the round).
 - Session rules (bust, auto-cashout, 15-minute timeout) — see `API-REFERENCE.md`.
+- **`plinko`: several balls at once (25.11.2026).** Every tap on Play is its own bet — own nonce,
+  own proof, own history entry — and the engine settles each one on its own; nothing locks a
+  player to one round. The reveal module offers `drop` (see `CUSTOMIZE.md`, rule 11), so
+  `SingleBetGame` keeps Play enabled while balls fall: at most 10 at once, at most 25 taps per
+  10 s (the engine takes 30 bets per player and game in 10 s, then `API-304`). This is not the
+  multi-shot `balls` param above — that is ONE bet whose multiplier is the average of N balls.
 - Which engine your game runs is fixed by the **creator when the game is registered** — the `.env`
   here must match it.
 

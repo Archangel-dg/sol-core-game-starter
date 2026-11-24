@@ -1,6 +1,25 @@
 CHANGELOG — Sol-Core Game Starter (the copyable game template)
 =====================================================================
 Newest entry first. Bullet points only.
+2026-11-25 — Plinko: several balls at once (tap Play again while balls fall)
+- Every tap is its own bet (own nonce, own proof, own history entry). The engine always settled each bet on its own;
+  the template used to lock Play until the ball had landed. Now `SingleBetGame` keeps Play enabled while balls fall —
+  at most 10 rounds at once (requests in flight included) and at most 25 taps per 10 s, below the engine's 30 bets per
+  player and game in 10 s (`API-304`).
+- Reveal contract (`src/lib/reveal.ts`): optional `drop(outcome, opts)` — one round MORE next to the ones already
+  playing, resolves when THAT round's final frame stands. `play()`, `reset()` and `destroy()` end dropped rounds too.
+  Modules without `drop` keep one round at a time. `src/reveals/plinko.js` implements it: each ball its own clock, pins
+  and buckets lit per ball, the readout written only when a ball has landed; a volley's last ball stays in its bucket
+  until the next one drops.
+- `RevealHost`: `multi` + `outcomes` (a list, so two answers in one render both drop) + `onMultiSupport`.
+- `SingleBetGame`: the balance stays frozen until the last ball has landed; history, sound and win toast per round
+  (`onRevealed`). Retry protection fixed for overlapping rounds: a bet counts as "open" only once its outcome is unclear
+  (API-500/316, network error) — a second tap while a bet is still running is a NEW bet, not a retry with the same key
+  (which Sol-Core would refuse with `API-316`).
+- `scripts/check-reveals.mjs` (kit): new check "several rounds" for modules with `drop` — three rounds in quick
+  succession, nothing of a result in the DOM before the first lands, each resolves, the final frame carries the last
+  landed round, reduced motion < 400 ms, `reset()` resolves a falling round.
+- Docs: `CUSTOMIZE.md` rule 11, `ENGINES.md` notes.
 2026-11-23 — New engine: Hold'em vs Dealer (`holdem-dealer`, session, own flow)
 - Texas Hold'em against the dealer: ante → two cards for the player, two face down for the dealer, the flop → ONE
   decision. Fold: the ante is lost. Call: a SECOND stake of 2 × the ante (+ fees), then turn and river; the dealer

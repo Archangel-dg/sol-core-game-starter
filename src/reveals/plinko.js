@@ -14,6 +14,13 @@
 // payout are read verbatim from the outcome. Nothing is derived, nothing is
 // random, and the readout nodes stay empty until the ball has settled.
 //
+// Several balls at once (`drop`, 25.11.2026): every round may also arrive while
+// others are still falling — each gets its own ball and its own clock, lights its
+// own pins and bucket, and writes the readout only when IT has landed. The other
+// balls never wait, slow down or jump. A volley's last ball stays in its bucket
+// (lit, with its pins) until the next ball drops; the others leave shortly after
+// landing so the board never fills up.
+//
 // Text goes through `ctx.text(...)` (four languages); colours through the theme
 // tokens in globals.css. Edit freely — this file is design zone.
 
@@ -196,11 +203,68 @@ export const reveal = {
       if (pending) { const p = pending; pending = null; p(); }
     };
 
+    // ── several balls at once (drop) ─────────────────────────────────────
+    // Every dropped round has its own ball, clock and promise. Pins and buckets
+    // count how many balls light them, so a ball that leaves never darkens a pin
+    // or bucket another ball still lights.
+    const drops = new Set(); // balls still falling
+    const landed = []; // landed balls still on the board (their pins, bucket, element)
+    const pinCount = new Map();
+    const bucketCount = new Map();
+    const LEAVE = 700; // ms a landed ball stays while others keep falling
+    const markPin = (p) => {
+      pinCount.set(p, (pinCount.get(p) || 0) + 1);
+      p.classList.add('sca-plinko-hit');
+    };
+    const unmarkPin = (p) => {
+      const n = (pinCount.get(p) || 0) - 1;
+      if (n > 0) { pinCount.set(p, n); return; }
+      pinCount.delete(p);
+      p.classList.remove('sca-plinko-hit');
+    };
+    const lightBucket = (slot) => {
+      bucketCount.set(slot, (bucketCount.get(slot) || 0) + 1);
+      if (B.buckets[slot]) B.buckets[slot].classList.add('sca-plinko-lit');
+      if (B.labels[slot]) B.labels[slot].classList.add('sca-plinko-lit');
+    };
+    const dimBucket = (slot) => {
+      const n = (bucketCount.get(slot) || 0) - 1;
+      if (n > 0) { bucketCount.set(slot, n); return; }
+      bucketCount.delete(slot);
+      if (B.buckets[slot]) B.buckets[slot].classList.remove('sca-plinko-lit');
+      if (B.labels[slot]) B.labels[slot].classList.remove('sca-plinko-lit');
+    };
+    /** A landed ball leaves the board: its element, its pins, its bucket light. */
+    const leave = (d) => {
+      const i = landed.indexOf(d);
+      if (i >= 0) landed.splice(i, 1);
+      if (d.leaveTimer) clearTimeout(d.leaveTimer);
+      d.leaveTimer = 0;
+      d.el.remove();
+      for (const p of d.pins) unmarkPin(p);
+      if (d.lit) dimBucket(d.slot);
+    };
+    /** Ends every dropped ball at once (play, reset, destroy). Rounds still falling
+     *  resolve — they took place — and nothing of them stays on the board. */
+    const stopDrops = () => {
+      for (const d of [...drops]) {
+        if (d.raf) cancelAnimationFrame(d.raf);
+        if (d.timer) clearTimeout(d.timer);
+        drops.delete(d);
+        d.el.remove();
+        d.resolve();
+      }
+      for (const d of [...landed]) leave(d);
+      pinCount.clear();
+      bucketCount.clear();
+    };
+
     idle();
     root.dataset.state = 'idle';
 
     return {
       play(o, opts) {
+        stopDrops();
         cancel();
         root.dataset.state = 'playing';
         o = o || {};
@@ -256,8 +320,95 @@ export const reveal = {
           raf = requestAnimationFrame(step);
         });
       },
-      reset() { cancel(); idle(); root.dataset.state = 'idle'; },
-      destroy() { cancel(); },
+      // One ball MORE, next to the ones already falling (lib/reveal.ts `drop`).
+      drop(o, opts) {
+        o = o || {};
+        const d0 = o.details || {};
+        const rows = clampRows(d0.rows, ROWS_DEFAULT);
+        const base = Number(d0.base) || 1.8;
+        const path = typeof d0.path === 'string' ? d0.path : '';
+        const bits = []; // 1 = right, 0 = left — one bit per row, exactly as the server encodes it
+        for (let j = 0; j < rows; j++) bits.push(path.charAt(j) === '1' ? 1 : 0);
+        const slot = Number.isFinite(d0.slot) ? Math.min(rows, Math.max(0, d0.slot)) : bits.reduce((s, b) => s + b, 0);
+        if (drops.size === 0) {
+          // A new volley: the board starts clean, like play() — and is built from THIS round.
+          cancel();
+          for (const d of [...landed]) leave(d);
+          buildBoard(
+            rows,
+            tableFor(rows, base, d0.paytableBps),
+            ctx.text('reveal.plinko.head', { rows, risk: riskText(base) }),
+            ctx.text('reveal.plinko.oneBall'),
+          );
+          neutral();
+        }
+        root.dataset.state = 'playing';
+        const pts = waypoints(bits, slot);
+        const HOP = Math.min(240, Math.max(120, Math.round(2100 / (rows + 1)))); // same tempo as play()
+        const total = HOP * (pts.length - 1);
+        const node = document.createElementNS(NS, 'circle');
+        node.setAttribute('class', 'sca-plinko-ball');
+        node.setAttribute('r', ball.getAttribute('r') || '1.6');
+        svg.insertBefore(node, readout); // under the readout, like the single ball
+        const put = (x, y) => { node.setAttribute('cx', x.toFixed(3)); node.setAttribute('cy', y.toFixed(3)); };
+        put(pts[0].x, pts[0].y);
+        const d = { el: node, raf: 0, timer: 0, pins: [], slot, lit: false, leaveTimer: 0, resolve: () => {} };
+        drops.add(d);
+        return new Promise((resolve) => {
+          d.resolve = resolve;
+          let hit = 0; // waypoints already passed (their pins are lit by this ball)
+          const markUpTo = (i) => {
+            while (hit <= i) {
+              const p = pts[hit];
+              // A volley shares one board (a game has one row count); a stray round never throws.
+              const pin = p.row >= 0 && B.pins[p.row] ? B.pins[p.row][p.k] : null;
+              if (pin) { markPin(pin); d.pins.push(pin); }
+              hit++;
+            }
+          };
+          const done = () => {
+            const last = pts[pts.length - 1];
+            put(last.x, last.y);
+            markUpTo(pts.length - 1);
+            drops.delete(d);
+            lightBucket(slot);
+            d.lit = true;
+            // The readout belongs to the ball that landed last — written only now it lies.
+            const win = !!o.win;
+            box.setAttribute('data-tone', win ? 'win' : 'loss');
+            mult.textContent = ctx.fmt.mult(o.multiplierBps);
+            out.textContent = win ? ctx.fmt.won(o.payoutLamports) : ctx.fmt.lost(o.payoutLamports);
+            fiat.textContent = (win && ctx.fmt.fiat(o.payoutLamports)) || '';
+            landed.push(d);
+            // While others keep falling it leaves soon; the volley's last ball stays until the next one drops.
+            d.leaveTimer = setTimeout(() => {
+              d.leaveTimer = 0;
+              if (drops.size === 0 && landed[landed.length - 1] === d) return;
+              leave(d);
+            }, LEAVE);
+            if (drops.size === 0) root.dataset.state = 'done';
+            resolve();
+          };
+          if (opts && opts.reducedMotion) { done(); return; }
+          const t0 = performance.now();
+          const step = (now) => {
+            const t = Math.max(0, Math.min(total, now - t0)); // rAF timestamps can precede t0
+            const i = Math.min(pts.length - 2, Math.floor(t / HOP));
+            const u = Math.min(1, (t - i * HOP) / HOP);
+            markUpTo(i);
+            const a = pts[i], b = pts[i + 1];
+            const dx = b.x - a.x, dy = b.y - a.y;
+            const lift = a.row >= 0 ? 0.3 * dy : 0; // bounce off a pin: brief rise, then fall
+            put(a.x + dx * (1 - (1 - u) * (1 - u)), a.y + dy * u * u - lift * 4 * u * (1 - u));
+            if (t < total) { d.raf = requestAnimationFrame(step); return; }
+            d.raf = 0;
+            d.timer = setTimeout(() => { d.timer = 0; done(); }, SETTLE);
+          };
+          d.raf = requestAnimationFrame(step);
+        });
+      },
+      reset() { stopDrops(); cancel(); idle(); root.dataset.state = 'idle'; },
+      destroy() { stopDrops(); cancel(); },
     };
   },
 };
